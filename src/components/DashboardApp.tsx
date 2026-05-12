@@ -58,10 +58,16 @@ const pages = [
 type SortDirection = "asc" | "desc";
 type TimelineMode = "monthly" | "quarterly" | "yearly";
 type ExportScope = "all" | "filtered";
+type RequestTermScope = "type" | "category" | "status";
 
 const allRequests = data.requests as RequestRow[];
 const allDepartments = Array.from(new Set(allRequests.map((row) => row.department))).sort();
 const months = Array.from(new Set(allRequests.map((row) => row.month).filter(Boolean) as string[])).sort();
+const requestTermGroups: Array<{ title: string; scope: RequestTermScope; terms: string[] }> = [
+  { title: "Request Type", scope: "type", terms: Array.from(new Set(allRequests.map((row) => row.type))).sort() },
+  { title: "Request Category", scope: "category", terms: Array.from(new Set(allRequests.map((row) => row.category))).sort() },
+  { title: "Request Status", scope: "status", terms: Array.from(new Set(allRequests.map((row) => row.status))).sort() }
+];
 
 export default function DashboardApp() {
   const [activePage, setActivePage] = useState("Dashboard");
@@ -70,6 +76,7 @@ export default function DashboardApp() {
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>(allDepartments);
   const [requestSort, setRequestSort] = useState<SortDirection>("desc");
   const [spendSort, setSpendSort] = useState<SortDirection>("desc");
+  const [selectedRequestTerms, setSelectedRequestTerms] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [timelineMode, setTimelineMode] = useState<TimelineMode>("monthly");
   const [fromMonth, setFromMonth] = useState(months[0] || "");
@@ -89,13 +96,22 @@ export default function DashboardApp() {
 
   const filteredRequests = useMemo(() => {
     const normalized = search.trim().toLowerCase();
+    const selectedTypes = selectedRequestTerms.filter((term) => term.startsWith("type:")).map((term) => term.slice("type:".length));
+    const selectedCategories = selectedRequestTerms.filter((term) => term.startsWith("category:")).map((term) => term.slice("category:".length));
+    const selectedStatuses = selectedRequestTerms.filter((term) => term.startsWith("status:")).map((term) => term.slice("status:".length));
     return allRequests.filter((row) => {
       const departmentMatch = selectedDepartments.includes(row.department);
       const searchMatch = !normalized || [row.id, row.department, row.type, row.category, row.status, row.description].join(" ").toLowerCase().includes(normalized);
       const dateMatch = !row.month || ((!fromMonth || row.month >= fromMonth) && (!toMonth || row.month <= toMonth));
-      return departmentMatch && searchMatch && dateMatch;
+      const requestTermMatch =
+        activePage !== "IT Requests" ||
+        selectedRequestTerms.length === 0 ||
+        ((selectedTypes.length === 0 || selectedTypes.includes(row.type)) &&
+          (selectedCategories.length === 0 || selectedCategories.includes(row.category)) &&
+          (selectedStatuses.length === 0 || selectedStatuses.includes(row.status)));
+      return departmentMatch && searchMatch && dateMatch && requestTermMatch;
     });
-  }, [fromMonth, search, selectedDepartments, toMonth]);
+  }, [activePage, fromMonth, search, selectedDepartments, selectedRequestTerms, toMonth]);
 
   const unfilteredPageRows = useMemo(() => scopedRows(activePage, allRequests), [activePage]);
   const pageRows = useMemo(() => scopedRows(activePage, activePage === "Dashboard" ? allRequests : filteredRequests), [activePage, filteredRequests]);
@@ -167,6 +183,7 @@ export default function DashboardApp() {
     setSelectedDepartments(allDepartments);
     setRequestSort("desc");
     setSpendSort("desc");
+    setSelectedRequestTerms([]);
     setSearch("");
     setTimelineMode("monthly");
     setFromMonth(months[0] || "");
@@ -242,6 +259,8 @@ export default function DashboardApp() {
               setRequestSort={setRequestSort}
               spendSort={spendSort}
               setSpendSort={setSpendSort}
+              selectedRequestTerms={selectedRequestTerms}
+              setSelectedRequestTerms={setSelectedRequestTerms}
               search={search}
               setSearch={setSearch}
               timelineMode={timelineMode}
@@ -444,6 +463,8 @@ function FilterPanel(props: {
   setRequestSort: (value: SortDirection) => void;
   spendSort: SortDirection;
   setSpendSort: (value: SortDirection) => void;
+  selectedRequestTerms: string[];
+  setSelectedRequestTerms: (value: string[]) => void;
   search: string;
   setSearch: (value: string) => void;
   timelineMode: TimelineMode;
@@ -457,6 +478,7 @@ function FilterPanel(props: {
   clearFilters: () => void;
 }) {
   const showTimeline = true;
+  const [requestTermsOpen, setRequestTermsOpen] = useState(false);
   const selectedCount = props.selectedDepartments.length;
   const allSelected = selectedCount === allDepartments.length;
 
@@ -465,6 +487,14 @@ function FilterPanel(props: {
       props.setSelectedDepartments(props.selectedDepartments.filter((item) => item !== department));
     } else {
       props.setSelectedDepartments([...props.selectedDepartments, department]);
+    }
+  }
+
+  function toggleRequestTerm(term: string) {
+    if (props.selectedRequestTerms.includes(term)) {
+      props.setSelectedRequestTerms(props.selectedRequestTerms.filter((item) => item !== term));
+    } else {
+      props.setSelectedRequestTerms([...props.selectedRequestTerms, term]);
     }
   }
 
@@ -533,6 +563,56 @@ function FilterPanel(props: {
               </select>
             </label>
           </div>
+
+          {props.activePage === "IT Requests" && (
+            <div className="mt-4 border-t border-line pt-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <span className="text-xs font-semibold uppercase text-slate-500">Requests</span>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">Filter by exact request terms from the raw PDF.</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button className="btn-compact" onClick={() => setRequestTermsOpen(!requestTermsOpen)}>
+                    {requestTermsOpen ? "Hide Terms" : "Open Terms"}
+                  </button>
+                  <button className="btn-compact" onClick={() => props.setSelectedRequestTerms([])}>
+                    Clear Terms
+                  </button>
+                </div>
+              </div>
+
+              {requestTermsOpen && (
+                <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                  {requestTermGroups.map((group) => (
+                    <div key={group.title} className="rounded-lg border border-line p-3">
+                      <h4 className="text-sm font-semibold text-ink">{group.title}</h4>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {group.terms.map((term) => {
+                          const key = `${group.scope}:${term}`;
+                          const selected = props.selectedRequestTerms.includes(key);
+                          return (
+                            <button
+                              key={key}
+                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold leading-5 transition ${
+                                selected ? "border-[#79a7d8] bg-[#e7f0fb] text-[#2d679d]" : "border-line bg-white text-slate-600 hover:bg-slate-50"
+                              }`}
+                              onClick={() => toggleRequestTerm(key)}
+                            >
+                              {term}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {props.selectedRequestTerms.length > 0 && (
+                <p className="mt-3 text-xs leading-5 text-slate-500">{props.selectedRequestTerms.length} request term filters active.</p>
+              )}
+            </div>
+          )}
 
           {showTimeline && (
             <div className="mt-4 border-t border-line pt-4">
