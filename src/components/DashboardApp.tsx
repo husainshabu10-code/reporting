@@ -63,6 +63,10 @@ type RequestTermScope = "type" | "category" | "status";
 const allRequests = data.requests as RequestRow[];
 const allDepartments = Array.from(new Set(allRequests.map((row) => row.department))).sort();
 const months = Array.from(new Set(allRequests.map((row) => row.month).filter(Boolean) as string[])).sort();
+const defaultCompareDepartments = groupRequests(allRequests, "department")
+  .sort((a, b) => b.requests - a.requests)
+  .slice(0, 5)
+  .map((row) => row.name);
 const requestTermGroups: Array<{ title: string; scope: RequestTermScope; terms: string[] }> = [
   { title: "Request Type", scope: "type", terms: Array.from(new Set(allRequests.map((row) => row.type))).sort() },
   { title: "Request Category", scope: "category", terms: Array.from(new Set(allRequests.map((row) => row.category))).sort() },
@@ -77,6 +81,7 @@ export default function DashboardApp() {
   const [requestSort, setRequestSort] = useState<SortDirection>("desc");
   const [spendSort, setSpendSort] = useState<SortDirection>("desc");
   const [selectedRequestTerms, setSelectedRequestTerms] = useState<string[]>([]);
+  const [compareDepartments, setCompareDepartments] = useState<string[]>(defaultCompareDepartments);
   const [search, setSearch] = useState("");
   const [timelineMode, setTimelineMode] = useState<TimelineMode>("monthly");
   const [fromMonth, setFromMonth] = useState(months[0] || "");
@@ -123,6 +128,7 @@ export default function DashboardApp() {
   const statusRows = useMemo(() => sortRows(groupRequests(pageRows, "status"), "requests", requestSort), [pageRows, requestSort]);
   const trendRows = useMemo(() => aggregateTimeline(pageRows, timelineMode), [pageRows, timelineMode]);
   const spendCategoryRows = useMemo(() => sortRows(groupRequests(pageRows, "category"), "spend", spendSort), [pageRows, spendSort]);
+  const compareTypeRows = useMemo(() => groupDepartmentTypes(pageRows, compareDepartments), [compareDepartments, pageRows]);
   const sortedRequests = useMemo(
     () => [...pageRows].sort((a, b) => (requestSort === "asc" ? a.department.localeCompare(b.department) : b.department.localeCompare(a.department))),
     [pageRows, requestSort]
@@ -248,6 +254,7 @@ export default function DashboardApp() {
     setRequestSort("desc");
     setSpendSort("desc");
     setSelectedRequestTerms([]);
+    setCompareDepartments(defaultCompareDepartments);
     setSearch("");
     setTimelineMode("monthly");
     setFromMonth(months[0] || "");
@@ -362,18 +369,22 @@ export default function DashboardApp() {
                           data={departmentRequests}
                           table={tableModes["dept-requests"]}
                           compare={compareModes["dept-requests"]}
+                          tableRows={pageRows}
+                          compareDepartments={compareDepartments}
+                          setCompareDepartments={setCompareDepartments}
                           onToggleTable={() => toggle(setTableModes, "dept-requests")}
                           onToggleCompare={() => toggle(setCompareModes, "dept-requests")}
                           onPdf={() => exportPdf("Department-wise Requests", rowsForExport(pageRows))}
                           onExcel={() => exportExcel("Department-wise Requests", rowsForExport(pageRows))}
                         >
-                          {compareModes["dept-requests"] ? <DualBar data={departmentRequests.slice(0, 12)} /> : <BarViz data={departmentRequests.slice(0, 12)} valueKey="requests" />}
+                          {compareModes["dept-requests"] ? <StackedDepartmentBar data={compareTypeRows} /> : <BarViz data={departmentRequests.slice(0, 12)} valueKey="requests" />}
                         </ChartPanel>
                         <ChartPanel
                           id="monthly-trend"
                           title="Monthly Trend Line"
                           data={trendRows}
                           table={tableModes["monthly-trend"]}
+                          tableRows={pageRows}
                           onToggleTable={() => toggle(setTableModes, "monthly-trend")}
                           onPdf={() => exportPdf("Monthly Trend Line", rowsForExport(pageRows))}
                           onExcel={() => exportExcel("Monthly Trend Line", rowsForExport(pageRows))}
@@ -386,12 +397,15 @@ export default function DashboardApp() {
                           data={departmentSpend}
                           table={tableModes["spend-dept"]}
                           compare={compareModes["spend-dept"]}
+                          tableRows={pageRows}
+                          compareDepartments={compareDepartments}
+                          setCompareDepartments={setCompareDepartments}
                           onToggleTable={() => toggle(setTableModes, "spend-dept")}
                           onToggleCompare={() => toggle(setCompareModes, "spend-dept")}
                           onPdf={() => exportPdf("Spend by Department", rowsForExport(pageRows))}
                           onExcel={() => exportExcel("Spend by Department", rowsForExport(pageRows))}
                         >
-                          {compareModes["spend-dept"] ? <DualBar data={departmentSpend.slice(0, 12)} /> : <BarViz data={departmentSpend.slice(0, 12)} valueKey="spend" />}
+                          {compareModes["spend-dept"] ? <StackedDepartmentBar data={compareTypeRows} /> : <BarViz data={departmentSpend.slice(0, 12)} valueKey="spend" />}
                         </ChartPanel>
                         <ChartPanel
                           id="request-category"
@@ -399,12 +413,15 @@ export default function DashboardApp() {
                           data={categoryRows}
                           table={tableModes["request-category"]}
                           compare={compareModes["request-category"]}
+                          tableRows={pageRows}
+                          compareDepartments={compareDepartments}
+                          setCompareDepartments={setCompareDepartments}
                           onToggleTable={() => toggle(setTableModes, "request-category")}
                           onToggleCompare={() => toggle(setCompareModes, "request-category")}
                           onPdf={() => exportPdf("Request Category", rowsForExport(pageRows))}
                           onExcel={() => exportExcel("Request Category", rowsForExport(pageRows))}
                         >
-                          {compareModes["request-category"] ? <DualBar data={categoryRows} /> : <DonutViz data={categoryRows} />}
+                          {compareModes["request-category"] ? <StackedDepartmentBar data={compareTypeRows} /> : <DonutViz data={categoryRows} />}
                         </ChartPanel>
                       </ChartGrid>
                       <Insights insights={summaryInsights} />
@@ -413,13 +430,13 @@ export default function DashboardApp() {
 
                   {activePage === "IT Requests" && (
                     <ChartGrid>
-                      <ChartPanel id="request-status" title="Request Status Overview" data={statusRows} table={tableModes["request-status"]} onToggleTable={() => toggle(setTableModes, "request-status")} onPdf={() => exportPdf("Request Status Overview", rowsForExport(pageRows))} onExcel={() => exportExcel("Request Status Overview", rowsForExport(pageRows))}>
+                      <ChartPanel id="request-status" title="Request Status Overview" data={statusRows} table={tableModes["request-status"]} tableRows={pageRows} onToggleTable={() => toggle(setTableModes, "request-status")} onPdf={() => exportPdf("Request Status Overview", rowsForExport(pageRows))} onExcel={() => exportExcel("Request Status Overview", rowsForExport(pageRows))}>
                         <DonutViz data={statusRows} />
                       </ChartPanel>
-                      <ChartPanel id="request-dept" title="Department-wise Requests" data={departmentRequests} table={tableModes["request-dept"]} compare={compareModes["request-dept"]} onToggleTable={() => toggle(setTableModes, "request-dept")} onToggleCompare={() => toggle(setCompareModes, "request-dept")} onPdf={() => exportPdf("Department-wise Requests", rowsForExport(pageRows))} onExcel={() => exportExcel("Department-wise Requests", rowsForExport(pageRows))}>
-                        {compareModes["request-dept"] ? <DualBar data={departmentRequests.slice(0, 12)} /> : <BarViz data={departmentRequests.slice(0, 12)} valueKey="requests" />}
+                      <ChartPanel id="request-dept" title="Department-wise Requests" data={departmentRequests} table={tableModes["request-dept"]} compare={compareModes["request-dept"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} onToggleTable={() => toggle(setTableModes, "request-dept")} onToggleCompare={() => toggle(setCompareModes, "request-dept")} onPdf={() => exportPdf("Department-wise Requests", rowsForExport(pageRows))} onExcel={() => exportExcel("Department-wise Requests", rowsForExport(pageRows))}>
+                        {compareModes["request-dept"] ? <StackedDepartmentBar data={compareTypeRows} /> : <BarViz data={departmentRequests.slice(0, 12)} valueKey="requests" />}
                       </ChartPanel>
-                      <ChartPanel id="request-type" title="Request Category/Type Breakdown" data={typeRows} table={tableModes["request-type"]} onToggleTable={() => toggle(setTableModes, "request-type")} onPdf={() => exportPdf("Request Type Breakdown", rowsForExport(pageRows))} onExcel={() => exportExcel("Request Type Breakdown", rowsForExport(pageRows))}>
+                      <ChartPanel id="request-type" title="Request Category/Type Breakdown" data={typeRows} table={tableModes["request-type"]} tableRows={pageRows} onToggleTable={() => toggle(setTableModes, "request-type")} onPdf={() => exportPdf("Request Type Breakdown", rowsForExport(pageRows))} onExcel={() => exportExcel("Request Type Breakdown", rowsForExport(pageRows))}>
                         <DonutViz data={typeRows} />
                       </ChartPanel>
                       <RequestTable title="Matching Requests" rows={sortedRequests} onPdf={() => exportPdf("Matching Requests", rowsForExport(sortedRequests))} onExcel={() => exportExcel("Matching Requests", rowsForExport(sortedRequests))} />
@@ -434,13 +451,13 @@ export default function DashboardApp() {
                         <MiniKpi title="TBD Amount Requests" value={String(pageRows.filter((row) => row.amount === null).length)} icon={<SlidersHorizontal size={20} />} />
                       </div>
                       <ChartGrid>
-                        <ChartPanel id="budget-dept" title="Spend by Department" data={departmentSpend} table={tableModes["budget-dept"]} compare={compareModes["budget-dept"]} onToggleTable={() => toggle(setTableModes, "budget-dept")} onToggleCompare={() => toggle(setCompareModes, "budget-dept")} onPdf={() => exportPdf("Spend by Department", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend by Department", rowsForExport(pageRows))}>
-                          {compareModes["budget-dept"] ? <DualBar data={departmentSpend.slice(0, 12)} /> : <BarViz data={departmentSpend.slice(0, 12)} valueKey="spend" />}
+                        <ChartPanel id="budget-dept" title="Spend by Department" data={departmentSpend} table={tableModes["budget-dept"]} compare={compareModes["budget-dept"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} onToggleTable={() => toggle(setTableModes, "budget-dept")} onToggleCompare={() => toggle(setCompareModes, "budget-dept")} onPdf={() => exportPdf("Spend by Department", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend by Department", rowsForExport(pageRows))}>
+                          {compareModes["budget-dept"] ? <StackedDepartmentBar data={compareTypeRows} /> : <BarViz data={departmentSpend.slice(0, 12)} valueKey="spend" />}
                         </ChartPanel>
-                        <ChartPanel id="budget-category" title="Spend by Request/Category" data={spendCategoryRows} table={tableModes["budget-category"]} compare={compareModes["budget-category"]} onToggleTable={() => toggle(setTableModes, "budget-category")} onToggleCompare={() => toggle(setCompareModes, "budget-category")} onPdf={() => exportPdf("Spend by Category", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend by Category", rowsForExport(pageRows))}>
-                          {compareModes["budget-category"] ? <DualBar data={spendCategoryRows} /> : <DonutViz data={spendCategoryRows} valueKey="spend" />}
+                        <ChartPanel id="budget-category" title="Spend by Request/Category" data={spendCategoryRows} table={tableModes["budget-category"]} compare={compareModes["budget-category"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} onToggleTable={() => toggle(setTableModes, "budget-category")} onToggleCompare={() => toggle(setCompareModes, "budget-category")} onPdf={() => exportPdf("Spend by Category", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend by Category", rowsForExport(pageRows))}>
+                          {compareModes["budget-category"] ? <StackedDepartmentBar data={compareTypeRows} /> : <DonutViz data={spendCategoryRows} valueKey="spend" />}
                         </ChartPanel>
-                        <ChartPanel id="budget-trend" title="Spend Trends Over Time" data={trendRows} table={tableModes["budget-trend"]} onToggleTable={() => toggle(setTableModes, "budget-trend")} onPdf={() => exportPdf("Spend Trends", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend Trends", rowsForExport(pageRows))}>
+                        <ChartPanel id="budget-trend" title="Spend Trends Over Time" data={trendRows} table={tableModes["budget-trend"]} tableRows={pageRows} onToggleTable={() => toggle(setTableModes, "budget-trend")} onPdf={() => exportPdf("Spend Trends", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend Trends", rowsForExport(pageRows))}>
                           <AreaViz data={trendRows} />
                         </ChartPanel>
                       </ChartGrid>
@@ -449,11 +466,11 @@ export default function DashboardApp() {
 
                   {activePage === "Departments" && (
                     <ChartGrid>
-                      <ChartPanel id="dept-view-requests" title="Department Requests" data={departmentRequests} table={tableModes["dept-view-requests"]} compare={compareModes["dept-view-requests"]} onToggleTable={() => toggle(setTableModes, "dept-view-requests")} onToggleCompare={() => toggle(setCompareModes, "dept-view-requests")} onPdf={() => exportPdf("Department Requests", rowsForExport(pageRows))} onExcel={() => exportExcel("Department Requests", rowsForExport(pageRows))}>
-                        {compareModes["dept-view-requests"] ? <DualBar data={departmentRequests.slice(0, 14)} /> : <BarViz data={departmentRequests.slice(0, 14)} valueKey="requests" />}
+                      <ChartPanel id="dept-view-requests" title="Department Requests" data={departmentRequests} table={tableModes["dept-view-requests"]} compare={compareModes["dept-view-requests"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} onToggleTable={() => toggle(setTableModes, "dept-view-requests")} onToggleCompare={() => toggle(setCompareModes, "dept-view-requests")} onPdf={() => exportPdf("Department Requests", rowsForExport(pageRows))} onExcel={() => exportExcel("Department Requests", rowsForExport(pageRows))}>
+                        {compareModes["dept-view-requests"] ? <StackedDepartmentBar data={compareTypeRows} /> : <BarViz data={departmentRequests.slice(0, 14)} valueKey="requests" />}
                       </ChartPanel>
-                      <ChartPanel id="dept-view-spend" title="Department Spend" data={departmentSpend} table={tableModes["dept-view-spend"]} compare={compareModes["dept-view-spend"]} onToggleTable={() => toggle(setTableModes, "dept-view-spend")} onToggleCompare={() => toggle(setCompareModes, "dept-view-spend")} onPdf={() => exportPdf("Department Spend", rowsForExport(pageRows))} onExcel={() => exportExcel("Department Spend", rowsForExport(pageRows))}>
-                        {compareModes["dept-view-spend"] ? <DualBar data={departmentSpend.slice(0, 14)} /> : <BarViz data={departmentSpend.slice(0, 14)} valueKey="spend" />}
+                      <ChartPanel id="dept-view-spend" title="Department Spend" data={departmentSpend} table={tableModes["dept-view-spend"]} compare={compareModes["dept-view-spend"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} onToggleTable={() => toggle(setTableModes, "dept-view-spend")} onToggleCompare={() => toggle(setCompareModes, "dept-view-spend")} onPdf={() => exportPdf("Department Spend", rowsForExport(pageRows))} onExcel={() => exportExcel("Department Spend", rowsForExport(pageRows))}>
+                        {compareModes["dept-view-spend"] ? <StackedDepartmentBar data={compareTypeRows} /> : <BarViz data={departmentSpend.slice(0, 14)} valueKey="spend" />}
                       </ChartPanel>
                       <NoData title="Project Involvement" />
                     </ChartGrid>
@@ -461,14 +478,14 @@ export default function DashboardApp() {
 
                   {activePage === "Trends" && (
                     <ChartGrid>
-                      <ChartPanel id="trend-requests" title={`${labelTimeline(timelineMode)} Request Trends`} data={trendRows} table={tableModes["trend-requests"]} compare={compareModes["trend-requests"]} onToggleTable={() => toggle(setTableModes, "trend-requests")} onToggleCompare={() => toggle(setCompareModes, "trend-requests")} onPdf={() => exportPdf("Request Trends", rowsForExport(pageRows))} onExcel={() => exportExcel("Request Trends", rowsForExport(pageRows))}>
-                        {compareModes["trend-requests"] ? <DualBar data={trendRows} /> : <LineViz data={trendRows} />}
+                      <ChartPanel id="trend-requests" title={`${labelTimeline(timelineMode)} Request Trends`} data={trendRows} table={tableModes["trend-requests"]} compare={compareModes["trend-requests"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} onToggleTable={() => toggle(setTableModes, "trend-requests")} onToggleCompare={() => toggle(setCompareModes, "trend-requests")} onPdf={() => exportPdf("Request Trends", rowsForExport(pageRows))} onExcel={() => exportExcel("Request Trends", rowsForExport(pageRows))}>
+                        {compareModes["trend-requests"] ? <StackedDepartmentBar data={compareTypeRows} /> : <LineViz data={trendRows} />}
                       </ChartPanel>
-                      <ChartPanel id="trend-spend" title={`${labelTimeline(timelineMode)} Spend Trends`} data={trendRows} table={tableModes["trend-spend"]} onToggleTable={() => toggle(setTableModes, "trend-spend")} onPdf={() => exportPdf("Spend Trends", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend Trends", rowsForExport(pageRows))}>
+                      <ChartPanel id="trend-spend" title={`${labelTimeline(timelineMode)} Spend Trends`} data={trendRows} table={tableModes["trend-spend"]} tableRows={pageRows} onToggleTable={() => toggle(setTableModes, "trend-spend")} onPdf={() => exportPdf("Spend Trends", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend Trends", rowsForExport(pageRows))}>
                         <AreaViz data={trendRows} />
                       </ChartPanel>
-                      <ChartPanel id="trend-category" title="Request Category Comparison" data={categoryRows} table={tableModes["trend-category"]} compare={compareModes["trend-category"]} onToggleTable={() => toggle(setTableModes, "trend-category")} onToggleCompare={() => toggle(setCompareModes, "trend-category")} onPdf={() => exportPdf("Category Comparison", rowsForExport(pageRows))} onExcel={() => exportExcel("Category Comparison", rowsForExport(pageRows))}>
-                        {compareModes["trend-category"] ? <DualBar data={categoryRows} /> : <BarViz data={categoryRows} valueKey="requests" />}
+                      <ChartPanel id="trend-category" title="Request Category Comparison" data={categoryRows} table={tableModes["trend-category"]} compare={compareModes["trend-category"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} onToggleTable={() => toggle(setTableModes, "trend-category")} onToggleCompare={() => toggle(setCompareModes, "trend-category")} onPdf={() => exportPdf("Category Comparison", rowsForExport(pageRows))} onExcel={() => exportExcel("Category Comparison", rowsForExport(pageRows))}>
+                        {compareModes["trend-category"] ? <StackedDepartmentBar data={compareTypeRows} /> : <BarViz data={categoryRows} valueKey="requests" />}
                       </ChartPanel>
                     </ChartGrid>
                   )}
@@ -499,13 +516,18 @@ function slug(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
-function chartRows(rows: Record<string, unknown>[]) {
-  return rows.map((row) => ({
-    Name: row.name,
-    Requests: row.requests ?? "",
-    Spend: typeof row.spend === "number" ? formatINR(row.spend) : row.spend ?? "",
-    Percentage: row.percentage ?? ""
-  }));
+function groupDepartmentTypes(rows: RequestRow[], departments: string[]) {
+  return departments.map((department) => {
+    const departmentRows = rows.filter((row) => row.department === department);
+    return {
+      name: department,
+      Development: departmentRows.filter((row) => row.type === "Development").length,
+      Subscription: departmentRows.filter((row) => row.type === "Subscription").length,
+      Software: departmentRows.filter((row) => row.type === "Software").length,
+      requests: departmentRows.length,
+      spend: departmentRows.reduce((sum, row) => sum + (row.amount || 0), 0)
+    };
+  });
 }
 
 function ExportCluster({ onPdfAll, onPdfFiltered, onExcelAll, onExcelFiltered }: { onPdfAll: () => void; onPdfFiltered: () => void; onExcelAll: () => void; onExcelFiltered: () => void }) {
@@ -749,8 +771,11 @@ function ChartPanel({
   id,
   title,
   data: rows,
+  tableRows,
   table,
   compare = false,
+  compareDepartments,
+  setCompareDepartments,
   children,
   onToggleTable,
   onToggleCompare,
@@ -760,8 +785,11 @@ function ChartPanel({
   id: string;
   title: string;
   data: Record<string, unknown>[];
+  tableRows?: RequestRow[];
   table?: boolean;
   compare?: boolean;
+  compareDepartments?: string[];
+  setCompareDepartments?: (value: string[]) => void;
   children: React.ReactNode;
   onToggleTable: () => void;
   onToggleCompare?: () => void;
@@ -786,8 +814,58 @@ function ChartPanel({
           <button className="icon-btn" onClick={onExcel} aria-label={`Export ${title} Excel`}><FileSpreadsheet size={16} /></button>
         </div>
       </div>
-      {rows.length === 0 ? <EmptyState /> : table ? <DataTable rows={chartRows(rows)} /> : <div className="chart-pop h-96">{children}</div>}
+      {compare && compareDepartments && setCompareDepartments && (
+        <CompareDepartmentPicker selectedDepartments={compareDepartments} setSelectedDepartments={setCompareDepartments} />
+      )}
+      {rows.length === 0 ? <EmptyState /> : table ? <DataTable rows={rowsForExport(tableRows || [])} /> : <div className="chart-pop h-96">{children}</div>}
     </section>
+  );
+}
+
+function CompareDepartmentPicker({
+  selectedDepartments,
+  setSelectedDepartments
+}: {
+  selectedDepartments: string[];
+  setSelectedDepartments: (value: string[]) => void;
+}) {
+  function toggleDepartment(department: string) {
+    if (selectedDepartments.includes(department)) {
+      setSelectedDepartments(selectedDepartments.filter((item) => item !== department));
+    } else {
+      setSelectedDepartments([...selectedDepartments, department]);
+    }
+  }
+
+  return (
+    <div className="no-print mb-4 rounded-lg border border-line bg-[#f8fafc] p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold uppercase text-slate-500">Compare Departments</p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">Selected departments appear as stacked bars split by request type.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-compact" onClick={() => setSelectedDepartments(defaultCompareDepartments)}>Top Departments</button>
+          <button className="btn-compact" onClick={() => setSelectedDepartments([])}>Clear</button>
+        </div>
+      </div>
+      <div className="flex max-h-32 flex-wrap gap-2 overflow-auto">
+        {allDepartments.map((department) => {
+          const selected = selectedDepartments.includes(department);
+          return (
+            <button
+              key={department}
+              className={`rounded-full border px-3 py-1.5 text-xs font-semibold leading-5 transition ${
+                selected ? "border-[#79a7d8] bg-[#e7f0fb] text-[#2d679d]" : "border-line bg-white text-slate-600 hover:bg-slate-50"
+              }`}
+              onClick={() => toggleDepartment(department)}
+            >
+              {department}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -919,21 +997,6 @@ function WrappedYAxisTick({ x = 0, y = 0, payload }: { x?: number; y?: number; p
   );
 }
 
-function WrappedXAxisTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: { value: string } }) {
-  const lines = wrapLabel(String(payload?.value || ""), 14);
-  return (
-    <g transform={`translate(${x},${y + 10})`}>
-      <text textAnchor="middle" fill="#536174" fontSize={10}>
-        {lines.map((line, index) => (
-          <tspan key={`${line}-${index}`} x={0} dy={index === 0 ? 0 : 13}>
-            {line}
-          </tspan>
-        ))}
-      </text>
-    </g>
-  );
-}
-
 function BarViz({ data: rows, valueKey }: { data: Record<string, unknown>[]; valueKey: "requests" | "spend" }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
@@ -951,18 +1014,19 @@ function BarViz({ data: rows, valueKey }: { data: Record<string, unknown>[]; val
   );
 }
 
-function DualBar({ data: rows }: { data: Record<string, unknown>[] }) {
+function StackedDepartmentBar({ data: rows }: { data: Record<string, unknown>[] }) {
+  if (rows.length === 0) return <EmptyState />;
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={rows} margin={{ top: 8, right: 86, left: 8, bottom: 32 }}>
+      <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 96, left: 12, bottom: 8 }} barCategoryGap={12}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
-        <XAxis dataKey="name" tick={<WrappedXAxisTick />} height={88} interval={0} />
-        <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
-        <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} tickFormatter={(value) => formatINR(Number(value), true)} />
+        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} />
+        <YAxis dataKey="name" type="category" width={176} interval={0} tick={<WrappedYAxisTick />} />
         <Tooltip content={<CustomTooltip />} />
         <Legend align="right" verticalAlign="middle" layout="vertical" />
-        <Bar yAxisId="left" dataKey="requests" name="Requests" fill="#79a7d8" radius={[6, 6, 0, 0]} />
-        <Bar yAxisId="right" dataKey="spend" name="Spend" fill="#f2a6a6" radius={[6, 6, 0, 0]} />
+        <Bar dataKey="Development" stackId="requests" name="Development" fill="#79a7d8" radius={[0, 0, 0, 0]} />
+        <Bar dataKey="Subscription" stackId="requests" name="Subscription" fill="#8fc9a8" radius={[0, 0, 0, 0]} />
+        <Bar dataKey="Software" stackId="requests" name="Software" fill="#f6c66f" radius={[0, 6, 6, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
