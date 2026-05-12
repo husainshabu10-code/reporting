@@ -764,7 +764,11 @@ function MiniKpi({ title, value, icon, tone = "blue" }: { title: string; value: 
 }
 
 function ChartGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid gap-5 xl:grid-cols-2">{children}</div>;
+  return <div className="grid items-start gap-5 xl:grid-cols-2">{children}</div>;
+}
+
+function chartCanvasHeight(rows: Record<string, unknown>[]) {
+  return Math.max(360, rows.length * 34);
 }
 
 function ChartPanel({
@@ -822,8 +826,8 @@ function ChartPanel({
       ) : table ? (
         <DataTable rows={rowsForExport(tableRows || [])} />
       ) : (
-        <div className="chart-pop h-96 min-h-96 resize-y overflow-auto rounded-lg border border-transparent bg-white/40 p-1">
-          {children}
+        <div className="chart-pop h-96 min-h-72 resize-y overflow-auto rounded-lg border border-line bg-white/40 p-1">
+          <div style={{ height: chartCanvasHeight(rows) }}>{children}</div>
         </div>
       )}
     </section>
