@@ -1,0 +1,3619 @@
+{
+  "title": "IT Request Analytics Dashboard",
+  "metadata": {
+    "rawPdf": "IT_Requests_Summary_Full.pdf",
+    "reportPdfReference": "Strategic_IT_Request_Analysis_Final_Revised.pdf",
+    "extractionScope": "Raw PDF exact data only. Report PDF used only for structure/chart logic reference.",
+    "projectPages": false,
+    "slaPages": false
+  },
+  "kpis": {
+    "totalRequests": {
+      "value": 157,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 1,
+        "section": "1. Request Count Summary"
+      }
+    },
+    "departmentWithMostRequests": {
+      "value": "DH Pro",
+      "requests": 25,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 36,
+        "section": "11. Final Summary"
+      }
+    },
+    "totalSpend": {
+      "value": 25253147,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 1,
+        "section": "2. Financial Summary"
+      }
+    }
+  },
+  "statusSummary": [
+    {
+      "name": "Approved",
+      "requests": 139,
+      "percentage": 88.5,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 1,
+        "section": "1. Request Count Summary"
+      }
+    },
+    {
+      "name": "Pending",
+      "requests": 15,
+      "percentage": 9.6,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 1,
+        "section": "1. Request Count Summary"
+      }
+    },
+    {
+      "name": "Under Review",
+      "requests": 3,
+      "percentage": 1.9,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 1,
+        "section": "1. Request Count Summary"
+      }
+    }
+  ],
+  "categorySummary": [
+    {
+      "name": "Development",
+      "requests": 42,
+      "spend": 18845766,
+      "percentage": 74.6,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 1,
+        "section": "2. Financial Summary"
+      }
+    },
+    {
+      "name": "Subscriptions",
+      "requests": 73,
+      "spend": 4169393,
+      "percentage": 16.5,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 1,
+        "section": "2. Financial Summary"
+      }
+    },
+    {
+      "name": "Software / HW / Cloud",
+      "requests": 42,
+      "spend": 2237988,
+      "percentage": 8.9,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 1,
+        "section": "2. Financial Summary"
+      }
+    }
+  ],
+  "departmentSummary": [
+    {
+      "name": "Umoor Sehhat",
+      "requests": 11,
+      "spend": 10312651,
+      "rowSpend": 10312650,
+      "devRequests": 3,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 13,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "At - Talimiyah / BCHET",
+      "requests": 6,
+      "spend": 3063403,
+      "rowSpend": 3063403,
+      "devRequests": 2,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 13,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Sigatul Mazaraat & Taamiraat",
+      "requests": 5,
+      "spend": 1668200,
+      "rowSpend": 1668200,
+      "devRequests": 4,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 14,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Alvazarat HR (Mawarid B)",
+      "requests": 4,
+      "spend": 1400200,
+      "rowSpend": 1400200,
+      "devRequests": 2,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 14,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Al - Alaqeeq",
+      "requests": 8,
+      "spend": 1319413,
+      "rowSpend": 1319413,
+      "devRequests": 1,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 14,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Idarat al - Zakereen",
+      "requests": 4,
+      "spend": 998000,
+      "rowSpend": 998000,
+      "devRequests": 3,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 15,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Umoor Maliyah",
+      "requests": 1,
+      "spend": 930100,
+      "rowSpend": 930100,
+      "devRequests": 1,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 15,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Daeratul Aqeeq / Sanstha HR",
+      "requests": 16,
+      "spend": 886608,
+      "rowSpend": 925109,
+      "devRequests": 6,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 15,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Elam Department",
+      "requests": 9,
+      "spend": 772687,
+      "rowSpend": 772687,
+      "devRequests": 1,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 16,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "SEZ / Communications",
+      "requests": 3,
+      "spend": 737940,
+      "rowSpend": 737940,
+      "devRequests": 1,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 17,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "DH Pro",
+      "requests": 25,
+      "spend": 700270,
+      "rowSpend": 700270,
+      "devRequests": 4,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 17,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Alvazarat - Shabab",
+      "requests": 2,
+      "spend": 673511,
+      "rowSpend": 673511,
+      "devRequests": 1,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 19,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "A l Jamea tus Saifiyah",
+      "requests": 14,
+      "spend": 453842,
+      "rowSpend": 453932,
+      "devRequests": 2,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 19,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Alvazarat - Oxy Park",
+      "requests": 1,
+      "spend": 250000,
+      "rowSpend": 250000,
+      "devRequests": 1,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 20,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Burhani Medical Idara (BMI)",
+      "requests": 3,
+      "spend": 219533,
+      "rowSpend": 219533,
+      "devRequests": 1,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 20,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Sigatul Waqf & Trust",
+      "requests": 7,
+      "spend": 109574,
+      "rowSpend": 110827,
+      "devRequests": 1,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 20,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Alvazarat - Projects (PMS)",
+      "requests": 2,
+      "spend": 102500,
+      "rowSpend": 102500,
+      "devRequests": 1,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 20,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Legal Department",
+      "requests": 5,
+      "spend": 100465,
+      "rowSpend": 100465,
+      "devRequests": 1,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 21,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Idara BGI",
+      "requests": 3,
+      "spend": 100284,
+      "rowSpend": 100284,
+      "devRequests": 1,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 21,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "FMB / Dana Committee",
+      "requests": 5,
+      "spend": 95518,
+      "rowSpend": 95518,
+      "devRequests": 0,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 21,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Mamureen (BADRI)",
+      "requests": 2,
+      "spend": 67000,
+      "rowSpend": 67000,
+      "devRequests": 2,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 22,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Sigatul Qaza",
+      "requests": 4,
+      "spend": 72347,
+      "rowSpend": 72347,
+      "devRequests": 0,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 22,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "At - Talimiyah / Majma Markazi",
+      "requests": 3,
+      "spend": 52828,
+      "rowSpend": 52828,
+      "devRequests": 0,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 22,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Mathaf al - Burhani",
+      "requests": 3,
+      "spend": 43760,
+      "rowSpend": 43760,
+      "devRequests": 0,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 23,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "ITNC (Umoor Deeniyah)",
+      "requests": 5,
+      "spend": 40188,
+      "rowSpend": 40188,
+      "devRequests": 2,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 23,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Tashreef App (TMS)",
+      "requests": 1,
+      "spend": 34000,
+      "rowSpend": 34000,
+      "devRequests": 0,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 23,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Sigat al - Hawaij",
+      "requests": 1,
+      "spend": 13570,
+      "rowSpend": 13570,
+      "devRequests": 0,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 23,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Alvazarat - General Dept",
+      "requests": 1,
+      "spend": 6012,
+      "rowSpend": 6012,
+      "devRequests": 0,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 24,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Sigat ul Haj",
+      "requests": 1,
+      "spend": 999,
+      "rowSpend": 999,
+      "devRequests": 0,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 24,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Dawatehadiyah.org",
+      "requests": 1,
+      "spend": null,
+      "rowSpend": 0,
+      "devRequests": 1,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 24,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "name": "Estate Department",
+      "requests": 1,
+      "spend": null,
+      "rowSpend": 0,
+      "devRequests": 0,
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "page": 24,
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    }
+  ],
+  "categoryBreakdown": [
+    {
+      "name": "SaaS",
+      "requests": 51,
+      "spend": 3687369
+    },
+    {
+      "name": "Development",
+      "requests": 41,
+      "spend": 18857865
+    },
+    {
+      "name": "Cloud",
+      "requests": 25,
+      "spend": 1997887
+    },
+    {
+      "name": "AI Tools",
+      "requests": 23,
+      "spend": 341662
+    },
+    {
+      "name": "Hardware",
+      "requests": 7,
+      "spend": 261967
+    },
+    {
+      "name": "Communication",
+      "requests": 4,
+      "spend": 77611
+    },
+    {
+      "name": "HR Software",
+      "requests": 3,
+      "spend": 35824
+    },
+    {
+      "name": "Software",
+      "requests": 2,
+      "spend": 5061
+    },
+    {
+      "name": "Cloud/Dev",
+      "requests": 1,
+      "spend": 0
+    }
+  ],
+  "typeBreakdown": [
+    {
+      "name": "Subscription",
+      "requests": 73,
+      "spend": 4169393
+    },
+    {
+      "name": "Development",
+      "requests": 42,
+      "spend": 18857865
+    },
+    {
+      "name": "Software",
+      "requests": 42,
+      "spend": 2237988
+    }
+  ],
+  "monthlyTrend": [
+    {
+      "month": "2025-01",
+      "requests": 1,
+      "spend": 18200
+    },
+    {
+      "month": "2025-04",
+      "requests": 1,
+      "spend": 6199
+    },
+    {
+      "month": "2025-05",
+      "requests": 11,
+      "spend": 670600
+    },
+    {
+      "month": "2025-06",
+      "requests": 5,
+      "spend": 650859
+    },
+    {
+      "month": "2025-07",
+      "requests": 2,
+      "spend": 125080
+    },
+    {
+      "month": "2025-08",
+      "requests": 11,
+      "spend": 701365
+    },
+    {
+      "month": "2025-09",
+      "requests": 6,
+      "spend": 8986035
+    },
+    {
+      "month": "2025-10",
+      "requests": 4,
+      "spend": 2943180
+    },
+    {
+      "month": "2025-11",
+      "requests": 14,
+      "spend": 1188678
+    },
+    {
+      "month": "2025-12",
+      "requests": 18,
+      "spend": 623144
+    },
+    {
+      "month": "2026-01",
+      "requests": 3,
+      "spend": 2136315
+    },
+    {
+      "month": "2026-02",
+      "requests": 8,
+      "spend": 1099289
+    },
+    {
+      "month": "2026-03",
+      "requests": 16,
+      "spend": 1227512
+    },
+    {
+      "month": "2026-04",
+      "requests": 51,
+      "spend": 4223342
+    },
+    {
+      "month": "2026-05",
+      "requests": 6,
+      "spend": 665448
+    }
+  ],
+  "requests": [
+    {
+      "id": "REQ-001",
+      "department": "Umoor Sehhat",
+      "type": "Development",
+      "date": "Sep - 25",
+      "month": "2025-09",
+      "description": "Upcoming Portal/Module - Siam Computing",
+      "category": "Development",
+      "amount": 8849671,
+      "amountRaw": "₹88,49,671",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          13
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-002",
+      "department": "Umoor Sehhat",
+      "type": "Development",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Medical Camp Module - Jamnagar Camp (12L+GST)",
+      "category": "Development",
+      "amount": 1200000,
+      "amountRaw": "₹12,00,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          13
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-003",
+      "department": "Umoor Sehhat",
+      "type": "Development",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Website redesign & Medical Case Tracking Module",
+      "category": "Development",
+      "amount": 212000,
+      "amountRaw": "₹2,12,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          13
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-004",
+      "department": "Umoor Sehhat",
+      "type": "Software",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "HROne HRMS - full implementation",
+      "category": "HR Software",
+      "amount": null,
+      "amountRaw": "TBD",
+      "status": "Pending",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          13
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-005",
+      "department": "Umoor Sehhat",
+      "type": "Software",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "HRMS software - 1 year",
+      "category": "HR Software",
+      "amount": 35824,
+      "amountRaw": "₹35,824",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          13
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-006",
+      "department": "Umoor Sehhat",
+      "type": "Software",
+      "date": "Aug - 25",
+      "month": "2025-08",
+      "description": "Canva (3 licences) + ChatGPT (1 subscription)",
+      "category": "AI Tools",
+      "amount": null,
+      "amountRaw": "TBD",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          13
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-007",
+      "department": "Umoor Sehhat",
+      "type": "Subscription",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "Google One - 2TB storage (6 months)",
+      "category": "Cloud",
+      "amount": 3900,
+      "amountRaw": "₹3,900",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          13
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-008",
+      "department": "Umoor Sehhat",
+      "type": "Subscription",
+      "date": "Feb - 26",
+      "month": "2026-02",
+      "description": "Office 365 - Dec 25 - Feb 26",
+      "category": "SaaS",
+      "amount": 1638,
+      "amountRaw": "₹1,638",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          13
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-009",
+      "department": "Umoor Sehhat",
+      "type": "Subscription",
+      "date": "Feb - 26",
+      "month": "2026-02",
+      "description": "Office 365 renewal (Req 221)",
+      "category": "SaaS",
+      "amount": 819,
+      "amountRaw": "₹819",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          13
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-010",
+      "department": "Umoor Sehhat",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Adobe Premiere Pro - 1 month (Apr 8 - May 7)",
+      "category": "SaaS",
+      "amount": 599,
+      "amountRaw": "₹599",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          13
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-011",
+      "department": "Umoor Sehhat",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Microsoft 365 - 6 users (Req 339)",
+      "category": "SaaS",
+      "amount": 8199,
+      "amountRaw": "₹8,199",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          13
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-012",
+      "department": "At - Talimiyah / BCHET",
+      "type": "Development",
+      "date": "May - 25",
+      "month": "2025-05",
+      "description": "Ticketing system new features - user control",
+      "category": "Development",
+      "amount": 95000,
+      "amountRaw": "₹95,000",
+      "status": "Pending",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          13
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-013",
+      "department": "At - Talimiyah / BCHET",
+      "type": "Subscription",
+      "date": "Oct - 25",
+      "month": "2025-10",
+      "description": "Matrix renewal + Graphicali + Dedicated Server",
+      "category": "SaaS",
+      "amount": 2920500,
+      "amountRaw": "₹29,20,500",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          13
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-014",
+      "department": "At - Talimiyah / BCHET",
+      "type": "Subscription",
+      "date": "May - 25",
+      "month": "2025-05",
+      "description": "Wix Light Plan & domain renewal (annual)",
+      "category": "SaaS",
+      "amount": 5639,
+      "amountRaw": "₹5,639",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          13
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-015",
+      "department": "At - Talimiyah / BCHET",
+      "type": "Subscription",
+      "date": "May - 25",
+      "month": "2025-05",
+      "description": "Google Workspace 19 users Business Standard",
+      "category": "SaaS",
+      "amount": 42264,
+      "amountRaw": "₹42,264",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          14
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-016",
+      "department": "At - Talimiyah / BCHET",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "AI Tools bundle: AI Fiesta, Genspark, Grammarly",
+      "category": "AI Tools",
+      "amount": null,
+      "amountRaw": "TBD",
+      "status": "Pending",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          14
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-017",
+      "department": "At - Talimiyah / BCHET",
+      "type": "Development",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "New Financial Assistance Application Website",
+      "category": "Development",
+      "amount": null,
+      "amountRaw": "TBD",
+      "status": "Pending",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          14
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-018",
+      "department": "Sigatul Mazaraat & Taamiraat",
+      "type": "Development",
+      "date": "May - 25",
+      "month": "2025-05",
+      "description": "Software AMC - sigatulmazaraat.org & taamiraat.org",
+      "category": "Development",
+      "amount": 93000,
+      "amountRaw": "₹93,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          14
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-019",
+      "department": "Sigatul Mazaraat & Taamiraat",
+      "type": "Development",
+      "date": "Mar - 26",
+      "month": "2026-03",
+      "description": "Software AMC - Mazaraat & Taamiraat modules 2026",
+      "category": "Development",
+      "amount": 93000,
+      "amountRaw": "₹93,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          14
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-020",
+      "department": "Sigatul Mazaraat & Taamiraat",
+      "type": "Development",
+      "date": "Jan - 26",
+      "month": "2026-01",
+      "description": "Software upgradation - major revamp request",
+      "category": "Development",
+      "amount": 1416000,
+      "amountRaw": "₹14,16,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          14
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-021",
+      "department": "Sigatul Mazaraat & Taamiraat",
+      "type": "Development",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Masajid Database Module - balance payment",
+      "category": "Development",
+      "amount": 48000,
+      "amountRaw": "₹48,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          14
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-022",
+      "department": "Sigatul Mazaraat & Taamiraat",
+      "type": "Subscription",
+      "date": "Jan - 25",
+      "month": "2025-01",
+      "description": "Adobe Creative Cloud Pro",
+      "category": "SaaS",
+      "amount": 18200,
+      "amountRaw": "₹18,200",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          14
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-023",
+      "department": "Alvazarat HR (Mawarid B)",
+      "type": "Development",
+      "date": "Jan - 26",
+      "month": "2026-01",
+      "description": "Phase 4 HR Website - 360 Degree Feedback System",
+      "category": "Development",
+      "amount": 700000,
+      "amountRaw": "₹7,00,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          14
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-024",
+      "department": "Alvazarat HR (Mawarid B)",
+      "type": "Development",
+      "date": "May - 26",
+      "month": "2026-05",
+      "description": "Phase 5 HR Website - Taqdeer Barnamaj",
+      "category": "Development",
+      "amount": 600000,
+      "amountRaw": "₹6,00,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          14
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-025",
+      "department": "Alvazarat HR (Mawarid B)",
+      "type": "Software",
+      "date": "Mar - 26",
+      "month": "2026-03",
+      "description": "HROne HRMS - annual renewal (12 months)",
+      "category": "HR Software",
+      "amount": null,
+      "amountRaw": "TBD",
+      "status": "Pending",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          14
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-026",
+      "department": "Alvazarat HR (Mawarid B)",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Al - Mawarid LMS renewal - 3 more years",
+      "category": "SaaS",
+      "amount": 100200,
+      "amountRaw": "₹1,00,200",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          14
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-027",
+      "department": "Al - Alaqeeq",
+      "type": "Development",
+      "date": "Aug - 25",
+      "month": "2025-08",
+      "description": "Almuntasebaat App & Website - Android/iOS + Web",
+      "category": "Development",
+      "amount": 602390,
+      "amountRaw": "₹6,02,390",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          14
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-028",
+      "department": "Al - Alaqeeq",
+      "type": "Subscription",
+      "date": "Sep - 25",
+      "month": "2025-09",
+      "description": "ChatGPT Business Plan - annual ($900)",
+      "category": "AI Tools",
+      "amount": 75150,
+      "amountRaw": "₹75,150",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          15
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-029",
+      "department": "Al - Alaqeeq",
+      "type": "Subscription",
+      "date": "Nov - 25",
+      "month": "2025-11",
+      "description": "Librarika Basic Pro - library inventory 1yr",
+      "category": "SaaS",
+      "amount": 11607,
+      "amountRaw": "₹11,607",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          15
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-030",
+      "department": "Al - Alaqeeq",
+      "type": "Subscription",
+      "date": "Nov - 25",
+      "month": "2025-11",
+      "description": "VideoExpress AI - video - making tool ($179)",
+      "category": "AI Tools",
+      "amount": 14947,
+      "amountRaw": "₹14,947",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          15
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-031",
+      "department": "Al - Alaqeeq",
+      "type": "Subscription",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "Grammarly - book publishing plagiarism (annual)",
+      "category": "AI Tools",
+      "amount": 11796,
+      "amountRaw": "₹11,796",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          15
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-032",
+      "department": "Al - Alaqeeq",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Vimeo Plus subscription",
+      "category": "SaaS",
+      "amount": 10195,
+      "amountRaw": "₹10,195",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          15
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-033",
+      "department": "Al - Alaqeeq",
+      "type": "Subscription",
+      "date": "Feb - 26",
+      "month": "2026-02",
+      "description": "Adobe Stock subscription renewal",
+      "category": "SaaS",
+      "amount": 28731,
+      "amountRaw": "₹28,731",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          15
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-034",
+      "department": "Al - Alaqeeq",
+      "type": "Software",
+      "date": "Feb - 26",
+      "month": "2026-02",
+      "description": "Dedicated server renewal + Adobe suite licence",
+      "category": "Cloud",
+      "amount": 564597,
+      "amountRaw": "₹5,64,597",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          15
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-035",
+      "department": "Idarat al - Zakereen",
+      "type": "Development",
+      "date": "May - 25",
+      "month": "2025-05",
+      "description": "Takhmeen Allocation Module Phase 2",
+      "category": "Development",
+      "amount": 130000,
+      "amountRaw": "₹1,30,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          15
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-036",
+      "department": "Idarat al - Zakereen",
+      "type": "Development",
+      "date": "Mar - 26",
+      "month": "2026-03",
+      "description": "Idarat al - Zakereen Website Redevelopment",
+      "category": "Development",
+      "amount": 750000,
+      "amountRaw": "₹7,50,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          15
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-037",
+      "department": "Idarat al - Zakereen",
+      "type": "Development",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Takhmeen Phase 3 (commenced without IT notice)",
+      "category": "Development",
+      "amount": 118000,
+      "amountRaw": "₹1,18,000",
+      "status": "Pending",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          15
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-038",
+      "department": "Idarat al - Zakereen",
+      "type": "Software",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "AWS integration - Takhmeen app (10 - month billing)",
+      "category": "Cloud",
+      "amount": null,
+      "amountRaw": "TBD",
+      "status": "Pending",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          15
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-039",
+      "department": "Umoor Maliyah",
+      "type": "Development",
+      "date": "Nov - 25",
+      "month": "2025-11",
+      "description": "Budget software Phase 4 upgrade (4 - yr system)",
+      "category": "Development",
+      "amount": 930100,
+      "amountRaw": "₹9,30,100",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          15
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-040",
+      "department": "Daeratul Aqeeq / Sanstha HR",
+      "type": "Development",
+      "date": "Jun - 25",
+      "month": "2025-06",
+      "description": "Al Aqeeq dev bills - Bill1 + Bill2",
+      "category": "Development",
+      "amount": 289943,
+      "amountRaw": "₹2,89,943",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          15
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-041",
+      "department": "Daeratul Aqeeq / Sanstha HR",
+      "type": "Development",
+      "date": "Jun - 25",
+      "month": "2025-06",
+      "description": "Hub collection module dev - Aqeeq Sanstha",
+      "category": "Development",
+      "amount": 207916,
+      "amountRaw": "₹2,07,916",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-042",
+      "department": "Daeratul Aqeeq / Sanstha HR",
+      "type": "Development",
+      "date": "Aug - 25",
+      "month": "2025-08",
+      "description": "New Module dev - Aqeeq Sanstha (Aug 2025)",
+      "category": "Development",
+      "amount": 14000,
+      "amountRaw": "₹14,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-043",
+      "department": "Daeratul Aqeeq / Sanstha HR",
+      "type": "Development",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "Feedback Module - Al Aqeeq Committee",
+      "category": "Development",
+      "amount": 30000,
+      "amountRaw": "₹30,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-044",
+      "department": "Daeratul Aqeeq / Sanstha HR",
+      "type": "Development",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Al Aqeeq Mumenaat Website AMC renewal",
+      "category": "Development",
+      "amount": 38500,
+      "amountRaw": "₹38,500",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-045",
+      "department": "Daeratul Aqeeq / Sanstha HR",
+      "type": "Development",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Graficali AMC renewal - Associations/Aqeeq",
+      "category": "Development",
+      "amount": 93712,
+      "amountRaw": "₹93,712",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-046",
+      "department": "Daeratul Aqeeq / Sanstha HR",
+      "type": "Software",
+      "date": "May - 25",
+      "month": "2025-05",
+      "description": "Interchange server - monthly Graficali bill",
+      "category": "Cloud",
+      "amount": 4714,
+      "amountRaw": "₹4,714",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-047",
+      "department": "Daeratul Aqeeq / Sanstha HR",
+      "type": "Software",
+      "date": "Nov - 25",
+      "month": "2025-11",
+      "description": "Website server - May - Oct 2025 (6 months)",
+      "category": "Cloud",
+      "amount": 125752,
+      "amountRaw": "₹1,25,752",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-048",
+      "department": "Daeratul Aqeeq / Sanstha HR",
+      "type": "Software",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "Website server - Nov 2025",
+      "category": "Cloud",
+      "amount": 19834,
+      "amountRaw": "₹19,834",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-049",
+      "department": "Daeratul Aqeeq / Sanstha HR",
+      "type": "Software",
+      "date": "Feb - 26",
+      "month": "2026-02",
+      "description": "Website server - Jan 2026",
+      "category": "Cloud",
+      "amount": 20729,
+      "amountRaw": "₹20,729",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-050",
+      "department": "Daeratul Aqeeq / Sanstha HR",
+      "type": "Software",
+      "date": "Mar - 26",
+      "month": "2026-03",
+      "description": "Website server - Feb 2026",
+      "category": "Cloud",
+      "amount": 19509,
+      "amountRaw": "₹19,509",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-051",
+      "department": "Daeratul Aqeeq / Sanstha HR",
+      "type": "Software",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Website server - Mar 2026",
+      "category": "Cloud",
+      "amount": 21320,
+      "amountRaw": "₹21,320",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-052",
+      "department": "Daeratul Aqeeq / Sanstha HR",
+      "type": "Software",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Desktop AMC - 10 PCs (Synergy 2026 - 27)",
+      "category": "Hardware",
+      "amount": 27140,
+      "amountRaw": "₹27,140",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-053",
+      "department": "Daeratul Aqeeq / Sanstha HR",
+      "type": "Software",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Quick Heal Antivirus renewal",
+      "category": "Software",
+      "amount": 580,
+      "amountRaw": "₹580",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-054",
+      "department": "Daeratul Aqeeq / Sanstha HR",
+      "type": "Subscription",
+      "date": "May - 26",
+      "month": "2026-05",
+      "description": "Adobe Illustrator - 2 users (monthly)",
+      "category": "SaaS",
+      "amount": 1468,
+      "amountRaw": "₹1,468",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-055",
+      "department": "Daeratul Aqeeq / Sanstha HR",
+      "type": "Software",
+      "date": "May - 26",
+      "month": "2026-05",
+      "description": "Al Aqeeq Mumenaat App - App Store annual",
+      "category": "SaaS",
+      "amount": 9992,
+      "amountRaw": "₹9,992",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-056",
+      "department": "Elam Department",
+      "type": "Software",
+      "date": "May - 25",
+      "month": "2025-05",
+      "description": "Adobe Creative Cloud - individual plan",
+      "category": "SaaS",
+      "amount": 100000,
+      "amountRaw": "₹1,00,000",
+      "status": "Under Review",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-057",
+      "department": "Elam Department",
+      "type": "Software",
+      "date": "May - 25",
+      "month": "2025-05",
+      "description": "CCTV Camera & Digital Lock installation",
+      "category": "Hardware",
+      "amount": 49265,
+      "amountRaw": "₹49,265",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-058",
+      "department": "Elam Department",
+      "type": "Software",
+      "date": "Nov - 25",
+      "month": "2025-11",
+      "description": "AWS - Samin Tekmindz monthly Nov 2025",
+      "category": "Cloud",
+      "amount": null,
+      "amountRaw": "TBD",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          16
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-059",
+      "department": "Elam Department",
+      "type": "Software",
+      "date": "Feb - 26",
+      "month": "2026-02",
+      "description": "AWS Invoice 032 - Dec 2025",
+      "category": "Cloud",
+      "amount": 138459,
+      "amountRaw": "₹1,38,459",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          17
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-060",
+      "department": "Elam Department",
+      "type": "Software",
+      "date": "Feb - 26",
+      "month": "2026-02",
+      "description": "AWS Invoice 029 - Jan 2026",
+      "category": "Cloud",
+      "amount": 138906,
+      "amountRaw": "₹1,38,906",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          17
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-061",
+      "department": "Elam Department",
+      "type": "Software",
+      "date": "Mar - 26",
+      "month": "2026-03",
+      "description": "AWS Invoice 036 - Mar 2026",
+      "category": "Cloud",
+      "amount": 160559,
+      "amountRaw": "₹1,60,559",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          17
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-062",
+      "department": "Elam Department",
+      "type": "Software",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "AWS Invoice 042 - Apr 2026 (disputed spike)",
+      "category": "Cloud",
+      "amount": 181039,
+      "amountRaw": "₹1,81,039",
+      "status": "Pending",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          17
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-063",
+      "department": "Elam Department",
+      "type": "Development",
+      "date": "May - 26",
+      "month": "2026-05",
+      "description": "Elam AWS own instance setup",
+      "category": "Cloud/Dev",
+      "amount": null,
+      "amountRaw": "TBD",
+      "status": "Under Review",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          17
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-064",
+      "department": "Elam Department",
+      "type": "Subscription",
+      "date": "Mar - 26",
+      "month": "2026-03",
+      "description": "Figma design tool subscription",
+      "category": "SaaS",
+      "amount": 4459,
+      "amountRaw": "₹4,459",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          17
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-065",
+      "department": "SEZ / Communications",
+      "type": "Software",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Chat for Biz - business chat integration (190 KW)",
+      "category": "Communication",
+      "amount": 51680,
+      "amountRaw": "₹51,680",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          17
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-066",
+      "department": "SEZ / Communications",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Google Workspace in INR - replacing KD billing",
+      "category": "SaaS",
+      "amount": 650,
+      "amountRaw": "₹650",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          17
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-067",
+      "department": "SEZ / Communications",
+      "type": "Development",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Shabab development ($8,066)",
+      "category": "Development",
+      "amount": 685610,
+      "amountRaw": "₹6,85,610",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          17
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-068",
+      "department": "DH Pro",
+      "type": "Development",
+      "date": "May - 25",
+      "month": "2025-05",
+      "description": "Project Rise website design & dev (2024 work)",
+      "category": "Development",
+      "amount": 94400,
+      "amountRaw": "₹94,400",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          17
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-069",
+      "department": "DH Pro",
+      "type": "Development",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "TDB Regional Websites (UK, East Africa)",
+      "category": "Development",
+      "amount": null,
+      "amountRaw": "TBD",
+      "status": "Under Review",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          17
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-070",
+      "department": "DH Pro",
+      "type": "Development",
+      "date": "Mar - 26",
+      "month": "2026-03",
+      "description": "Website redesign & dev quarterly - Saifee Creations",
+      "category": "Development",
+      "amount": null,
+      "amountRaw": "TBD",
+      "status": "Pending",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          17
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-071",
+      "department": "DH Pro",
+      "type": "Development",
+      "date": "Feb - 26",
+      "month": "2026-02",
+      "description": "SEO services 6 months - Saifee Creations",
+      "category": "Development",
+      "amount": 205410,
+      "amountRaw": "₹2,05,410",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          17
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-072",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Aug - 25",
+      "month": "2025-08",
+      "description": "Email signature - Exclaimer annual ($211)",
+      "category": "SaaS",
+      "amount": 17619,
+      "amountRaw": "₹17,619",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          17
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-073",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "GoDaddy domain - thedawoodibohras.com 1yr",
+      "category": "SaaS",
+      "amount": 1853,
+      "amountRaw": "₹1,853",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          17
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-074",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Mar - 26",
+      "month": "2026-03",
+      "description": "DHPRO domain renewal 1yr",
+      "category": "SaaS",
+      "amount": 3815,
+      "amountRaw": "₹3,815",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-075",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "Zapier annual - workflow automation",
+      "category": "SaaS",
+      "amount": 20030,
+      "amountRaw": "₹20,030",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-076",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "Microsoft O365 - 5 users 1yr (Req 136)",
+      "category": "SaaS",
+      "amount": 6199,
+      "amountRaw": "₹6,199",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-077",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Sep - 25",
+      "month": "2025-09",
+      "description": "Wavel.ai - monthly AI audio tool ($25)",
+      "category": "AI Tools",
+      "amount": 2088,
+      "amountRaw": "₹2,088",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-078",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Sep - 25",
+      "month": "2025-09",
+      "description": "Qalam.ai - monthly content writing ($11.99)",
+      "category": "AI Tools",
+      "amount": 1001,
+      "amountRaw": "₹1,001",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-079",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Aug - 25",
+      "month": "2025-08",
+      "description": "ChatGPT Plus - shared 7 - 10 users ($20/mo)",
+      "category": "AI Tools",
+      "amount": 1670,
+      "amountRaw": "₹1,670",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-080",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Veed yearly (Req 276)",
+      "category": "SaaS",
+      "amount": 5988,
+      "amountRaw": "₹5,988",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-081",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "Veed.io - video transcription (Oct 2025)",
+      "category": "SaaS",
+      "amount": null,
+      "amountRaw": "TBD",
+      "status": "Pending",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-082",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Eleven Labs yearly (Req 275, $311.52)",
+      "category": "AI Tools",
+      "amount": 26012,
+      "amountRaw": "₹26,012",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-083",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "Eleven Labs Creator Plan - Oct 2025 (50% off)",
+      "category": "AI Tools",
+      "amount": 2168,
+      "amountRaw": "₹2,168",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-084",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Ditto Music Distribution - audio publishing 1yr",
+      "category": "SaaS",
+      "amount": 1099,
+      "amountRaw": "₹1,099",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-085",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Mar - 26",
+      "month": "2026-03",
+      "description": "Grammarly Premium 1yr ($139.95)",
+      "category": "AI Tools",
+      "amount": 11686,
+      "amountRaw": "₹11,686",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-086",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Mar - 26",
+      "month": "2026-03",
+      "description": "Claude Pro - 3 months x $20",
+      "category": "AI Tools",
+      "amount": 5010,
+      "amountRaw": "₹5,010",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-087",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Anthropic Claude API - $50/mo x 12 months",
+      "category": "AI Tools",
+      "amount": 50100,
+      "amountRaw": "₹50,100",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-088",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Cloud hosting - Ibrahim bhai Jun 25 - May 26",
+      "category": "Cloud",
+      "amount": 200400,
+      "amountRaw": "₹2,00,400",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-089",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Mar - 26",
+      "month": "2026-03",
+      "description": "DHPRO Gmail account renewal - M. Murtaza Sadriwala",
+      "category": "SaaS",
+      "amount": 8468,
+      "amountRaw": "₹8,468",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-090",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "3 New DHPRO Gmail accounts 2yrs (Req 358 - 360)",
+      "category": "SaaS",
+      "amount": 3439,
+      "amountRaw": "₹3,439",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-091",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Ammar Gheewala email bills - March 2026",
+      "category": "SaaS",
+      "amount": 11500,
+      "amountRaw": "₹11,500",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-092",
+      "department": "DH Pro",
+      "type": "Subscription",
+      "date": "Jan - 26",
+      "month": "2026-01",
+      "description": "Genspark AI - 1yr",
+      "category": "AI Tools",
+      "amount": 20315,
+      "amountRaw": "₹20,315",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          18
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-093",
+      "department": "Alvazarat - Shabab",
+      "type": "Development",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Shabab platform development ($7,000)",
+      "category": "Development",
+      "amount": 584500,
+      "amountRaw": "₹5,84,500",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          19
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-094",
+      "department": "Alvazarat - Shabab",
+      "type": "Software",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Shabab platform hosting ($1,066)",
+      "category": "Cloud",
+      "amount": 89011,
+      "amountRaw": "₹89,011",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          19
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-095",
+      "department": "A l Jamea tus Saifiyah",
+      "type": "Development",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "Tajweed Musabaqat Website AMC - Dec 2025",
+      "category": "Development",
+      "amount": 78870,
+      "amountRaw": "₹78,870",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          19
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-096",
+      "department": "A l Jamea tus Saifiyah",
+      "type": "Development",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Tajweed Musabaqat Website AMC - Apr 2026",
+      "category": "Development",
+      "amount": 73523,
+      "amountRaw": "₹73,523",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          19
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-097",
+      "department": "A l Jamea tus Saifiyah",
+      "type": "Software",
+      "date": "Oct - 25",
+      "month": "2025-10",
+      "description": "Disk Drill PRO + Lifetime Upgrade",
+      "category": "Software",
+      "amount": 4481,
+      "amountRaw": "₹4,481",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          19
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-098",
+      "department": "A l Jamea tus Saifiyah",
+      "type": "Subscription",
+      "date": "Aug - 25",
+      "month": "2025-08",
+      "description": "Adobe Creative Cloud - 2 users (Aug 2025)",
+      "category": "SaaS",
+      "amount": 10548,
+      "amountRaw": "₹10,548",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          19
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-099",
+      "department": "A l Jamea tus Saifiyah",
+      "type": "Subscription",
+      "date": "Sep - 25",
+      "month": "2025-09",
+      "description": "Adobe Creative Cloud - additional 2 users",
+      "category": "SaaS",
+      "amount": 8125,
+      "amountRaw": "₹8,125",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          19
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-100",
+      "department": "A l Jamea tus Saifiyah",
+      "type": "Subscription",
+      "date": "May - 25",
+      "month": "2025-05",
+      "description": "Adobe Creative Cloud - 2 users renewal",
+      "category": "SaaS",
+      "amount": 11497,
+      "amountRaw": "₹11,497",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          19
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-101",
+      "department": "A l Jamea tus Saifiyah",
+      "type": "Subscription",
+      "date": "Mar - 26",
+      "month": "2026-03",
+      "description": "Adobe CC Pro - 1yr (Jan 26 - Jan 27)",
+      "category": "SaaS",
+      "amount": 18196,
+      "amountRaw": "₹18,196",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          19
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-102",
+      "department": "A l Jamea tus Saifiyah",
+      "type": "Subscription",
+      "date": "Nov - 25",
+      "month": "2025-11",
+      "description": "MailGun invoice - Oct 2025",
+      "category": "SaaS",
+      "amount": 4634,
+      "amountRaw": "₹4,634",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          19
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-103",
+      "department": "A l Jamea tus Saifiyah",
+      "type": "Subscription",
+      "date": "Jul - 25",
+      "month": "2025-07",
+      "description": "Deep Internet - Main line recharge",
+      "category": "SaaS",
+      "amount": 62540,
+      "amountRaw": "₹62,540",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          19
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-104",
+      "department": "A l Jamea tus Saifiyah",
+      "type": "Subscription",
+      "date": "Jul - 25",
+      "month": "2025-07",
+      "description": "Deep Internet - 1st Floor recharge",
+      "category": "SaaS",
+      "amount": 62540,
+      "amountRaw": "₹62,540",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          19
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-105",
+      "department": "A l Jamea tus Saifiyah",
+      "type": "Subscription",
+      "date": "Apr - 25",
+      "month": "2025-04",
+      "description": "Microsoft Office - 6 users renewal (Apr 2025)",
+      "category": "SaaS",
+      "amount": 6199,
+      "amountRaw": "₹6,199",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          19
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-106",
+      "department": "A l Jamea tus Saifiyah",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Microsoft Office - 6 users renewal (Apr 2026)",
+      "category": "SaaS",
+      "amount": 6199,
+      "amountRaw": "₹6,199",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          19
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-107",
+      "department": "A l Jamea tus Saifiyah",
+      "type": "Software",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "NAS Drive + HDDs accessories (Req 133)",
+      "category": "Hardware",
+      "amount": 70000,
+      "amountRaw": "₹70,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          19
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-108",
+      "department": "A l Jamea tus Saifiyah",
+      "type": "Software",
+      "date": "Mar - 26",
+      "month": "2026-03",
+      "description": "Scanner - reception (portal registered)",
+      "category": "Hardware",
+      "amount": 36580,
+      "amountRaw": "₹36,580",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          19
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-109",
+      "department": "Alvazarat - Oxy Park",
+      "type": "Development",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "Oxy Park tree - tagging app Phase 1",
+      "category": "Development",
+      "amount": 250000,
+      "amountRaw": "₹2,50,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          20
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-110",
+      "department": "Burhani Medical Idara (BMI)",
+      "type": "Development",
+      "date": "Jun - 25",
+      "month": "2025-06",
+      "description": "Website AMC renewal - MTECH Softwares",
+      "category": "Development",
+      "amount": 153000,
+      "amountRaw": "₹1,53,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          20
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-111",
+      "department": "Burhani Medical Idara (BMI)",
+      "type": "Software",
+      "date": "May - 25",
+      "month": "2025-05",
+      "description": "Domain renewal - BurhaniMedicalIdara.Org & .Com",
+      "category": "SaaS",
+      "amount": 44821,
+      "amountRaw": "₹44,821",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          20
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-112",
+      "department": "Burhani Medical Idara (BMI)",
+      "type": "Software",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "AMC 2026/27 - 7 PCs + 1 Laptop",
+      "category": "Hardware",
+      "amount": 21712,
+      "amountRaw": "₹21,712",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          20
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-113",
+      "department": "Sigatul Waqf & Trust",
+      "type": "Development",
+      "date": "Sep - 25",
+      "month": "2025-09",
+      "description": "SignCare e - Sign - Aadhaar - compliant e - signing",
+      "category": "Development",
+      "amount": 50000,
+      "amountRaw": "₹50,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          20
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-114",
+      "department": "Sigatul Waqf & Trust",
+      "type": "Subscription",
+      "date": "Aug - 25",
+      "month": "2025-08",
+      "description": "Fireflies AI Pro - meeting transcription $10/mo",
+      "category": "AI Tools",
+      "amount": 10020,
+      "amountRaw": "₹10,020",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          20
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-115",
+      "department": "Sigatul Waqf & Trust",
+      "type": "Subscription",
+      "date": "Aug - 25",
+      "month": "2025-08",
+      "description": "Gamma AI Plus - presentation tool ($15)",
+      "category": "AI Tools",
+      "amount": 1253,
+      "amountRaw": "₹1,253",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          20
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-116",
+      "department": "Sigatul Waqf & Trust",
+      "type": "Subscription",
+      "date": "Nov - 25",
+      "month": "2025-11",
+      "description": "ChatGPT Plus - Nov 2025",
+      "category": "AI Tools",
+      "amount": 2152,
+      "amountRaw": "₹2,152",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          20
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-117",
+      "department": "Sigatul Waqf & Trust",
+      "type": "Subscription",
+      "date": "Nov - 25",
+      "month": "2025-11",
+      "description": "Coursera - 1yr training",
+      "category": "SaaS",
+      "amount": 3150,
+      "amountRaw": "₹3,150",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          20
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-118",
+      "department": "Sigatul Waqf & Trust",
+      "type": "Subscription",
+      "date": "Nov - 25",
+      "month": "2025-11",
+      "description": "GoDaddy professional email",
+      "category": "SaaS",
+      "amount": 552,
+      "amountRaw": "₹552",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          20
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-119",
+      "department": "Sigatul Waqf & Trust",
+      "type": "Software",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Computer AMC 2026 - 27",
+      "category": "Hardware",
+      "amount": 43700,
+      "amountRaw": "₹43,700",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          20
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-120",
+      "department": "Alvazarat - Projects (PMS)",
+      "type": "Software",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Server capacity upgrade for PMS Module",
+      "category": "Cloud",
+      "amount": 77500,
+      "amountRaw": "₹77,500",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          21
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-121",
+      "department": "Alvazarat - Projects (PMS)",
+      "type": "Development",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "PMMS maintenance & dev work - Graficali",
+      "category": "Development",
+      "amount": 25000,
+      "amountRaw": "₹25,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          21
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-122",
+      "department": "Legal Department",
+      "type": "Development",
+      "date": "Aug - 25",
+      "month": "2025-08",
+      "description": "Trust Term Renewal feature - SRS & dev quote",
+      "category": "Development",
+      "amount": 33300,
+      "amountRaw": "₹33,300",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          21
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-123",
+      "department": "Legal Department",
+      "type": "Software",
+      "date": "Oct - 25",
+      "month": "2025-10",
+      "description": "Microsoft 365 - Juzer BS Shakir",
+      "category": "SaaS",
+      "amount": 6199,
+      "amountRaw": "₹6,199",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          21
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-124",
+      "department": "Legal Department",
+      "type": "Software",
+      "date": "Aug - 25",
+      "month": "2025-08",
+      "description": "DropSuite Email Archive",
+      "category": "SaaS",
+      "amount": 4366,
+      "amountRaw": "₹4,366",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          21
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-125",
+      "department": "Legal Department",
+      "type": "Software",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Annual server & maintenance - legaldh.in",
+      "category": "Cloud",
+      "amount": 21600,
+      "amountRaw": "₹21,600",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          21
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-126",
+      "department": "Legal Department",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Wispr Flow Enterprise + 2 PRO licences - annual",
+      "category": "AI Tools",
+      "amount": 35000,
+      "amountRaw": "₹35,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          21
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-127",
+      "department": "Idara BGI",
+      "type": "Development",
+      "date": "Nov - 25",
+      "month": "2025-11",
+      "description": "Vendor payments, AI integration & website",
+      "category": "Development",
+      "amount": 46020,
+      "amountRaw": "₹46,020",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          21
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-128",
+      "department": "Idara BGI",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Claude AI Pro - yearly ($204 = 12x$17)",
+      "category": "AI Tools",
+      "amount": 17034,
+      "amountRaw": "₹17,034",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          21
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-129",
+      "department": "Idara BGI",
+      "type": "Software",
+      "date": "Mar - 26",
+      "month": "2026-03",
+      "description": "KVM 4 Server renewal - Hostinger cloud annual",
+      "category": "Cloud",
+      "amount": 37230,
+      "amountRaw": "₹37,230",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          21
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-130",
+      "department": "FMB / Dana Committee",
+      "type": "Software",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "WhatsApp Business API & plug - in - 3 months",
+      "category": "Communication",
+      "amount": 12932,
+      "amountRaw": "₹12,932",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          21
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-131",
+      "department": "FMB / Dana Committee",
+      "type": "Software",
+      "date": "Nov - 25",
+      "month": "2025-11",
+      "description": "Adobe Creative Cloud (Req 83)",
+      "category": "SaaS",
+      "amount": 8387,
+      "amountRaw": "₹8,387",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          21
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-132",
+      "department": "FMB / Dana Committee",
+      "type": "Subscription",
+      "date": "Aug - 25",
+      "month": "2025-08",
+      "description": "Microsoft 365 Family - 6 emails annual",
+      "category": "SaaS",
+      "amount": 6199,
+      "amountRaw": "₹6,199",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          21
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-133",
+      "department": "FMB / Dana Committee",
+      "type": "Software",
+      "date": "Oct - 25",
+      "month": "2025-10",
+      "description": "WhatsApp final bill clearance - Smart Solution",
+      "category": "Communication",
+      "amount": 12000,
+      "amountRaw": "₹12,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          22
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-134",
+      "department": "FMB / Dana Committee",
+      "type": "Subscription",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "Mawaqit Deniyah - server, app & hosting",
+      "category": "Cloud",
+      "amount": 56000,
+      "amountRaw": "₹56,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          22
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-135",
+      "department": "Mamureen (BADRI)",
+      "type": "Development",
+      "date": "Mar - 26",
+      "month": "2026-03",
+      "description": "Mamureen Photo App - Phase 1",
+      "category": "Development",
+      "amount": 45000,
+      "amountRaw": "₹45,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          22
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-136",
+      "department": "Mamureen (BADRI)",
+      "type": "Development",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Mamureen App - additional modules Phase 2",
+      "category": "Development",
+      "amount": 22000,
+      "amountRaw": "₹22,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          22
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-137",
+      "department": "Sigatul Qaza",
+      "type": "Subscription",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "Windows 365 licensed user - 1yr",
+      "category": "SaaS",
+      "amount": 2220,
+      "amountRaw": "₹2,220",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          22
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-138",
+      "department": "Sigatul Qaza",
+      "type": "Subscription",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "MS Office 365 - 1yr",
+      "category": "SaaS",
+      "amount": 2000,
+      "amountRaw": "₹2,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          22
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-139",
+      "department": "Sigatul Qaza",
+      "type": "Subscription",
+      "date": "Nov - 25",
+      "month": "2025-11",
+      "description": "IT bills - Rasme Saifee Form, Airtable, misc",
+      "category": "SaaS",
+      "amount": 38127,
+      "amountRaw": "₹38,127",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          22
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-140",
+      "department": "Sigatul Qaza",
+      "type": "Software",
+      "date": "May - 26",
+      "month": "2026-05",
+      "description": "Server rental - 30,000/month",
+      "category": "Cloud",
+      "amount": 30000,
+      "amountRaw": "₹30,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          22
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-141",
+      "department": "At - Talimiyah / Majma Markazi",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Digital Ocean Server + OpenAI - January 2026",
+      "category": "Cloud",
+      "amount": 17800,
+      "amountRaw": "₹17,800",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          22
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-142",
+      "department": "At - Talimiyah / Majma Markazi",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Digital Ocean Server + OpenAI - February 2026",
+      "category": "Cloud",
+      "amount": 17387,
+      "amountRaw": "₹17,387",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          22
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-143",
+      "department": "At - Talimiyah / Majma Markazi",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Digital Ocean Server + OpenAI - March 2026",
+      "category": "Cloud",
+      "amount": 17641,
+      "amountRaw": "₹17,641",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          22
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-144",
+      "department": "Mathaf al - Burhani",
+      "type": "Subscription",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "Software bundle: Canva + XMind + MS Office",
+      "category": "SaaS",
+      "amount": 16250,
+      "amountRaw": "₹16,250",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          23
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-145",
+      "department": "Mathaf al - Burhani",
+      "type": "Subscription",
+      "date": "Nov - 25",
+      "month": "2025-11",
+      "description": "Microsoft Office 365 - 1 user",
+      "category": "SaaS",
+      "amount": 3250,
+      "amountRaw": "₹3,250",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          23
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-146",
+      "department": "Mathaf al - Burhani",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Google Workspace AI Pro - revised approval",
+      "category": "AI Tools",
+      "amount": 24260,
+      "amountRaw": "₹24,260",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          23
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-147",
+      "department": "ITNC (Umoor Deeniyah)",
+      "type": "Development",
+      "date": "Jun - 25",
+      "month": "2025-06",
+      "description": "ATB (Attaiseer ul Burhani) software enhancements",
+      "category": "Development",
+      "amount": null,
+      "amountRaw": "TBD",
+      "status": "Pending",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          23
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-148",
+      "department": "ITNC (Umoor Deeniyah)",
+      "type": "Development",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "ATB new version - Royal Cyber (American co.)",
+      "category": "Development",
+      "amount": null,
+      "amountRaw": "TBD",
+      "status": "Pending",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          23
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-149",
+      "department": "ITNC (Umoor Deeniyah)",
+      "type": "Software",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Asana upgrade - custom fields & advanced features",
+      "category": "SaaS",
+      "amount": null,
+      "amountRaw": "TBD",
+      "status": "Pending",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          23
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-150",
+      "department": "ITNC (Umoor Deeniyah)",
+      "type": "Subscription",
+      "date": "Dec - 25",
+      "month": "2025-12",
+      "description": "Canva Business - annual",
+      "category": "SaaS",
+      "amount": 16200,
+      "amountRaw": "₹16,200",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          23
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-151",
+      "department": "ITNC (Umoor Deeniyah)",
+      "type": "Subscription",
+      "date": "May - 26",
+      "month": "2026-05",
+      "description": "Google AI Pro (mid version) - 3 users",
+      "category": "AI Tools",
+      "amount": 23988,
+      "amountRaw": "₹23,988",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          23
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-152",
+      "department": "Tashreef App (TMS)",
+      "type": "Software",
+      "date": "Mar - 26",
+      "month": "2026-03",
+      "description": "Hosting 1yr + email for Tashreef app",
+      "category": "Cloud",
+      "amount": 34000,
+      "amountRaw": "₹34,000",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          23
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-153",
+      "department": "Sigat al - Hawaij",
+      "type": "Software",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "AMC 2026/27 - 4 PCs + 1 Laptop",
+      "category": "Hardware",
+      "amount": 13570,
+      "amountRaw": "₹13,570",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          23
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-154",
+      "department": "Alvazarat - General Dept",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Claude Cowork - Aliasger Motiwala ($24/mo x 3)",
+      "category": "AI Tools",
+      "amount": 6012,
+      "amountRaw": "₹6,012",
+      "status": "Pending",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          24
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-155",
+      "department": "Sigat ul Haj",
+      "type": "Subscription",
+      "date": "Apr - 26",
+      "month": "2026-04",
+      "description": "Bulk messaging service - Hajje Badal follow - up",
+      "category": "Communication",
+      "amount": 999,
+      "amountRaw": "₹999",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          24
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-156",
+      "department": "Dawatehadiyah.org",
+      "type": "Development",
+      "date": "Jun - 25",
+      "month": "2025-06",
+      "description": "AMC for dawatehadiyah.org - Hatsoff proposal",
+      "category": "Development",
+      "amount": null,
+      "amountRaw": "TBD",
+      "status": "Pending",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          24
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    },
+    {
+      "id": "REQ-157",
+      "department": "Estate Department",
+      "type": "Subscription",
+      "date": "Nov - 25",
+      "month": "2025-11",
+      "description": "ChatGPT - Estate Dept & Hatimi Retreats (2 accts)",
+      "category": "AI Tools",
+      "amount": null,
+      "amountRaw": "TBD",
+      "status": "Approved",
+      "source": {
+        "pdf": "IT_Requests_Summary_Full.pdf",
+        "pages": [
+          24
+        ],
+        "section": "9. Department-Wise Detailed Request Breakdown"
+      }
+    }
+  ],
+  "validation": {
+    "rawPdf": "IT_Requests_Summary_Full.pdf",
+    "reportPdfReference": "Strategic_IT_Request_Analysis_Final_Revised.pdf",
+    "extractionPages": "Raw PDF pages 1, 13-24, and 36",
+    "exactRequestRowsExtracted": 157,
+    "noMockDataUsed": true,
+    "notes": [
+      "The raw data PDF was extracted once into this structured JSON file.",
+      "The chart/report PDF was reviewed only for dashboard structure and chart grouping logic.",
+      "No mock, placeholder, inferred, or invented values were added.",
+      "Original PDFs are not copied to public assets and are excluded by .gitignore.",
+      "Row-level known spend sums to ₹2,52,65,246; the raw PDF financial summary states ₹2,52,53,147. Both values are retained with source context rather than reconciled by assumption.",
+      "Detailed request rows include 16 TBD amount rows; the raw PDF summary/data-quality sections state 11 TBD rows. The dashboard does not invent a reconciliation."
+    ]
+  }
+}

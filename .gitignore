@@ -1,0 +1,9 @@
+.next
+node_modules
+out
+dist
+.vercel
+*.log
+*.zip
+IT_Requests_Summary_Full.pdf
+Strategic_IT_Request_Analysis_Final_Revised.pdf
