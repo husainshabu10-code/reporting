@@ -153,10 +153,41 @@ export default function DashboardApp() {
     const { jsPDF } = await import("jspdf");
     const autoTable = (await import("jspdf-autotable")).default;
     const doc = new jsPDF({ orientation: "landscape", unit: "pt" });
-    doc.setFontSize(15);
-    doc.text(title, 40, 36);
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 34;
+    const topic = title.replace(/\s+-\s+(Export All|Export Filtered)$/i, "");
+
+    const drawTemplate = () => {
+      doc.setDrawColor(220, 228, 239);
+      doc.setLineWidth(0.8);
+      doc.roundedRect(22, 22, pageWidth - 44, pageHeight - 44, 6, 6);
+      doc.setFillColor(246, 248, 251);
+      doc.rect(23, 23, pageWidth - 46, 54, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(16);
+      doc.setTextColor(35, 50, 68);
+      doc.text("IT Request Analytics Dashboard", margin, 48);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(91, 105, 124);
+      doc.text("Detailed export from validated dashboard data", pageWidth - margin, 48, { align: "right" });
+    };
+
+    drawTemplate();
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(45, 103, 157);
+    doc.text(`Topic: ${topic}`, margin, 98);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(91, 105, 124);
+    doc.text(`Rows: ${rows.length} detailed request records`, margin, 116);
+
     if (rows.length === 0) {
-      doc.text("No data available", 40, 64);
+      doc.setFontSize(11);
+      doc.setTextColor(91, 105, 124);
+      doc.text("No data available", margin, 146);
     } else {
       const columns = Object.keys(rows[0]);
       const body = rows.map((row) =>
@@ -168,11 +199,44 @@ export default function DashboardApp() {
         })
       );
       autoTable(doc, {
-        startY: 56,
+        startY: 136,
+        margin: { left: margin, right: margin, bottom: 38 },
         head: [columns],
         body,
-        styles: { fontSize: 8, cellPadding: 5 },
-        headStyles: { fillColor: [121, 167, 216] }
+        styles: {
+          fontSize: 7.5,
+          cellPadding: 4,
+          lineColor: [226, 232, 240],
+          lineWidth: 0.25,
+          textColor: [55, 65, 81],
+          overflow: "linebreak",
+          valign: "top"
+        },
+        headStyles: {
+          fillColor: [231, 240, 251],
+          textColor: [45, 103, 157],
+          fontStyle: "bold",
+          lineColor: [210, 222, 238],
+          lineWidth: 0.4
+        },
+        alternateRowStyles: { fillColor: [250, 252, 255] },
+        columnStyles: {
+          ID: { cellWidth: 48 },
+          Department: { cellWidth: 112 },
+          Type: { cellWidth: 72 },
+          Date: { cellWidth: 58 },
+          Category: { cellWidth: 74 },
+          Status: { cellWidth: 70 },
+          Amount: { cellWidth: 72 },
+          Description: { cellWidth: "auto" }
+        },
+        didDrawPage: () => {
+          drawTemplate();
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(8);
+          doc.setTextColor(120, 132, 150);
+          doc.text(`Page ${doc.getNumberOfPages()}`, pageWidth - margin, pageHeight - 30, { align: "right" });
+        }
       });
     }
     doc.save(`${slug(title)}.pdf`);
