@@ -32,7 +32,6 @@ import {
   Search,
   SlidersHorizontal,
   Table2,
-  Ticket,
   TrendingUp,
   WalletCards,
   X
@@ -51,7 +50,6 @@ import type { RequestRow } from "@/lib/dashboard";
 const pages = [
   { id: "Dashboard", icon: Home },
   { id: "IT Requests", icon: BarChart3 },
-  { id: "Tickets", icon: Ticket },
   { id: "Budget", icon: WalletCards },
   { id: "Departments", icon: Building2 },
   { id: "Trends", icon: TrendingUp }
@@ -76,6 +74,7 @@ export default function DashboardApp() {
   const [timelineMode, setTimelineMode] = useState<TimelineMode>("monthly");
   const [fromMonth, setFromMonth] = useState(months[0] || "");
   const [toMonth, setToMonth] = useState(months[months.length - 1] || "");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [tableModes, setTableModes] = useState<Record<string, boolean>>({});
   const [compareModes, setCompareModes] = useState<Record<string, boolean>>({});
 
@@ -83,6 +82,10 @@ export default function DashboardApp() {
     const timer = window.setTimeout(() => setReady(true), 260);
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    setFiltersOpen(false);
+  }, [activePage]);
 
   const filteredRequests = useMemo(() => {
     const normalized = search.trim().toLowerCase();
@@ -95,7 +98,7 @@ export default function DashboardApp() {
   }, [fromMonth, search, selectedDepartments, toMonth]);
 
   const unfilteredPageRows = useMemo(() => scopedRows(activePage, allRequests), [activePage]);
-  const pageRows = useMemo(() => scopedRows(activePage, filteredRequests), [activePage, filteredRequests]);
+  const pageRows = useMemo(() => scopedRows(activePage, activePage === "Dashboard" ? allRequests : filteredRequests), [activePage, filteredRequests]);
 
   const departmentRequests = useMemo(() => sortRows(groupRequests(pageRows, "department"), "requests", requestSort), [pageRows, requestSort]);
   const departmentSpend = useMemo(() => sortRows(groupRequests(pageRows, "department"), "spend", spendSort), [pageRows, spendSort]);
@@ -160,6 +163,15 @@ export default function DashboardApp() {
   }
 
   const exportPageRows = (scope: ExportScope) => rowsForExport(scope === "all" ? unfilteredPageRows : pageRows);
+  const clearFilters = () => {
+    setSelectedDepartments(allDepartments);
+    setRequestSort("desc");
+    setSpendSort("desc");
+    setSearch("");
+    setTimelineMode("monthly");
+    setFromMonth(months[0] || "");
+    setToMonth(months[months.length - 1] || "");
+  };
 
   return (
     <div className="min-h-screen">
@@ -221,23 +233,28 @@ export default function DashboardApp() {
         </header>
 
         <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-          <FilterPanel
-            activePage={activePage}
-            selectedDepartments={selectedDepartments}
-            setSelectedDepartments={setSelectedDepartments}
-            requestSort={requestSort}
-            setRequestSort={setRequestSort}
-            spendSort={spendSort}
-            setSpendSort={setSpendSort}
-            search={search}
-            setSearch={setSearch}
-            timelineMode={timelineMode}
-            setTimelineMode={setTimelineMode}
-            fromMonth={fromMonth}
-            toMonth={toMonth}
-            setFromMonth={setFromMonth}
-            setToMonth={setToMonth}
-          />
+          {activePage !== "Dashboard" && (
+            <FilterPanel
+              activePage={activePage}
+              selectedDepartments={selectedDepartments}
+              setSelectedDepartments={setSelectedDepartments}
+              requestSort={requestSort}
+              setRequestSort={setRequestSort}
+              spendSort={spendSort}
+              setSpendSort={setSpendSort}
+              search={search}
+              setSearch={setSearch}
+              timelineMode={timelineMode}
+              setTimelineMode={setTimelineMode}
+              fromMonth={fromMonth}
+              toMonth={toMonth}
+              setFromMonth={setFromMonth}
+              setToMonth={setToMonth}
+              filtersOpen={filtersOpen}
+              setFiltersOpen={setFiltersOpen}
+              clearFilters={clearFilters}
+            />
+          )}
 
           <AnimatePresence mode="wait">
             <motion.section
@@ -294,17 +311,17 @@ export default function DashboardApp() {
                           {compareModes["spend-dept"] ? <DualBar data={departmentSpend.slice(0, 12)} /> : <BarViz data={departmentSpend.slice(0, 12)} valueKey="spend" />}
                         </ChartPanel>
                         <ChartPanel
-                          id="ticket-category"
-                          title="Ticket Category"
+                          id="request-category"
+                          title="Request Category"
                           data={categoryRows}
-                          table={tableModes["ticket-category"]}
-                          compare={compareModes["ticket-category"]}
-                          onToggleTable={() => toggle(setTableModes, "ticket-category")}
-                          onToggleCompare={() => toggle(setCompareModes, "ticket-category")}
-                          onPdf={() => exportPdf("Ticket Category", chartRows(categoryRows))}
-                          onExcel={() => exportExcel("Ticket Category", chartRows(categoryRows))}
+                          table={tableModes["request-category"]}
+                          compare={compareModes["request-category"]}
+                          onToggleTable={() => toggle(setTableModes, "request-category")}
+                          onToggleCompare={() => toggle(setCompareModes, "request-category")}
+                          onPdf={() => exportPdf("Request Category", chartRows(categoryRows))}
+                          onExcel={() => exportExcel("Request Category", chartRows(categoryRows))}
                         >
-                          {compareModes["ticket-category"] ? <DualBar data={categoryRows} /> : <DonutViz data={categoryRows} />}
+                          {compareModes["request-category"] ? <DualBar data={categoryRows} /> : <DonutViz data={categoryRows} />}
                         </ChartPanel>
                       </ChartGrid>
                       <Insights insights={summaryInsights} />
@@ -323,15 +340,6 @@ export default function DashboardApp() {
                         <DonutViz data={typeRows} />
                       </ChartPanel>
                       <RequestTable title="Matching Requests" rows={sortedRequests} onPdf={() => exportPdf("Matching Requests", rowsForExport(sortedRequests))} onExcel={() => exportExcel("Matching Requests", rowsForExport(sortedRequests))} />
-                    </ChartGrid>
-                  )}
-
-                  {activePage === "Tickets" && (
-                    <ChartGrid>
-                      <NoData title="Ticket Status Overview" />
-                      <NoData title="Ticket Category/Type Breakdown" />
-                      <NoData title="Ticket Volume by Department" />
-                      <NoData title="Ticket Trends Over Time" />
                     </ChartGrid>
                   )}
 
@@ -364,7 +372,6 @@ export default function DashboardApp() {
                       <ChartPanel id="dept-view-spend" title="Department Spend" data={departmentSpend} table={tableModes["dept-view-spend"]} compare={compareModes["dept-view-spend"]} onToggleTable={() => toggle(setTableModes, "dept-view-spend")} onToggleCompare={() => toggle(setCompareModes, "dept-view-spend")} onPdf={() => exportPdf("Department Spend", chartRows(departmentSpend))} onExcel={() => exportExcel("Department Spend", chartRows(departmentSpend))}>
                         {compareModes["dept-view-spend"] ? <DualBar data={departmentSpend.slice(0, 14)} /> : <BarViz data={departmentSpend.slice(0, 14)} valueKey="spend" />}
                       </ChartPanel>
-                      <NoData title="Department Tickets" />
                       <NoData title="Project Involvement" />
                     </ChartGrid>
                   )}
@@ -445,71 +452,116 @@ function FilterPanel(props: {
   toMonth: string;
   setFromMonth: (value: string) => void;
   setToMonth: (value: string) => void;
+  filtersOpen: boolean;
+  setFiltersOpen: (value: boolean) => void;
+  clearFilters: () => void;
 }) {
-  const showSearch = props.activePage === "IT Requests" || props.activePage === "Dashboard";
-  const showTimeline = ["Dashboard", "Budget", "Trends"].includes(props.activePage);
+  const showTimeline = true;
+  const selectedCount = props.selectedDepartments.length;
+  const allSelected = selectedCount === allDepartments.length;
+
+  function toggleDepartment(department: string) {
+    if (props.selectedDepartments.includes(department)) {
+      props.setSelectedDepartments(props.selectedDepartments.filter((item) => item !== department));
+    } else {
+      props.setSelectedDepartments([...props.selectedDepartments, department]);
+    }
+  }
 
   return (
-    <section className="no-print rounded-lg border border-line bg-white/90 p-4 shadow-soft">
-      <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
-        <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase text-slate-500">Departments</span>
-          <select
-            className="field h-24"
-            multiple
-            value={props.selectedDepartments}
-            onChange={(event) => props.setSelectedDepartments(Array.from(event.target.selectedOptions).map((option) => option.value))}
-          >
-            {allDepartments.map((department) => (
-              <option key={department} value={department}>
-                {department}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase text-slate-500">Request Sort</span>
-          <select className="field" value={props.requestSort} onChange={(event) => props.setRequestSort(event.target.value as SortDirection)}>
-            <option value="desc">High to low</option>
-            <option value="asc">Low to high</option>
-          </select>
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase text-slate-500">Spend Sort</span>
-          <select className="field" value={props.spendSort} onChange={(event) => props.setSpendSort(event.target.value as SortDirection)}>
-            <option value="desc">High to low</option>
-            <option value="asc">Low to high</option>
-          </select>
-        </label>
-        {showSearch ? (
-          <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase text-slate-500">Search Requests</span>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-              <input className="field pl-9" value={props.search} onChange={(event) => props.setSearch(event.target.value)} placeholder="Search request" />
-            </div>
-          </label>
-        ) : (
-          <div />
-        )}
-      </div>
-      {showTimeline && (
-        <div className="mt-4 grid gap-3 md:grid-cols-3">
-          <div className="flex rounded-lg border border-line bg-slate-50 p-1">
-            {(["monthly", "quarterly", "yearly"] as TimelineMode[]).map((mode) => (
-              <button key={mode} className={`flex-1 rounded-md px-3 py-2 text-sm capitalize ${props.timelineMode === mode ? "bg-white text-[#2d679d] shadow-sm" : "text-slate-600"}`} onClick={() => props.setTimelineMode(mode)}>
-                {mode}
-              </button>
-            ))}
+    <section className="no-print relative rounded-lg border border-line bg-white/90 p-4 shadow-soft">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <label className="w-full space-y-1 lg:max-w-xl">
+          <span className="text-xs font-semibold uppercase text-slate-500">Search Requests</span>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input className="field pl-9" value={props.search} onChange={(event) => props.setSearch(event.target.value)} placeholder="Search request" />
           </div>
-          <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase text-slate-500">From Date</span>
-            <input className="field" type="month" value={props.fromMonth} min={months[0]} max={months[months.length - 1]} onChange={(event) => props.setFromMonth(event.target.value)} />
-          </label>
-          <label className="space-y-1">
-            <span className="text-xs font-semibold uppercase text-slate-500">To Date</span>
-            <input className="field" type="month" value={props.toMonth} min={months[0]} max={months[months.length - 1]} onChange={(event) => props.setToMonth(event.target.value)} />
-          </label>
+        </label>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button className="btn-primary" onClick={() => props.setFiltersOpen(!props.filtersOpen)}>
+            <SlidersHorizontal size={16} />
+            Filters
+          </button>
+          <button className="btn-secondary" onClick={props.clearFilters}>Clear Filters</button>
+        </div>
+      </div>
+
+      {props.filtersOpen && (
+        <div className="absolute right-4 top-[calc(100%-8px)] z-30 w-[min(720px,calc(100vw-2rem))] rounded-lg border border-line bg-white p-4 shadow-soft">
+          <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-xs font-semibold uppercase text-slate-500">Departments</span>
+                <button
+                  className="text-xs font-semibold text-[#2d679d]"
+                  onClick={() => props.setSelectedDepartments(allSelected ? [] : allDepartments)}
+                >
+                  {allSelected ? "Unselect all" : "Select all"}
+                </button>
+              </div>
+              <div className="max-h-64 space-y-1 overflow-auto rounded-lg border border-line p-2">
+                {allDepartments.map((department) => (
+                  <label key={department} className="flex items-start gap-2 rounded-md px-2 py-1.5 text-sm leading-6 text-slate-700 hover:bg-slate-50">
+                    <input
+                      className="mt-1"
+                      type="checkbox"
+                      checked={props.selectedDepartments.includes(department)}
+                      onChange={() => toggleDepartment(department)}
+                    />
+                    <span>{department}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-slate-500">{selectedCount} departments selected</p>
+            </div>
+
+            <label className="space-y-2">
+              <span className="text-xs font-semibold uppercase text-slate-500">Requests</span>
+              <select className="field" value={props.requestSort} onChange={(event) => props.setRequestSort(event.target.value as SortDirection)}>
+                <option value="desc">High to low</option>
+                <option value="asc">Low to high</option>
+              </select>
+            </label>
+
+            <label className="space-y-2">
+              <span className="text-xs font-semibold uppercase text-slate-500">Spend</span>
+              <select className="field" value={props.spendSort} onChange={(event) => props.setSpendSort(event.target.value as SortDirection)}>
+                <option value="desc">High to low</option>
+                <option value="asc">Low to high</option>
+              </select>
+            </label>
+          </div>
+
+          {showTimeline && (
+            <div className="mt-4 border-t border-line pt-4">
+              <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_1fr]">
+                <div className="space-y-2">
+                  <span className="text-xs font-semibold uppercase text-slate-500">Timeline</span>
+                  <div className="flex rounded-lg border border-line bg-slate-50 p-1">
+                    {(["monthly", "quarterly", "yearly"] as TimelineMode[]).map((mode) => (
+                      <button key={mode} className={`flex-1 rounded-md px-3 py-2 text-sm capitalize ${props.timelineMode === mode ? "bg-white text-[#2d679d] shadow-sm" : "text-slate-600"}`} onClick={() => props.setTimelineMode(mode)}>
+                        {mode}
+                      </button>
+                    ))}
+                    <button className="flex-1 rounded-md px-3 py-2 text-sm text-slate-400" disabled title="Daily request counts are unavailable because the raw PDF contains month-year dates only.">
+                      daily
+                    </button>
+                  </div>
+                </div>
+                <label className="space-y-2">
+                  <span className="text-xs font-semibold uppercase text-slate-500">From Date</span>
+                  <input className="field" type="month" value={props.fromMonth} min={months[0]} max={months[months.length - 1]} onChange={(event) => props.setFromMonth(event.target.value)} />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-xs font-semibold uppercase text-slate-500">To Date</span>
+                  <input className="field" type="month" value={props.toMonth} min={months[0]} max={months[months.length - 1]} onChange={(event) => props.setToMonth(event.target.value)} />
+                </label>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-500">Day-wise filtering unavailable: the raw PDF provides exact month-year fields, not day-level dates.</p>
+            </div>
+          )}
         </div>
       )}
     </section>
@@ -590,7 +642,7 @@ function ChartPanel({
           <button className="icon-btn" onClick={onExcel} aria-label={`Export ${title} Excel`}><FileSpreadsheet size={16} /></button>
         </div>
       </div>
-      {rows.length === 0 ? <EmptyState /> : table ? <DataTable rows={chartRows(rows)} /> : <div className="chart-pop h-80">{children}</div>}
+      {rows.length === 0 ? <EmptyState /> : table ? <DataTable rows={chartRows(rows)} /> : <div className="chart-pop h-96">{children}</div>}
     </section>
   );
 }
@@ -607,7 +659,7 @@ function DataTable({ rows }: { rows: Record<string, unknown>[] }) {
         <tbody>
           {rows.map((row, index) => (
             <tr key={index} className="odd:bg-white even:bg-slate-50/60">
-              {keys.map((key) => <td key={key} className="border-b border-line px-3 py-2 text-slate-700">{String(row[key] ?? "")}</td>)}
+              {keys.map((key) => <td key={key} className="border-b border-line px-3 py-3 leading-6 text-slate-700">{String(row[key] ?? "")}</td>)}
             </tr>
           ))}
         </tbody>
@@ -689,13 +741,62 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   );
 }
 
+function wrapLabel(value: string, maxLength = 18) {
+  const words = value.split(" ");
+  const lines: string[] = [];
+  let current = "";
+
+  words.forEach((word) => {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > maxLength && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  });
+
+  if (current) lines.push(current);
+  return lines.slice(0, 3);
+}
+
+function WrappedYAxisTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: { value: string } }) {
+  const lines = wrapLabel(String(payload?.value || ""), 20);
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={-8} y={0} textAnchor="end" fill="#536174" fontSize={11}>
+        {lines.map((line, index) => (
+          <tspan key={`${line}-${index}`} x={-8} dy={index === 0 ? -((lines.length - 1) * 7) : 14}>
+            {line}
+          </tspan>
+        ))}
+      </text>
+    </g>
+  );
+}
+
+function WrappedXAxisTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: { value: string } }) {
+  const lines = wrapLabel(String(payload?.value || ""), 14);
+  return (
+    <g transform={`translate(${x},${y + 10})`}>
+      <text textAnchor="middle" fill="#536174" fontSize={10}>
+        {lines.map((line, index) => (
+          <tspan key={`${line}-${index}`} x={0} dy={index === 0 ? 0 : 13}>
+            {line}
+          </tspan>
+        ))}
+      </text>
+    </g>
+  );
+}
+
 function BarViz({ data: rows, valueKey }: { data: Record<string, unknown>[]; valueKey: "requests" | "spend" }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 82, left: 16, bottom: 8 }}>
+      <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 82, left: 12, bottom: 8 }} barCategoryGap={10}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
         <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(value) => (valueKey === "spend" ? formatINR(Number(value), true) : String(value))} />
-        <YAxis dataKey="name" type="category" width={112} tick={{ fontSize: 11 }} />
+        <YAxis dataKey="name" type="category" width={176} interval={0} tick={<WrappedYAxisTick />} />
         <Tooltip content={<CustomTooltip />} />
         <Legend align="right" verticalAlign="middle" layout="vertical" />
         <Bar dataKey={valueKey} name={valueKey === "spend" ? "Spend" : "Requests"} radius={[0, 6, 6, 0]}>
@@ -711,7 +812,7 @@ function DualBar({ data: rows }: { data: Record<string, unknown>[] }) {
     <ResponsiveContainer width="100%" height="100%">
       <BarChart data={rows} margin={{ top: 8, right: 86, left: 8, bottom: 32 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
-        <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-25} textAnchor="end" height={70} />
+        <XAxis dataKey="name" tick={<WrappedXAxisTick />} height={88} interval={0} />
         <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
         <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} tickFormatter={(value) => formatINR(Number(value), true)} />
         <Tooltip content={<CustomTooltip />} />
