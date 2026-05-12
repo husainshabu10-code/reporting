@@ -139,10 +139,19 @@ export default function DashboardApp() {
     if (rows.length === 0) {
       doc.text("No data available", 40, 64);
     } else {
+      const columns = Object.keys(rows[0]);
+      const body = rows.map((row) =>
+        columns.map((column) => {
+          const value = row[column];
+          if (typeof value === "number" || typeof value === "string") return value;
+          if (value === null || value === undefined) return "";
+          return String(value);
+        })
+      );
       autoTable(doc, {
         startY: 56,
-        head: [Object.keys(rows[0])],
-        body: rows.map((row) => Object.values(row)),
+        head: [columns],
+        body,
         styles: { fontSize: 8, cellPadding: 5 },
         headStyles: { fillColor: [121, 167, 216] }
       });
