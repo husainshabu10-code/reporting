@@ -768,7 +768,21 @@ function ChartGrid({ children }: { children: React.ReactNode }) {
 }
 
 function chartCanvasHeight(rows: Record<string, unknown>[]) {
-  return Math.max(360, rows.length * 34);
+  return Math.max(360, rows.length * barRowHeight(rows.length));
+}
+
+function barRowHeight(count: number) {
+  if (count <= 2) return 72;
+  if (count <= 6) return 56;
+  if (count <= 14) return 44;
+  return 38;
+}
+
+function barSize(count: number) {
+  if (count <= 2) return 26;
+  if (count <= 6) return 30;
+  if (count <= 14) return 32;
+  return 34;
 }
 
 function ChartPanel({
@@ -1022,7 +1036,7 @@ function VerticalXAxisTick({ x = 0, y = 0, payload }: { x?: number; y?: number; 
 function BarViz({ data: rows, valueKey }: { data: Record<string, unknown>[]; valueKey: "requests" | "spend" }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 82, left: 12, bottom: 8 }} barCategoryGap={10}>
+      <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 82, left: 12, bottom: 8 }} barCategoryGap={8} barSize={barSize(rows.length)}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
         <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(value) => (valueKey === "spend" ? formatINR(Number(value), true) : String(value))} />
         <YAxis dataKey="name" type="category" width={176} interval={0} tick={<WrappedYAxisTick />} />
@@ -1040,7 +1054,7 @@ function StackedDepartmentBar({ data: rows }: { data: Record<string, unknown>[] 
   if (rows.length === 0) return <EmptyState />;
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 96, left: 12, bottom: 8 }} barCategoryGap={12}>
+      <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 96, left: 12, bottom: 8 }} barCategoryGap={8} barSize={barSize(rows.length)}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
         <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} />
         <YAxis dataKey="name" type="category" width={176} interval={0} tick={<WrappedYAxisTick />} />
