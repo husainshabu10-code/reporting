@@ -11,6 +11,15 @@
   --mist: #f5f7fb;
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #e8eef7;
+  --muted: #a9b6c8;
+  --line: #314156;
+  --panel: #172132;
+  --mist: #0f1724;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -23,6 +32,12 @@ body {
   color: var(--ink);
   font-family: Arial, Helvetica, sans-serif;
   letter-spacing: 0;
+}
+
+:root[data-theme="dark"] body {
+  background:
+    linear-gradient(135deg, rgba(31, 48, 71, 0.9), rgba(20, 28, 44, 0.84) 42%, rgba(21, 43, 42, 0.82)),
+    var(--mist);
 }
 
 button,
@@ -41,6 +56,65 @@ select {
 .chart-pop .recharts-sector:hover {
   opacity: 0.86;
   filter: drop-shadow(0 8px 12px rgba(35, 50, 68, 0.18));
+}
+
+:root[data-theme="dark"] .bg-white,
+:root[data-theme="dark"] .bg-white\/90,
+:root[data-theme="dark"] .bg-white\/92,
+:root[data-theme="dark"] .bg-white\/82 {
+  background-color: rgba(23, 33, 50, 0.94) !important;
+}
+
+:root[data-theme="dark"] .bg-white\/70,
+:root[data-theme="dark"] .bg-white\/40 {
+  background-color: rgba(23, 33, 50, 0.68) !important;
+}
+
+:root[data-theme="dark"] .bg-slate-50,
+:root[data-theme="dark"] .bg-slate-50\/60,
+:root[data-theme="dark"] .bg-slate-100,
+:root[data-theme="dark"] .bg-\[\#f6f8fb\],
+:root[data-theme="dark"] .bg-\[\#f8fafc\] {
+  background-color: rgba(30, 41, 59, 0.78) !important;
+}
+
+:root[data-theme="dark"] .text-ink,
+:root[data-theme="dark"] .text-slate-700,
+:root[data-theme="dark"] .text-slate-600 {
+  color: #e8eef7 !important;
+}
+
+:root[data-theme="dark"] .text-slate-500,
+:root[data-theme="dark"] .text-slate-400 {
+  color: #a9b6c8 !important;
+}
+
+:root[data-theme="dark"] .border-line {
+  border-color: #314156 !important;
+}
+
+:root[data-theme="dark"] .shadow-soft {
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.26) !important;
+}
+
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] select {
+  background-color: #111a29 !important;
+  color: #e8eef7 !important;
+}
+
+:root[data-theme="dark"] input::placeholder {
+  color: #7f8ca1;
+}
+
+:root[data-theme="dark"] .recharts-cartesian-grid line {
+  stroke: #2b3a50;
+}
+
+:root[data-theme="dark"] .recharts-text,
+:root[data-theme="dark"] .recharts-legend-item-text {
+  fill: #a9b6c8 !important;
+  color: #a9b6c8 !important;
 }
 
 @media print {
