@@ -495,7 +495,6 @@ export default function DashboardApp() {
                       <ChartPanel id="dept-view-spend" title="Department Spend" variant="wide" data={departmentSpend} table={tableModes["dept-view-spend"]} compare={compareModes["dept-view-spend"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} onToggleTable={() => toggle(setTableModes, "dept-view-spend")} onToggleCompare={() => toggle(setCompareModes, "dept-view-spend")} onPdf={() => exportPdf("Department Spend", rowsForExport(pageRows))} onExcel={() => exportExcel("Department Spend", rowsForExport(pageRows))}>
                         {compareModes["dept-view-spend"] ? <StackedDepartmentBar data={compareTypeRows} /> : <BarViz data={departmentSpend} valueKey="spend" />}
                       </ChartPanel>
-                      <NoData title="Project Involvement" />
                     </ChartGrid>
                   )}
 
