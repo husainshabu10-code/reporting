@@ -471,7 +471,6 @@ export default function DashboardApp() {
                       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         <MiniKpi title="Total Spend Overview" value={formatINR(data.kpis.totalSpend.value, true)} icon={<IndianRupee size={20} />} />
                         <MiniKpi title="Known Row Spend" value={formatINR(pageRows.reduce((sum, row) => sum + (row.amount || 0), 0), true)} icon={<WalletCards size={20} />} />
-                        <MiniKpi title="TBD Amount Requests" value={String(pageRows.filter((row) => row.amount === null).length)} icon={<SlidersHorizontal size={20} />} />
                       </div>
                       <ChartGrid>
                         <ChartPanel id="budget-dept" title="Spend by Department" variant="wide" data={departmentSpend} table={tableModes["budget-dept"]} compare={compareModes["budget-dept"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} onToggleTable={() => toggle(setTableModes, "budget-dept")} onToggleCompare={() => toggle(setCompareModes, "budget-dept")} onPdf={() => exportPdf("Spend by Department", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend by Department", rowsForExport(pageRows))}>
