@@ -270,9 +270,10 @@ export default function DashboardApp() {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen overflow-x-hidden">
+      {sidebarOpen && <button className="no-print fixed inset-0 z-30 bg-slate-900/25 backdrop-blur-[2px] lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close navigation overlay" />}
       <aside
-        className={`no-print fixed inset-y-0 left-0 z-40 w-72 border-r border-line bg-white/92 shadow-soft backdrop-blur transition-transform duration-300 lg:translate-x-0 ${
+        className={`no-print fixed inset-y-0 left-0 z-40 flex w-[min(18rem,86vw)] flex-col border-r border-line bg-white/92 shadow-soft backdrop-blur transition-transform duration-300 lg:w-72 lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -285,7 +286,7 @@ export default function DashboardApp() {
             <X size={20} />
           </button>
         </div>
-        <nav className="space-y-1 p-4">
+        <nav className="flex-1 space-y-1 overflow-y-auto p-4">
           {pages.map((page) => {
             const Icon = page.icon;
             return (
@@ -307,21 +308,21 @@ export default function DashboardApp() {
         </nav>
       </aside>
 
-      <main className="lg:pl-72">
+      <main className="min-w-0 lg:pl-72">
         <header className="sticky top-0 z-30 border-b border-line bg-white/82 backdrop-blur">
-          <div className="flex min-h-20 flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-3">
-              <button className="no-print rounded-md border border-line bg-white p-2 text-slate-600 lg:hidden" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
+          <div className="flex min-h-20 flex-col gap-3 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+            <div className="flex min-w-0 items-center gap-3">
+              <button className="no-print rounded-md border border-line bg-white p-2.5 text-slate-600 lg:hidden" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
                 <Menu size={20} />
               </button>
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm text-slate-500">{activePage}</p>
-                <h2 className="text-2xl font-semibold text-ink sm:text-3xl">IT Request Analytics Dashboard</h2>
+                <h2 className="text-xl font-semibold leading-tight text-ink sm:text-2xl xl:text-3xl">IT Request Analytics Dashboard</h2>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap lg:w-auto lg:items-center lg:justify-end">
               <button
-                className="btn-secondary no-print"
+                className="btn-secondary no-print justify-center"
                 onClick={() => setTheme(theme === "light" ? "dark" : "light")}
                 aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
               >
@@ -338,7 +339,7 @@ export default function DashboardApp() {
           </div>
         </header>
 
-        <div className="space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="w-full max-w-[1800px] space-y-5 px-3 py-4 sm:space-y-6 sm:px-5 sm:py-6 lg:px-7 xl:px-8">
           {activePage !== "Dashboard" && (
             <FilterPanel
               activePage={activePage}
@@ -467,7 +468,7 @@ export default function DashboardApp() {
 
                   {activePage === "Budget" && (
                     <>
-                      <div className="grid gap-4 md:grid-cols-3">
+                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                         <MiniKpi title="Total Spend Overview" value={formatINR(data.kpis.totalSpend.value, true)} icon={<IndianRupee size={20} />} />
                         <MiniKpi title="Known Row Spend" value={formatINR(pageRows.reduce((sum, row) => sum + (row.amount || 0), 0), true)} icon={<WalletCards size={20} />} />
                         <MiniKpi title="TBD Amount Requests" value={String(pageRows.filter((row) => row.amount === null).length)} icon={<SlidersHorizontal size={20} />} />
@@ -530,6 +531,20 @@ function toggle(setter: (updater: (current: Record<string, boolean>) => Record<s
   setter((current) => ({ ...current, [key]: !current[key] }));
 }
 
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    setMatches(media.matches);
+    const listener = (event: MediaQueryListEvent) => setMatches(event.matches);
+    media.addEventListener("change", listener);
+    return () => media.removeEventListener("change", listener);
+  }, [query]);
+
+  return matches;
+}
+
 function labelTimeline(mode: TimelineMode) {
   return mode === "monthly" ? "Monthly" : mode === "quarterly" ? "Quarterly" : "Yearly";
 }
@@ -554,11 +569,11 @@ function groupDepartmentTypes(rows: RequestRow[], departments: string[]) {
 
 function ExportCluster({ onPdfAll, onPdfFiltered, onExcelAll, onExcelFiltered }: { onPdfAll: () => void; onPdfFiltered: () => void; onExcelAll: () => void; onExcelFiltered: () => void }) {
   return (
-    <div className="no-print flex flex-wrap items-center gap-2">
-      <button className="btn-secondary" onClick={onPdfAll}><FileDown size={16} /> PDF All</button>
-      <button className="btn-primary" onClick={onPdfFiltered}><Download size={16} /> PDF Filtered</button>
-      <button className="btn-secondary" onClick={onExcelAll}><FileSpreadsheet size={16} /> Excel All</button>
-      <button className="btn-secondary" onClick={onExcelFiltered}><FileSpreadsheet size={16} /> Excel Filtered</button>
+    <div className="no-print grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end">
+      <button className="btn-secondary justify-center" onClick={onPdfAll}><FileDown size={16} /> PDF All</button>
+      <button className="btn-primary justify-center" onClick={onPdfFiltered}><Download size={16} /> PDF Filtered</button>
+      <button className="btn-secondary justify-center" onClick={onExcelAll}><FileSpreadsheet size={16} /> Excel All</button>
+      <button className="btn-secondary justify-center" onClick={onExcelFiltered}><FileSpreadsheet size={16} /> Excel Filtered</button>
     </div>
   );
 }
@@ -607,7 +622,7 @@ function FilterPanel(props: {
   }
 
   return (
-    <section className="no-print relative rounded-lg border border-line bg-white/90 p-4 shadow-soft">
+    <section className="no-print relative rounded-lg border border-line bg-white/90 p-3 shadow-soft sm:p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <label className="w-full space-y-1 lg:max-w-xl">
           <span className="text-xs font-semibold uppercase text-slate-500">Search Requests</span>
@@ -617,18 +632,18 @@ function FilterPanel(props: {
           </div>
         </label>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button className="btn-primary" onClick={() => props.setFiltersOpen(!props.filtersOpen)}>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          <button className="btn-primary justify-center" onClick={() => props.setFiltersOpen(!props.filtersOpen)}>
             <SlidersHorizontal size={16} />
             Filters
           </button>
-          <button className="btn-secondary" onClick={props.clearFilters}>Clear Filters</button>
+          <button className="btn-secondary justify-center" onClick={props.clearFilters}>Clear Filters</button>
         </div>
       </div>
 
       {props.filtersOpen && (
-        <div className="absolute right-4 top-[calc(100%-8px)] z-30 w-[min(720px,calc(100vw-2rem))] rounded-lg border border-line bg-white p-4 shadow-soft">
-          <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr]">
+        <div className="mt-4 max-h-[72vh] w-full overflow-y-auto rounded-lg border border-line bg-white p-3 shadow-soft sm:p-4 md:absolute md:right-4 md:top-[calc(100%-8px)] md:z-30 md:mt-0 md:w-[min(720px,calc(100vw-2rem))]">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr]">
             <div>
               <div className="mb-2 flex items-center justify-between gap-3">
                 <span className="text-xs font-semibold uppercase text-slate-500">Departments</span>
@@ -641,7 +656,7 @@ function FilterPanel(props: {
               </div>
               <div className="max-h-64 space-y-1 overflow-auto rounded-lg border border-line p-2">
                 {allDepartments.map((department) => (
-                  <label key={department} className="flex items-start gap-2 rounded-md px-2 py-1.5 text-sm leading-6 text-slate-700 hover:bg-slate-50">
+                  <label key={department} className="flex min-h-11 items-start gap-2 rounded-md px-2 py-2 text-sm leading-6 text-slate-700 hover:bg-slate-50">
                     <input
                       className="mt-1"
                       type="checkbox"
@@ -690,7 +705,7 @@ function FilterPanel(props: {
               </div>
 
               {requestTermsOpen && (
-                <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {requestTermGroups.map((group) => (
                     <div key={group.title} className="rounded-lg border border-line p-3">
                       <h4 className="text-sm font-semibold text-ink">{group.title}</h4>
@@ -727,7 +742,7 @@ function FilterPanel(props: {
               <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_1fr]">
                 <div className="space-y-2">
                   <span className="text-xs font-semibold uppercase text-slate-500">Timeline</span>
-                  <div className="flex rounded-lg border border-line bg-slate-50 p-1">
+                  <div className="grid grid-cols-2 rounded-lg border border-line bg-slate-50 p-1 sm:grid-cols-4">
                     {(["monthly", "quarterly", "yearly"] as TimelineMode[]).map((mode) => (
                       <button key={mode} className={`flex-1 rounded-md px-3 py-2 text-sm capitalize ${props.timelineMode === mode ? "bg-white text-[#2d679d] shadow-sm" : "text-slate-600"}`} onClick={() => props.setTimelineMode(mode)}>
                         {mode}
@@ -758,7 +773,7 @@ function FilterPanel(props: {
 
 function KpiGrid() {
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       <MiniKpi title="Total Requests" value={String(data.kpis.totalRequests.value)} icon={<BarChart3 size={20} />} tone="blue" />
       <MiniKpi title="Department with Most Requests" value={`${data.kpis.departmentWithMostRequests.value} (${data.kpis.departmentWithMostRequests.requests})`} icon={<Building2 size={20} />} tone="green" />
       <MiniKpi title="Total Spend" value={formatINR(data.kpis.totalSpend.value, true)} icon={<IndianRupee size={20} />} tone="rose" />
@@ -773,11 +788,11 @@ function MiniKpi({ title, value, icon, tone = "blue" }: { title: string; value: 
     rose: "bg-[#fff0f2] text-[#a04d62]"
   };
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="print-panel rounded-lg border border-line bg-white p-5 shadow-soft">
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="print-panel rounded-lg border border-line bg-white p-4 shadow-soft sm:p-5">
       <div className="flex items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <p className="text-sm font-medium text-slate-500">{title}</p>
-          <p className="mt-3 text-2xl font-semibold text-ink">{value}</p>
+          <p className="mt-3 break-words text-xl font-semibold text-ink sm:text-2xl">{value}</p>
         </div>
         <div className={`rounded-lg p-3 ${tones[tone]}`}>{icon}</div>
       </div>
@@ -786,25 +801,25 @@ function MiniKpi({ title, value, icon, tone = "blue" }: { title: string; value: 
 }
 
 function ChartGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-flow-dense items-start gap-5 xl:grid-cols-12">{children}</div>;
+  return <div className="grid grid-flow-dense items-start gap-4 lg:grid-cols-12 xl:gap-5">{children}</div>;
 }
 
 function panelSpan(variant: PanelVariant) {
   const spans: Record<PanelVariant, string> = {
-    compact: "xl:col-span-4",
-    standard: "xl:col-span-6",
-    wide: "xl:col-span-8",
-    full: "xl:col-span-12"
+    compact: "lg:col-span-6 xl:col-span-4",
+    standard: "lg:col-span-6",
+    wide: "lg:col-span-12 xl:col-span-8",
+    full: "lg:col-span-12"
   };
   return spans[variant];
 }
 
 function panelViewport(variant: PanelVariant) {
   const heights: Record<PanelVariant, string> = {
-    compact: "h-80",
-    standard: "h-96",
-    wide: "h-[28rem]",
-    full: "h-[30rem]"
+    compact: "h-[20rem] sm:h-80",
+    standard: "h-[22rem] sm:h-96",
+    wide: "h-[24rem] sm:h-[28rem]",
+    full: "h-[26rem] sm:h-[30rem]"
   };
   return heights[variant];
 }
@@ -860,19 +875,19 @@ function ChartPanel({
   onExcel: () => void;
 }) {
   return (
-    <section id={id} className={`print-panel rounded-lg border border-line bg-white p-4 shadow-soft ${panelSpan(variant)}`}>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
+    <section id={id} className={`print-panel min-w-0 rounded-lg border border-line bg-white p-3 shadow-soft sm:p-4 ${panelSpan(variant)}`}>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h3 className="text-base font-semibold text-ink">{title}</h3>
           <p className="text-sm text-slate-500">{rows.length ? `${rows.length} data points` : "No data available"}</p>
         </div>
-        <div className="no-print flex flex-wrap items-center gap-2">
+        <div className="no-print grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
           {onToggleCompare && (
-            <button className={`btn-compact ${compare ? "bg-[#e8f5ee] text-[#2f7a52]" : ""}`} onClick={onToggleCompare}>
+            <button className={`btn-compact justify-center ${compare ? "bg-[#e8f5ee] text-[#2f7a52]" : ""}`} onClick={onToggleCompare}>
               Compare Mode
             </button>
           )}
-          <button className="btn-compact" onClick={onToggleTable}><Table2 size={15} /> View as Table</button>
+          <button className="btn-compact justify-center" onClick={onToggleTable}><Table2 size={15} /> View as Table</button>
           <button className="icon-btn" onClick={onPdf} aria-label={`Export ${title} PDF`}><FileDown size={16} /></button>
           <button className="icon-btn" onClick={onExcel} aria-label={`Export ${title} Excel`}><FileSpreadsheet size={16} /></button>
         </div>
@@ -944,15 +959,15 @@ function DataTable({ rows }: { rows: Record<string, unknown>[] }) {
   if (!rows.length) return <EmptyState />;
   const keys = Object.keys(rows[0]);
   return (
-    <div className="max-h-80 overflow-auto rounded-lg border border-line">
-      <table className="w-full min-w-[620px] border-collapse text-left text-sm">
+    <div className="max-h-80 max-w-full overflow-auto overscroll-x-contain rounded-lg border border-line">
+      <table className="w-full min-w-[720px] border-collapse text-left text-xs sm:text-sm">
         <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500">
-          <tr>{keys.map((key) => <th key={key} className="border-b border-line px-3 py-2">{key}</th>)}</tr>
+          <tr>{keys.map((key) => <th key={key} className="border-b border-line px-2.5 py-2 sm:px-3">{key}</th>)}</tr>
         </thead>
         <tbody>
           {rows.map((row, index) => (
             <tr key={index} className="odd:bg-white even:bg-slate-50/60">
-              {keys.map((key) => <td key={key} className="border-b border-line px-3 py-3 leading-6 text-slate-700">{String(row[key] ?? "")}</td>)}
+              {keys.map((key) => <td key={key} className="border-b border-line px-2.5 py-2.5 leading-6 text-slate-700 sm:px-3 sm:py-3">{String(row[key] ?? "")}</td>)}
             </tr>
           ))}
         </tbody>
@@ -985,9 +1000,9 @@ function RequestTable({
   }, [rows, tableSearch]);
 
   return (
-    <section className="print-panel rounded-lg border border-line bg-white p-4 shadow-soft xl:col-span-12">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
+    <section className="print-panel min-w-0 rounded-lg border border-line bg-white p-3 shadow-soft sm:p-4 lg:col-span-12">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h3 className="text-base font-semibold">{title}</h3>
           <p className="text-sm text-slate-500">{visibleRows.length} of {rows.length} requests</p>
         </div>
@@ -1009,12 +1024,12 @@ function RequestTable({
 }
 
 function EmptyState() {
-  return <div className="flex h-80 items-center justify-center rounded-lg border border-dashed border-line bg-slate-50 text-sm text-slate-500">No data available</div>;
+  return <div className="flex h-64 items-center justify-center rounded-lg border border-dashed border-line bg-slate-50 px-4 text-center text-sm text-slate-500 sm:h-80">No data available</div>;
 }
 
 function NoData({ title }: { title: string }) {
   return (
-    <section className="print-panel rounded-lg border border-line bg-white p-4 shadow-soft xl:col-span-4">
+    <section className="print-panel min-w-0 rounded-lg border border-line bg-white p-3 shadow-soft sm:p-4 lg:col-span-6 xl:col-span-4">
       <h3 className="text-base font-semibold">{title}</h3>
       <div className="mt-4"><EmptyState /></div>
     </section>
@@ -1023,7 +1038,7 @@ function NoData({ title }: { title: string }) {
 
 function LoadingGrid() {
   return (
-    <div className="grid gap-5 xl:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-2 xl:gap-5">
       {Array.from({ length: 6 }).map((_, index) => (
         <div key={index} className="h-80 animate-pulse rounded-lg border border-line bg-white/70 p-4 shadow-soft">
           <div className="h-5 w-1/3 rounded bg-slate-200" />
@@ -1036,9 +1051,9 @@ function LoadingGrid() {
 
 function Insights({ insights }: { insights: string[] }) {
   return (
-    <section className="rounded-lg border border-line bg-white p-5 shadow-soft">
+    <section className="rounded-lg border border-line bg-white p-4 shadow-soft sm:p-5">
       <h3 className="text-base font-semibold">Show Insights</h3>
-      <div className="mt-3 grid gap-3 md:grid-cols-3">
+      <div className="mt-3 grid gap-3 lg:grid-cols-3">
         {insights.map((item) => (
           <p key={item} className="rounded-lg bg-[#f6f8fb] p-3 text-sm text-slate-700">{item}</p>
         ))}
@@ -1107,15 +1122,22 @@ function VerticalXAxisTick({ x = 0, y = 0, payload }: { x?: number; y?: number; 
   );
 }
 
+function legendProps(isMobile: boolean) {
+  return isMobile
+    ? { align: "center" as const, verticalAlign: "bottom" as const, layout: "horizontal" as const }
+    : { align: "right" as const, verticalAlign: "middle" as const, layout: "vertical" as const };
+}
+
 function BarViz({ data: rows, valueKey }: { data: Record<string, unknown>[]; valueKey: "requests" | "spend" }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 82, left: 12, bottom: 8 }} barCategoryGap={8} barSize={barSize(rows.length)}>
+      <BarChart data={rows} layout="vertical" margin={isMobile ? { top: 8, right: 12, left: 0, bottom: 42 } : { top: 8, right: 82, left: 12, bottom: 8 }} barCategoryGap={8} barSize={barSize(rows.length)}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
         <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(value) => (valueKey === "spend" ? formatINR(Number(value), true) : String(value))} />
-        <YAxis dataKey="name" type="category" width={176} interval={0} tick={<WrappedYAxisTick />} />
+        <YAxis dataKey="name" type="category" width={isMobile ? 118 : 176} interval={0} tick={<WrappedYAxisTick />} />
         <Tooltip content={<CustomTooltip />} />
-        <Legend align="right" verticalAlign="middle" layout="vertical" />
+        <Legend {...legendProps(isMobile)} />
         <Bar dataKey={valueKey} name={valueKey === "spend" ? "Spend" : "Requests"} radius={[0, 6, 6, 0]}>
           {rows.map((_, index) => <Cell key={index} fill={palette[index % palette.length]} />)}
         </Bar>
@@ -1125,15 +1147,16 @@ function BarViz({ data: rows, valueKey }: { data: Record<string, unknown>[]; val
 }
 
 function StackedDepartmentBar({ data: rows }: { data: Record<string, unknown>[] }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
   if (rows.length === 0) return <EmptyState />;
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 96, left: 12, bottom: 8 }} barCategoryGap={8} barSize={barSize(rows.length)}>
+      <BarChart data={rows} layout="vertical" margin={isMobile ? { top: 8, right: 12, left: 0, bottom: 52 } : { top: 8, right: 96, left: 12, bottom: 8 }} barCategoryGap={8} barSize={barSize(rows.length)}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
         <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} />
-        <YAxis dataKey="name" type="category" width={176} interval={0} tick={<WrappedYAxisTick />} />
+        <YAxis dataKey="name" type="category" width={isMobile ? 118 : 176} interval={0} tick={<WrappedYAxisTick />} />
         <Tooltip content={<CustomTooltip />} />
-        <Legend align="right" verticalAlign="middle" layout="vertical" />
+        <Legend {...legendProps(isMobile)} />
         <Bar dataKey="Development" stackId="requests" name="Development" fill="#79a7d8" radius={[0, 0, 0, 0]} />
         <Bar dataKey="Subscription" stackId="requests" name="Subscription" fill="#8fc9a8" radius={[0, 0, 0, 0]} />
         <Bar dataKey="Software" stackId="requests" name="Software" fill="#f6c66f" radius={[0, 6, 6, 0]} />
@@ -1143,14 +1166,15 @@ function StackedDepartmentBar({ data: rows }: { data: Record<string, unknown>[] 
 }
 
 function LineViz({ data: rows }: { data: Record<string, unknown>[] }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={rows} margin={{ top: 8, right: 82, left: 8, bottom: 82 }}>
+      <LineChart data={rows} margin={isMobile ? { top: 8, right: 12, left: 0, bottom: 92 } : { top: 8, right: 82, left: 8, bottom: 82 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
         <XAxis dataKey="name" tick={<VerticalXAxisTick />} height={82} interval={0} />
         <YAxis tick={{ fontSize: 12 }} />
         <Tooltip content={<CustomTooltip />} />
-        <Legend align="right" verticalAlign="middle" layout="vertical" />
+        <Legend {...legendProps(isMobile)} />
         <Line type="monotone" dataKey="requests" name="Requests" stroke="#79a7d8" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 7 }} />
       </LineChart>
     </ResponsiveContainer>
@@ -1158,9 +1182,10 @@ function LineViz({ data: rows }: { data: Record<string, unknown>[] }) {
 }
 
 function AreaViz({ data: rows }: { data: Record<string, unknown>[] }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={rows} margin={{ top: 8, right: 82, left: 8, bottom: 82 }}>
+      <AreaChart data={rows} margin={isMobile ? { top: 8, right: 12, left: 0, bottom: 92 } : { top: 8, right: 82, left: 8, bottom: 82 }}>
         <defs>
           <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor="#8fc9a8" stopOpacity={0.5} />
@@ -1171,7 +1196,7 @@ function AreaViz({ data: rows }: { data: Record<string, unknown>[] }) {
         <XAxis dataKey="name" tick={<VerticalXAxisTick />} height={82} interval={0} />
         <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => formatINR(Number(value), true)} />
         <Tooltip content={<CustomTooltip />} />
-        <Legend align="right" verticalAlign="middle" layout="vertical" />
+        <Legend {...legendProps(isMobile)} />
         <Area type="monotone" dataKey="spend" name="Spend" stroke="#4d9b70" strokeWidth={3} fill="url(#spendFill)" />
       </AreaChart>
     </ResponsiveContainer>
@@ -1179,16 +1204,17 @@ function AreaViz({ data: rows }: { data: Record<string, unknown>[] }) {
 }
 
 function DonutViz({ data: rows, valueKey = "requests" }: { data: Record<string, unknown>[]; valueKey?: "requests" | "spend" }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
   const total = rows.reduce((sum, row) => sum + Number(row[valueKey] || 0), 0);
   const withTotal = rows.map((row) => ({ ...row, total }));
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <PieChart margin={{ top: 8, right: 86, left: 8, bottom: 8 }}>
-        <Pie data={withTotal} dataKey={valueKey} nameKey="name" innerRadius={62} outerRadius={98} paddingAngle={3}>
+      <PieChart margin={isMobile ? { top: 8, right: 8, left: 8, bottom: 56 } : { top: 8, right: 86, left: 8, bottom: 8 }}>
+        <Pie data={withTotal} dataKey={valueKey} nameKey="name" innerRadius={isMobile ? 46 : 62} outerRadius={isMobile ? 78 : 98} paddingAngle={3}>
           {rows.map((_, index) => <Cell key={index} fill={palette[index % palette.length]} />)}
         </Pie>
         <Tooltip content={<CustomTooltip />} />
-        <Legend align="right" verticalAlign="middle" layout="vertical" />
+        <Legend {...legendProps(isMobile)} />
       </PieChart>
     </ResponsiveContainer>
   );

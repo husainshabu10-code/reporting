@@ -24,6 +24,12 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   background:
@@ -44,6 +50,16 @@ button,
 input,
 select {
   font: inherit;
+}
+
+button,
+select,
+input:not([type="checkbox"]):not([type="radio"]) {
+  min-height: 2.5rem;
+}
+
+table {
+  max-width: 100%;
 }
 
 .chart-pop .recharts-rectangle,
@@ -73,6 +89,7 @@ select {
 :root[data-theme="dark"] .bg-slate-50,
 :root[data-theme="dark"] .bg-slate-50\/60,
 :root[data-theme="dark"] .bg-slate-100,
+:root[data-theme="dark"] .bg-slate-200,
 :root[data-theme="dark"] .bg-\[\#f6f8fb\],
 :root[data-theme="dark"] .bg-\[\#f8fafc\] {
   background-color: rgba(30, 41, 59, 0.78) !important;
@@ -139,18 +156,18 @@ select {
   }
 
   .btn-primary {
-    @apply inline-flex items-center gap-2 rounded-lg bg-[#2d679d] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#24547f];
+    @apply inline-flex min-h-10 items-center gap-2 rounded-lg bg-[#2d679d] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#24547f];
   }
 
   .btn-secondary {
-    @apply inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50;
+    @apply inline-flex min-h-10 items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50;
   }
 
   .btn-compact {
-    @apply inline-flex items-center gap-2 rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50;
+    @apply inline-flex min-h-10 items-center gap-2 rounded-lg border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50;
   }
 
   .icon-btn {
-    @apply inline-flex h-8 w-8 items-center justify-center rounded-lg border border-line bg-white text-slate-600 transition hover:bg-slate-50;
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-lg border border-line bg-white text-slate-600 transition hover:bg-slate-50;
   }
 }
