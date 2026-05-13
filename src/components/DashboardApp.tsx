@@ -62,6 +62,8 @@ type TimelineMode = "monthly" | "quarterly" | "yearly";
 type ExportScope = "all" | "filtered";
 type RequestTermScope = "type" | "category" | "status";
 type PanelVariant = "compact" | "standard" | "wide" | "full";
+type ChartTemplate = "horizontal-bar" | "vertical-bar" | "donut" | "pie" | "line" | "area" | "stacked-bar" | "grouped-bar";
+type ChartTemplateOption = { value: ChartTemplate; label: string };
 
 const allRequests = data.requests as RequestRow[];
 const allDepartments = Array.from(new Set(allRequests.map((row) => row.department))).sort();
@@ -74,6 +76,38 @@ const requestTermGroups: Array<{ title: string; scope: RequestTermScope; terms: 
   { title: "Request Type", scope: "type", terms: Array.from(new Set(allRequests.map((row) => row.type))).sort() },
   { title: "Request Category", scope: "category", terms: Array.from(new Set(allRequests.map((row) => row.category))).sort() },
   { title: "Request Status", scope: "status", terms: Array.from(new Set(allRequests.map((row) => row.status))).sort() }
+];
+const horizontalBarOptions: ChartTemplateOption[] = [
+  { value: "horizontal-bar", label: "Default: Horizontal Bar" },
+  { value: "vertical-bar", label: "Vertical Bar" },
+  { value: "donut", label: "Donut" },
+  { value: "pie", label: "Pie" }
+];
+const spendBarOptions: ChartTemplateOption[] = [
+  { value: "horizontal-bar", label: "Default: Horizontal Bar" },
+  { value: "vertical-bar", label: "Vertical Bar" },
+  { value: "donut", label: "Donut" },
+  { value: "pie", label: "Pie" }
+];
+const donutOptions: ChartTemplateOption[] = [
+  { value: "donut", label: "Default: Donut" },
+  { value: "pie", label: "Pie" },
+  { value: "horizontal-bar", label: "Horizontal Bar" },
+  { value: "vertical-bar", label: "Vertical Bar" }
+];
+const lineOptions: ChartTemplateOption[] = [
+  { value: "line", label: "Default: Line" },
+  { value: "area", label: "Area" },
+  { value: "vertical-bar", label: "Vertical Bar" }
+];
+const areaOptions: ChartTemplateOption[] = [
+  { value: "area", label: "Default: Area" },
+  { value: "line", label: "Line" },
+  { value: "vertical-bar", label: "Vertical Bar" }
+];
+const compareOptions: ChartTemplateOption[] = [
+  { value: "stacked-bar", label: "Default: Stacked Bar" },
+  { value: "grouped-bar", label: "Grouped Bar" }
 ];
 
 export default function DashboardApp() {
@@ -93,6 +127,7 @@ export default function DashboardApp() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [tableModes, setTableModes] = useState<Record<string, boolean>>({});
   const [compareModes, setCompareModes] = useState<Record<string, boolean>>({});
+  const [chartTemplates, setChartTemplates] = useState<Record<string, ChartTemplate>>({});
 
   useEffect(() => {
     const timer = window.setTimeout(() => setReady(true), 260);
@@ -268,6 +303,18 @@ export default function DashboardApp() {
     setFromMonth(months[0] || "");
     setToMonth(months[months.length - 1] || "");
   };
+  const selectedTemplate = (id: string, fallback: ChartTemplate, options: ChartTemplateOption[]) => {
+    const saved = chartTemplates[id];
+    return saved && options.some((option) => option.value === saved) ? saved : fallback;
+  };
+  const setChartTemplate = (id: string, value: ChartTemplate) => {
+    setChartTemplates((current) => ({ ...current, [id]: value }));
+  };
+  const chartTemplateProps = (id: string, fallback: ChartTemplate, options: ChartTemplateOption[]) => ({
+    templateOptions: options,
+    selectedTemplate: selectedTemplate(id, fallback, options),
+    onTemplateChange: (value: ChartTemplate) => setChartTemplate(id, value)
+  });
 
   return (
     <div className="min-h-screen overflow-x-hidden">
@@ -392,25 +439,31 @@ export default function DashboardApp() {
                           tableRows={pageRows}
                           compareDepartments={compareDepartments}
                           setCompareDepartments={setCompareDepartments}
+                          {...chartTemplateProps("dept-requests", compareModes["dept-requests"] ? "stacked-bar" : "horizontal-bar", compareModes["dept-requests"] ? compareOptions : horizontalBarOptions)}
                           onToggleTable={() => toggle(setTableModes, "dept-requests")}
                           onToggleCompare={() => toggle(setCompareModes, "dept-requests")}
                           onPdf={() => exportPdf("Department-wise Requests", rowsForExport(pageRows))}
                           onExcel={() => exportExcel("Department-wise Requests", rowsForExport(pageRows))}
                         >
-                          {compareModes["dept-requests"] ? <StackedDepartmentBar data={compareTypeRows} /> : <BarViz data={departmentRequests} valueKey="requests" />}
+                          {compareModes["dept-requests"] ? (
+                            <CompareChart template={selectedTemplate("dept-requests", "stacked-bar", compareOptions)} data={compareTypeRows} />
+                          ) : (
+                            <MetricChart template={selectedTemplate("dept-requests", "horizontal-bar", horizontalBarOptions)} data={departmentRequests} valueKey="requests" />
+                          )}
                         </ChartPanel>
                         <ChartPanel
                           id="monthly-trend"
                           title="Monthly Trend Line"
-                          variant="compact"
+                          variant="standard"
                           data={trendRows}
                           table={tableModes["monthly-trend"]}
                           tableRows={pageRows}
+                          {...chartTemplateProps("monthly-trend", "line", lineOptions)}
                           onToggleTable={() => toggle(setTableModes, "monthly-trend")}
                           onPdf={() => exportPdf("Monthly Trend Line", rowsForExport(pageRows))}
                           onExcel={() => exportExcel("Monthly Trend Line", rowsForExport(pageRows))}
                         >
-                          <LineViz data={trendRows} />
+                          <TrendChart template={selectedTemplate("monthly-trend", "line", lineOptions)} data={trendRows} valueKey="requests" />
                         </ChartPanel>
                         <ChartPanel
                           id="spend-dept"
@@ -422,12 +475,17 @@ export default function DashboardApp() {
                           tableRows={pageRows}
                           compareDepartments={compareDepartments}
                           setCompareDepartments={setCompareDepartments}
+                          {...chartTemplateProps("spend-dept", compareModes["spend-dept"] ? "stacked-bar" : "horizontal-bar", compareModes["spend-dept"] ? compareOptions : spendBarOptions)}
                           onToggleTable={() => toggle(setTableModes, "spend-dept")}
                           onToggleCompare={() => toggle(setCompareModes, "spend-dept")}
                           onPdf={() => exportPdf("Spend by Department", rowsForExport(pageRows))}
                           onExcel={() => exportExcel("Spend by Department", rowsForExport(pageRows))}
                         >
-                          {compareModes["spend-dept"] ? <StackedDepartmentBar data={compareTypeRows} /> : <BarViz data={departmentSpend} valueKey="spend" />}
+                          {compareModes["spend-dept"] ? (
+                            <CompareChart template={selectedTemplate("spend-dept", "stacked-bar", compareOptions)} data={compareTypeRows} />
+                          ) : (
+                            <MetricChart template={selectedTemplate("spend-dept", "horizontal-bar", spendBarOptions)} data={departmentSpend} valueKey="spend" />
+                          )}
                         </ChartPanel>
                         <ChartPanel
                           id="request-category"
@@ -439,12 +497,17 @@ export default function DashboardApp() {
                           tableRows={pageRows}
                           compareDepartments={compareDepartments}
                           setCompareDepartments={setCompareDepartments}
+                          {...chartTemplateProps("request-category", compareModes["request-category"] ? "stacked-bar" : "donut", compareModes["request-category"] ? compareOptions : donutOptions)}
                           onToggleTable={() => toggle(setTableModes, "request-category")}
                           onToggleCompare={() => toggle(setCompareModes, "request-category")}
                           onPdf={() => exportPdf("Request Category", rowsForExport(pageRows))}
                           onExcel={() => exportExcel("Request Category", rowsForExport(pageRows))}
                         >
-                          {compareModes["request-category"] ? <StackedDepartmentBar data={compareTypeRows} /> : <DonutViz data={categoryRows} />}
+                          {compareModes["request-category"] ? (
+                            <CompareChart template={selectedTemplate("request-category", "stacked-bar", compareOptions)} data={compareTypeRows} />
+                          ) : (
+                            <MetricChart template={selectedTemplate("request-category", "donut", donutOptions)} data={categoryRows} valueKey="requests" />
+                          )}
                         </ChartPanel>
                       </ChartGrid>
                       <Insights insights={summaryInsights} />
@@ -453,14 +516,18 @@ export default function DashboardApp() {
 
                   {activePage === "IT Requests" && (
                     <ChartGrid>
-                      <ChartPanel id="request-status" title="Request Status Overview" variant="compact" data={statusRows} table={tableModes["request-status"]} tableRows={pageRows} onToggleTable={() => toggle(setTableModes, "request-status")} onPdf={() => exportPdf("Request Status Overview", rowsForExport(pageRows))} onExcel={() => exportExcel("Request Status Overview", rowsForExport(pageRows))}>
-                        <DonutViz data={statusRows} />
+                      <ChartPanel id="request-status" title="Request Status Overview" variant="compact" data={statusRows} table={tableModes["request-status"]} tableRows={pageRows} {...chartTemplateProps("request-status", "donut", donutOptions)} onToggleTable={() => toggle(setTableModes, "request-status")} onPdf={() => exportPdf("Request Status Overview", rowsForExport(pageRows))} onExcel={() => exportExcel("Request Status Overview", rowsForExport(pageRows))}>
+                        <MetricChart template={selectedTemplate("request-status", "donut", donutOptions)} data={statusRows} valueKey="requests" />
                       </ChartPanel>
-                      <ChartPanel id="request-dept" title="Department-wise Requests" variant="wide" data={departmentRequests} table={tableModes["request-dept"]} compare={compareModes["request-dept"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} onToggleTable={() => toggle(setTableModes, "request-dept")} onToggleCompare={() => toggle(setCompareModes, "request-dept")} onPdf={() => exportPdf("Department-wise Requests", rowsForExport(pageRows))} onExcel={() => exportExcel("Department-wise Requests", rowsForExport(pageRows))}>
-                        {compareModes["request-dept"] ? <StackedDepartmentBar data={compareTypeRows} /> : <BarViz data={departmentRequests} valueKey="requests" />}
+                      <ChartPanel id="request-dept" title="Department-wise Requests" variant="wide" data={departmentRequests} table={tableModes["request-dept"]} compare={compareModes["request-dept"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} {...chartTemplateProps("request-dept", compareModes["request-dept"] ? "stacked-bar" : "horizontal-bar", compareModes["request-dept"] ? compareOptions : horizontalBarOptions)} onToggleTable={() => toggle(setTableModes, "request-dept")} onToggleCompare={() => toggle(setCompareModes, "request-dept")} onPdf={() => exportPdf("Department-wise Requests", rowsForExport(pageRows))} onExcel={() => exportExcel("Department-wise Requests", rowsForExport(pageRows))}>
+                        {compareModes["request-dept"] ? (
+                          <CompareChart template={selectedTemplate("request-dept", "stacked-bar", compareOptions)} data={compareTypeRows} />
+                        ) : (
+                          <MetricChart template={selectedTemplate("request-dept", "horizontal-bar", horizontalBarOptions)} data={departmentRequests} valueKey="requests" />
+                        )}
                       </ChartPanel>
-                      <ChartPanel id="request-type" title="Request Category/Type Breakdown" variant="compact" data={typeRows} table={tableModes["request-type"]} tableRows={pageRows} onToggleTable={() => toggle(setTableModes, "request-type")} onPdf={() => exportPdf("Request Type Breakdown", rowsForExport(pageRows))} onExcel={() => exportExcel("Request Type Breakdown", rowsForExport(pageRows))}>
-                        <DonutViz data={typeRows} />
+                      <ChartPanel id="request-type" title="Request Category/Type Breakdown" variant="compact" data={typeRows} table={tableModes["request-type"]} tableRows={pageRows} {...chartTemplateProps("request-type", "donut", donutOptions)} onToggleTable={() => toggle(setTableModes, "request-type")} onPdf={() => exportPdf("Request Type Breakdown", rowsForExport(pageRows))} onExcel={() => exportExcel("Request Type Breakdown", rowsForExport(pageRows))}>
+                        <MetricChart template={selectedTemplate("request-type", "donut", donutOptions)} data={typeRows} valueKey="requests" />
                       </ChartPanel>
                       <RequestTable title="Matching Requests" rows={sortedRequests} onPdf={(exportRows) => exportPdf("Matching Requests", rowsForExport(exportRows))} onExcel={(exportRows) => exportExcel("Matching Requests", rowsForExport(exportRows))} />
                     </ChartGrid>
@@ -473,14 +540,22 @@ export default function DashboardApp() {
                         <MiniKpi title="Known Row Spend" value={formatINR(pageRows.reduce((sum, row) => sum + (row.amount || 0), 0), true)} icon={<WalletCards size={20} />} />
                       </div>
                       <ChartGrid>
-                        <ChartPanel id="budget-dept" title="Spend by Department" variant="wide" data={departmentSpend} table={tableModes["budget-dept"]} compare={compareModes["budget-dept"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} onToggleTable={() => toggle(setTableModes, "budget-dept")} onToggleCompare={() => toggle(setCompareModes, "budget-dept")} onPdf={() => exportPdf("Spend by Department", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend by Department", rowsForExport(pageRows))}>
-                          {compareModes["budget-dept"] ? <StackedDepartmentBar data={compareTypeRows} /> : <BarViz data={departmentSpend} valueKey="spend" />}
+                        <ChartPanel id="budget-dept" title="Spend by Department" variant="wide" data={departmentSpend} table={tableModes["budget-dept"]} compare={compareModes["budget-dept"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} {...chartTemplateProps("budget-dept", compareModes["budget-dept"] ? "stacked-bar" : "horizontal-bar", compareModes["budget-dept"] ? compareOptions : spendBarOptions)} onToggleTable={() => toggle(setTableModes, "budget-dept")} onToggleCompare={() => toggle(setCompareModes, "budget-dept")} onPdf={() => exportPdf("Spend by Department", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend by Department", rowsForExport(pageRows))}>
+                          {compareModes["budget-dept"] ? (
+                            <CompareChart template={selectedTemplate("budget-dept", "stacked-bar", compareOptions)} data={compareTypeRows} />
+                          ) : (
+                            <MetricChart template={selectedTemplate("budget-dept", "horizontal-bar", spendBarOptions)} data={departmentSpend} valueKey="spend" />
+                          )}
                         </ChartPanel>
-                        <ChartPanel id="budget-category" title="Spend by Request/Category" variant="compact" data={spendCategoryRows} table={tableModes["budget-category"]} compare={compareModes["budget-category"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} onToggleTable={() => toggle(setTableModes, "budget-category")} onToggleCompare={() => toggle(setCompareModes, "budget-category")} onPdf={() => exportPdf("Spend by Category", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend by Category", rowsForExport(pageRows))}>
-                          {compareModes["budget-category"] ? <StackedDepartmentBar data={compareTypeRows} /> : <DonutViz data={spendCategoryRows} valueKey="spend" />}
+                        <ChartPanel id="budget-category" title="Spend by Request/Category" variant="compact" data={spendCategoryRows} table={tableModes["budget-category"]} compare={compareModes["budget-category"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} {...chartTemplateProps("budget-category", compareModes["budget-category"] ? "stacked-bar" : "donut", compareModes["budget-category"] ? compareOptions : donutOptions)} onToggleTable={() => toggle(setTableModes, "budget-category")} onToggleCompare={() => toggle(setCompareModes, "budget-category")} onPdf={() => exportPdf("Spend by Category", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend by Category", rowsForExport(pageRows))}>
+                          {compareModes["budget-category"] ? (
+                            <CompareChart template={selectedTemplate("budget-category", "stacked-bar", compareOptions)} data={compareTypeRows} />
+                          ) : (
+                            <MetricChart template={selectedTemplate("budget-category", "donut", donutOptions)} data={spendCategoryRows} valueKey="spend" />
+                          )}
                         </ChartPanel>
-                        <ChartPanel id="budget-trend" title="Spend Trends Over Time" variant="standard" data={trendRows} table={tableModes["budget-trend"]} tableRows={pageRows} onToggleTable={() => toggle(setTableModes, "budget-trend")} onPdf={() => exportPdf("Spend Trends", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend Trends", rowsForExport(pageRows))}>
-                          <AreaViz data={trendRows} />
+                        <ChartPanel id="budget-trend" title="Spend Trends Over Time" variant="standard" data={trendRows} table={tableModes["budget-trend"]} tableRows={pageRows} {...chartTemplateProps("budget-trend", "area", areaOptions)} onToggleTable={() => toggle(setTableModes, "budget-trend")} onPdf={() => exportPdf("Spend Trends", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend Trends", rowsForExport(pageRows))}>
+                          <TrendChart template={selectedTemplate("budget-trend", "area", areaOptions)} data={trendRows} valueKey="spend" />
                         </ChartPanel>
                       </ChartGrid>
                     </>
@@ -488,25 +563,41 @@ export default function DashboardApp() {
 
                   {activePage === "Departments" && (
                     <ChartGrid>
-                      <ChartPanel id="dept-view-requests" title="Department Requests" variant="wide" data={departmentRequests} table={tableModes["dept-view-requests"]} compare={compareModes["dept-view-requests"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} onToggleTable={() => toggle(setTableModes, "dept-view-requests")} onToggleCompare={() => toggle(setCompareModes, "dept-view-requests")} onPdf={() => exportPdf("Department Requests", rowsForExport(pageRows))} onExcel={() => exportExcel("Department Requests", rowsForExport(pageRows))}>
-                        {compareModes["dept-view-requests"] ? <StackedDepartmentBar data={compareTypeRows} /> : <BarViz data={departmentRequests} valueKey="requests" />}
+                      <ChartPanel id="dept-view-requests" title="Department Requests" variant="wide" data={departmentRequests} table={tableModes["dept-view-requests"]} compare={compareModes["dept-view-requests"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} {...chartTemplateProps("dept-view-requests", compareModes["dept-view-requests"] ? "stacked-bar" : "horizontal-bar", compareModes["dept-view-requests"] ? compareOptions : horizontalBarOptions)} onToggleTable={() => toggle(setTableModes, "dept-view-requests")} onToggleCompare={() => toggle(setCompareModes, "dept-view-requests")} onPdf={() => exportPdf("Department Requests", rowsForExport(pageRows))} onExcel={() => exportExcel("Department Requests", rowsForExport(pageRows))}>
+                        {compareModes["dept-view-requests"] ? (
+                          <CompareChart template={selectedTemplate("dept-view-requests", "stacked-bar", compareOptions)} data={compareTypeRows} />
+                        ) : (
+                          <MetricChart template={selectedTemplate("dept-view-requests", "horizontal-bar", horizontalBarOptions)} data={departmentRequests} valueKey="requests" />
+                        )}
                       </ChartPanel>
-                      <ChartPanel id="dept-view-spend" title="Department Spend" variant="wide" data={departmentSpend} table={tableModes["dept-view-spend"]} compare={compareModes["dept-view-spend"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} onToggleTable={() => toggle(setTableModes, "dept-view-spend")} onToggleCompare={() => toggle(setCompareModes, "dept-view-spend")} onPdf={() => exportPdf("Department Spend", rowsForExport(pageRows))} onExcel={() => exportExcel("Department Spend", rowsForExport(pageRows))}>
-                        {compareModes["dept-view-spend"] ? <StackedDepartmentBar data={compareTypeRows} /> : <BarViz data={departmentSpend} valueKey="spend" />}
+                      <ChartPanel id="dept-view-spend" title="Department Spend" variant="wide" data={departmentSpend} table={tableModes["dept-view-spend"]} compare={compareModes["dept-view-spend"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} {...chartTemplateProps("dept-view-spend", compareModes["dept-view-spend"] ? "stacked-bar" : "horizontal-bar", compareModes["dept-view-spend"] ? compareOptions : spendBarOptions)} onToggleTable={() => toggle(setTableModes, "dept-view-spend")} onToggleCompare={() => toggle(setCompareModes, "dept-view-spend")} onPdf={() => exportPdf("Department Spend", rowsForExport(pageRows))} onExcel={() => exportExcel("Department Spend", rowsForExport(pageRows))}>
+                        {compareModes["dept-view-spend"] ? (
+                          <CompareChart template={selectedTemplate("dept-view-spend", "stacked-bar", compareOptions)} data={compareTypeRows} />
+                        ) : (
+                          <MetricChart template={selectedTemplate("dept-view-spend", "horizontal-bar", spendBarOptions)} data={departmentSpend} valueKey="spend" />
+                        )}
                       </ChartPanel>
                     </ChartGrid>
                   )}
 
                   {activePage === "Trends" && (
                     <ChartGrid>
-                      <ChartPanel id="trend-requests" title={`${labelTimeline(timelineMode)} Request Trends`} variant={compareModes["trend-requests"] ? "wide" : "standard"} data={trendRows} table={tableModes["trend-requests"]} compare={compareModes["trend-requests"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} onToggleTable={() => toggle(setTableModes, "trend-requests")} onToggleCompare={() => toggle(setCompareModes, "trend-requests")} onPdf={() => exportPdf("Request Trends", rowsForExport(pageRows))} onExcel={() => exportExcel("Request Trends", rowsForExport(pageRows))}>
-                        {compareModes["trend-requests"] ? <StackedDepartmentBar data={compareTypeRows} /> : <LineViz data={trendRows} />}
+                      <ChartPanel id="trend-requests" title={`${labelTimeline(timelineMode)} Request Trends`} variant={compareModes["trend-requests"] ? "wide" : "standard"} data={trendRows} table={tableModes["trend-requests"]} compare={compareModes["trend-requests"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} {...chartTemplateProps("trend-requests", compareModes["trend-requests"] ? "stacked-bar" : "line", compareModes["trend-requests"] ? compareOptions : lineOptions)} onToggleTable={() => toggle(setTableModes, "trend-requests")} onToggleCompare={() => toggle(setCompareModes, "trend-requests")} onPdf={() => exportPdf("Request Trends", rowsForExport(pageRows))} onExcel={() => exportExcel("Request Trends", rowsForExport(pageRows))}>
+                        {compareModes["trend-requests"] ? (
+                          <CompareChart template={selectedTemplate("trend-requests", "stacked-bar", compareOptions)} data={compareTypeRows} />
+                        ) : (
+                          <TrendChart template={selectedTemplate("trend-requests", "line", lineOptions)} data={trendRows} valueKey="requests" />
+                        )}
                       </ChartPanel>
-                      <ChartPanel id="trend-spend" title={`${labelTimeline(timelineMode)} Spend Trends`} variant="standard" data={trendRows} table={tableModes["trend-spend"]} tableRows={pageRows} onToggleTable={() => toggle(setTableModes, "trend-spend")} onPdf={() => exportPdf("Spend Trends", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend Trends", rowsForExport(pageRows))}>
-                        <AreaViz data={trendRows} />
+                      <ChartPanel id="trend-spend" title={`${labelTimeline(timelineMode)} Spend Trends`} variant="standard" data={trendRows} table={tableModes["trend-spend"]} tableRows={pageRows} {...chartTemplateProps("trend-spend", "area", areaOptions)} onToggleTable={() => toggle(setTableModes, "trend-spend")} onPdf={() => exportPdf("Spend Trends", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend Trends", rowsForExport(pageRows))}>
+                        <TrendChart template={selectedTemplate("trend-spend", "area", areaOptions)} data={trendRows} valueKey="spend" />
                       </ChartPanel>
-                      <ChartPanel id="trend-category" title="Request Category Comparison" variant="wide" data={categoryRows} table={tableModes["trend-category"]} compare={compareModes["trend-category"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} onToggleTable={() => toggle(setTableModes, "trend-category")} onToggleCompare={() => toggle(setCompareModes, "trend-category")} onPdf={() => exportPdf("Category Comparison", rowsForExport(pageRows))} onExcel={() => exportExcel("Category Comparison", rowsForExport(pageRows))}>
-                        {compareModes["trend-category"] ? <StackedDepartmentBar data={compareTypeRows} /> : <BarViz data={categoryRows} valueKey="requests" />}
+                      <ChartPanel id="trend-category" title="Request Category Comparison" variant="wide" data={categoryRows} table={tableModes["trend-category"]} compare={compareModes["trend-category"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} {...chartTemplateProps("trend-category", compareModes["trend-category"] ? "stacked-bar" : "horizontal-bar", compareModes["trend-category"] ? compareOptions : horizontalBarOptions)} onToggleTable={() => toggle(setTableModes, "trend-category")} onToggleCompare={() => toggle(setCompareModes, "trend-category")} onPdf={() => exportPdf("Category Comparison", rowsForExport(pageRows))} onExcel={() => exportExcel("Category Comparison", rowsForExport(pageRows))}>
+                        {compareModes["trend-category"] ? (
+                          <CompareChart template={selectedTemplate("trend-category", "stacked-bar", compareOptions)} data={compareTypeRows} />
+                        ) : (
+                          <MetricChart template={selectedTemplate("trend-category", "horizontal-bar", horizontalBarOptions)} data={categoryRows} valueKey="requests" />
+                        )}
                       </ChartPanel>
                     </ChartGrid>
                   )}
@@ -812,7 +903,12 @@ function panelSpan(variant: PanelVariant) {
   return spans[variant];
 }
 
-function panelViewport(variant: PanelVariant) {
+function panelViewport(variant: PanelVariant, template?: ChartTemplate) {
+  if (template === "donut" || template === "pie") return "h-[18rem] sm:h-[20rem]";
+  if (template === "line" || template === "area") return "h-[23rem] sm:h-[27rem]";
+  if (template === "horizontal-bar" || template === "stacked-bar" || template === "grouped-bar") return "h-[24rem] sm:h-[28rem]";
+  if (template === "vertical-bar") return "h-[22rem] sm:h-[25rem]";
+
   const heights: Record<PanelVariant, string> = {
     compact: "h-[20rem] sm:h-80",
     standard: "h-[22rem] sm:h-96",
@@ -850,6 +946,9 @@ function ChartPanel({
   compare = false,
   compareDepartments,
   setCompareDepartments,
+  templateOptions,
+  selectedTemplate,
+  onTemplateChange,
   children,
   onToggleTable,
   onToggleCompare,
@@ -865,6 +964,9 @@ function ChartPanel({
   compare?: boolean;
   compareDepartments?: string[];
   setCompareDepartments?: (value: string[]) => void;
+  templateOptions?: ChartTemplateOption[];
+  selectedTemplate?: ChartTemplate;
+  onTemplateChange?: (value: ChartTemplate) => void;
   children: React.ReactNode;
   onToggleTable: () => void;
   onToggleCompare?: () => void;
@@ -879,6 +981,18 @@ function ChartPanel({
           <p className="text-sm text-slate-500">{rows.length ? `${rows.length} data points` : "No data available"}</p>
         </div>
         <div className="no-print grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
+          {templateOptions && selectedTemplate && onTemplateChange && (
+            <select
+              className="field col-span-2 h-10 min-w-44 py-1.5 text-xs font-semibold sm:col-span-1 sm:w-auto"
+              value={selectedTemplate}
+              onChange={(event) => onTemplateChange(event.target.value as ChartTemplate)}
+              aria-label={`${title} chart template`}
+            >
+              {templateOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          )}
           {onToggleCompare && (
             <button className={`btn-compact justify-center ${compare ? "bg-[#e8f5ee] text-[#2f7a52]" : ""}`} onClick={onToggleCompare}>
               Compare Mode
@@ -897,7 +1011,7 @@ function ChartPanel({
       ) : table ? (
         <DataTable rows={rowsForExport(tableRows || [])} />
       ) : (
-        <div className={`chart-pop ${panelViewport(variant)} overflow-hidden rounded-lg border border-line bg-white/40 p-1`}>
+        <div className={`chart-pop ${panelViewport(variant, selectedTemplate)} overflow-hidden rounded-lg border border-line bg-white/40 p-1`}>
           <div style={{ height: chartCanvasHeight() }}>{children}</div>
         </div>
       )}
@@ -1150,11 +1264,11 @@ function BarScaleAxis({
   const rightMargin = isMobile ? 12 : 24;
 
   return (
-    <div className="bar-sticky-axis h-12 flex-none border-t border-line bg-white/90">
+    <div className="bar-sticky-axis h-12 flex-none bg-white/90">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={[{ name: "axis" }]} layout="vertical" margin={{ top: 0, right: rightMargin, left: isMobile ? 0 : 12, bottom: 4 }}>
           <XAxis type="number" domain={[0, domainMax]} allowDecimals={valueKey === "spend"} tick={{ fontSize: 12 }} tickFormatter={axisFormatter(valueKey)} />
-          <YAxis dataKey="name" type="category" width={yAxisWidth} hide />
+          <YAxis dataKey="name" type="category" width={yAxisWidth} tick={false} axisLine={false} tickLine={false} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -1172,6 +1286,39 @@ function ChartLegendList({ items }: { items: Array<{ label: string; color: strin
       ))}
     </div>
   );
+}
+
+function MetricChart({
+  template,
+  data: rows,
+  valueKey = "requests"
+}: {
+  template: ChartTemplate;
+  data: Record<string, unknown>[];
+  valueKey?: "requests" | "spend";
+}) {
+  if (template === "vertical-bar") return <VerticalBarViz data={rows} valueKey={valueKey} />;
+  if (template === "donut") return <DonutViz data={rows} valueKey={valueKey} shape="donut" />;
+  if (template === "pie") return <DonutViz data={rows} valueKey={valueKey} shape="pie" />;
+  return <BarViz data={rows} valueKey={valueKey} />;
+}
+
+function TrendChart({
+  template,
+  data: rows,
+  valueKey = "requests"
+}: {
+  template: ChartTemplate;
+  data: Record<string, unknown>[];
+  valueKey?: "requests" | "spend";
+}) {
+  if (template === "area") return <AreaViz data={rows} valueKey={valueKey} />;
+  if (template === "vertical-bar") return <VerticalBarViz data={rows} valueKey={valueKey} />;
+  return <LineViz data={rows} valueKey={valueKey} />;
+}
+
+function CompareChart({ template, data: rows }: { template: ChartTemplate; data: Record<string, unknown>[] }) {
+  return <StackedDepartmentBar data={rows} mode={template === "grouped-bar" ? "grouped" : "stacked"} />;
 }
 
 function BarViz({ data: rows, valueKey }: { data: Record<string, unknown>[]; valueKey: "requests" | "spend" }) {
@@ -1207,12 +1354,34 @@ function BarViz({ data: rows, valueKey }: { data: Record<string, unknown>[]; val
   );
 }
 
-function StackedDepartmentBar({ data: rows }: { data: Record<string, unknown>[] }) {
+function VerticalBarViz({ data: rows, valueKey }: { data: Record<string, unknown>[]; valueKey: "requests" | "spend" }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={rows} margin={isMobile ? { top: 8, right: 12, left: 0, bottom: 92 } : { top: 8, right: 82, left: 8, bottom: 92 }} barCategoryGap={10} barSize={barSize(rows.length)}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
+        <XAxis dataKey="name" tick={<VerticalXAxisTick />} height={82} interval={0} />
+        <YAxis tick={{ fontSize: 12 }} tickFormatter={axisFormatter(valueKey)} />
+        <Tooltip content={<CustomTooltip />} />
+        <Legend {...legendProps(isMobile)} />
+        <Bar dataKey={valueKey} name={valueKey === "spend" ? "Spend" : "Requests"} radius={[6, 6, 0, 0]}>
+          {rows.map((_, index) => <Cell key={index} fill={palette[index % palette.length]} />)}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function StackedDepartmentBar({ data: rows, mode = "stacked" }: { data: Record<string, unknown>[]; mode?: "stacked" | "grouped" }) {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const yAxisWidth = isMobile ? 118 : 176;
   const rightMargin = isMobile ? 12 : 24;
   const stackKeys = ["Development", "Subscription", "Software"];
-  const domainMax = barDomain(rows, stackKeys);
+  const domainMax =
+    mode === "grouped"
+      ? Math.max(1, ...rows.flatMap((row) => stackKeys.map((key) => Number(row[key] || 0))))
+      : barDomain(rows, stackKeys);
   const needsScroll = rows.length > (isMobile ? 5 : 8);
   const scrollHeight = Math.max(280, rows.length * barRowHeight(rows.length));
 
@@ -1228,9 +1397,9 @@ function StackedDepartmentBar({ data: rows }: { data: Record<string, unknown>[] 
                 <XAxis type="number" domain={[0, domainMax]} allowDecimals={false} hide />
                 <YAxis dataKey="name" type="category" width={yAxisWidth} interval={0} tick={<WrappedYAxisTick />} />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="Development" stackId="requests" name="Development" fill="#79a7d8" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Subscription" stackId="requests" name="Subscription" fill="#8fc9a8" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Software" stackId="requests" name="Software" fill="#f6c66f" radius={[0, 6, 6, 0]} />
+                <Bar dataKey="Development" stackId={mode === "stacked" ? "requests" : undefined} name="Development" fill="#79a7d8" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Subscription" stackId={mode === "stacked" ? "requests" : undefined} name="Subscription" fill="#8fc9a8" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Software" stackId={mode === "stacked" ? "requests" : undefined} name="Software" fill="#f6c66f" radius={[0, 6, 6, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -1248,24 +1417,28 @@ function StackedDepartmentBar({ data: rows }: { data: Record<string, unknown>[] 
   );
 }
 
-function LineViz({ data: rows }: { data: Record<string, unknown>[] }) {
+function LineViz({ data: rows, valueKey = "requests" }: { data: Record<string, unknown>[]; valueKey?: "requests" | "spend" }) {
   const isMobile = useMediaQuery("(max-width: 767px)");
+  const label = valueKey === "spend" ? "Spend" : "Requests";
+
   return (
     <ResponsiveContainer width="100%" height="100%">
       <LineChart data={rows} margin={isMobile ? { top: 8, right: 12, left: 0, bottom: 92 } : { top: 8, right: 82, left: 8, bottom: 82 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
         <XAxis dataKey="name" tick={<VerticalXAxisTick />} height={82} interval={0} />
-        <YAxis tick={{ fontSize: 12 }} />
+        <YAxis tick={{ fontSize: 12 }} tickFormatter={axisFormatter(valueKey)} />
         <Tooltip content={<CustomTooltip />} />
         <Legend {...legendProps(isMobile)} />
-        <Line type="monotone" dataKey="requests" name="Requests" stroke="#79a7d8" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 7 }} />
+        <Line type="monotone" dataKey={valueKey} name={label} stroke="#79a7d8" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 7 }} />
       </LineChart>
     </ResponsiveContainer>
   );
 }
 
-function AreaViz({ data: rows }: { data: Record<string, unknown>[] }) {
+function AreaViz({ data: rows, valueKey = "spend" }: { data: Record<string, unknown>[]; valueKey?: "requests" | "spend" }) {
   const isMobile = useMediaQuery("(max-width: 767px)");
+  const label = valueKey === "spend" ? "Spend" : "Requests";
+
   return (
     <ResponsiveContainer width="100%" height="100%">
       <AreaChart data={rows} margin={isMobile ? { top: 8, right: 12, left: 0, bottom: 92 } : { top: 8, right: 82, left: 8, bottom: 82 }}>
@@ -1277,23 +1450,31 @@ function AreaViz({ data: rows }: { data: Record<string, unknown>[] }) {
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
         <XAxis dataKey="name" tick={<VerticalXAxisTick />} height={82} interval={0} />
-        <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => formatINR(Number(value), true)} />
+        <YAxis tick={{ fontSize: 12 }} tickFormatter={axisFormatter(valueKey)} />
         <Tooltip content={<CustomTooltip />} />
         <Legend {...legendProps(isMobile)} />
-        <Area type="monotone" dataKey="spend" name="Spend" stroke="#4d9b70" strokeWidth={3} fill="url(#spendFill)" />
+        <Area type="monotone" dataKey={valueKey} name={label} stroke="#4d9b70" strokeWidth={3} fill="url(#spendFill)" />
       </AreaChart>
     </ResponsiveContainer>
   );
 }
 
-function DonutViz({ data: rows, valueKey = "requests" }: { data: Record<string, unknown>[]; valueKey?: "requests" | "spend" }) {
+function DonutViz({
+  data: rows,
+  valueKey = "requests",
+  shape = "donut"
+}: {
+  data: Record<string, unknown>[];
+  valueKey?: "requests" | "spend";
+  shape?: "donut" | "pie";
+}) {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const total = rows.reduce((sum, row) => sum + Number(row[valueKey] || 0), 0);
   const withTotal = rows.map((row) => ({ ...row, total }));
   return (
     <ResponsiveContainer width="100%" height="100%">
       <PieChart margin={isMobile ? { top: 8, right: 8, left: 8, bottom: 56 } : { top: 8, right: 86, left: 8, bottom: 8 }}>
-        <Pie data={withTotal} dataKey={valueKey} nameKey="name" innerRadius={isMobile ? 46 : 62} outerRadius={isMobile ? 78 : 98} paddingAngle={3}>
+        <Pie data={withTotal} dataKey={valueKey} nameKey="name" innerRadius={shape === "donut" ? (isMobile ? 46 : 62) : 0} outerRadius={isMobile ? 78 : 98} paddingAngle={3}>
           {rows.map((_, index) => <Cell key={index} fill={palette[index % palette.length]} />)}
         </Pie>
         <Tooltip content={<CustomTooltip />} />

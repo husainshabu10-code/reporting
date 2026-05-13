@@ -74,6 +74,15 @@ table {
   filter: drop-shadow(0 8px 12px rgba(35, 50, 68, 0.18));
 }
 
+.bar-chart-frame,
+.bar-chart-frame > * {
+  min-width: 0;
+}
+
+.bar-sticky-axis {
+  pointer-events: none;
+}
+
 :root[data-theme="dark"] .bg-white,
 :root[data-theme="dark"] .bg-white\/90,
 :root[data-theme="dark"] .bg-white\/92,
