@@ -824,9 +824,8 @@ function panelViewport(variant: PanelVariant) {
   return heights[variant];
 }
 
-function chartCanvasHeight(rows: Record<string, unknown>[], variant: PanelVariant) {
-  if (variant !== "wide") return "100%";
-  return Math.max(420, rows.length * barRowHeight(rows.length));
+function chartCanvasHeight() {
+  return "100%";
 }
 
 function barRowHeight(count: number) {
@@ -900,8 +899,8 @@ function ChartPanel({
       ) : table ? (
         <DataTable rows={rowsForExport(tableRows || [])} />
       ) : (
-        <div className={`chart-pop ${panelViewport(variant)} overflow-auto rounded-lg border border-line bg-white/40 p-1`}>
-          <div style={{ height: chartCanvasHeight(rows, variant) }}>{children}</div>
+        <div className={`chart-pop ${panelViewport(variant)} overflow-hidden rounded-lg border border-line bg-white/40 p-1`}>
+          <div style={{ height: chartCanvasHeight() }}>{children}</div>
         </div>
       )}
     </section>
@@ -1128,40 +1127,126 @@ function legendProps(isMobile: boolean) {
     : { align: "right" as const, verticalAlign: "middle" as const, layout: "vertical" as const };
 }
 
+function axisFormatter(valueKey: "requests" | "spend") {
+  return (value: number | string) => (valueKey === "spend" ? formatINR(Number(value), true) : String(value));
+}
+
+function barDomain(rows: Record<string, unknown>[], keys: string[]) {
+  const maxValue = Math.max(
+    0,
+    ...rows.map((row) => keys.reduce((sum, key) => sum + Number(row[key] || 0), 0))
+  );
+  return Math.max(1, maxValue);
+}
+
+function BarScaleAxis({
+  domainMax,
+  isMobile,
+  valueKey
+}: {
+  domainMax: number;
+  isMobile: boolean;
+  valueKey: "requests" | "spend";
+}) {
+  const yAxisWidth = isMobile ? 118 : 176;
+  const rightMargin = isMobile ? 12 : 24;
+
+  return (
+    <div className="bar-sticky-axis h-12 flex-none border-t border-line bg-white/90">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={[{ name: "axis" }]} layout="vertical" margin={{ top: 0, right: rightMargin, left: isMobile ? 0 : 12, bottom: 4 }}>
+          <XAxis type="number" domain={[0, domainMax]} allowDecimals={valueKey === "spend"} tick={{ fontSize: 12 }} tickFormatter={axisFormatter(valueKey)} />
+          <YAxis dataKey="name" type="category" width={yAxisWidth} hide />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function ChartLegendList({ items }: { items: Array<{ label: string; color: string }> }) {
+  return (
+    <div className="bar-legend flex flex-wrap gap-2 px-2 pb-1 pt-2 text-xs font-semibold text-slate-600 md:w-28 md:flex-col md:justify-center md:px-0 md:py-2">
+      {items.map((item) => (
+        <div key={item.label} className="flex items-center gap-2 leading-5">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+          <span>{item.label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function BarViz({ data: rows, valueKey }: { data: Record<string, unknown>[]; valueKey: "requests" | "spend" }) {
   const isMobile = useMediaQuery("(max-width: 767px)");
+  const yAxisWidth = isMobile ? 118 : 176;
+  const rightMargin = isMobile ? 12 : 24;
+  const domainMax = barDomain(rows, [valueKey]);
+  const needsScroll = rows.length > (isMobile ? 5 : 8);
+  const scrollHeight = Math.max(280, rows.length * barRowHeight(rows.length));
+
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={rows} layout="vertical" margin={isMobile ? { top: 8, right: 12, left: 0, bottom: 42 } : { top: 8, right: 82, left: 12, bottom: 8 }} barCategoryGap={8} barSize={barSize(rows.length)}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
-        <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(value) => (valueKey === "spend" ? formatINR(Number(value), true) : String(value))} />
-        <YAxis dataKey="name" type="category" width={isMobile ? 118 : 176} interval={0} tick={<WrappedYAxisTick />} />
-        <Tooltip content={<CustomTooltip />} />
-        <Legend {...legendProps(isMobile)} />
-        <Bar dataKey={valueKey} name={valueKey === "spend" ? "Spend" : "Requests"} radius={[0, 6, 6, 0]}>
-          {rows.map((_, index) => <Cell key={index} fill={palette[index % palette.length]} />)}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="bar-chart-frame flex h-full min-h-0 flex-col md:grid md:grid-cols-[minmax(0,1fr)_auto] md:gap-3">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className={`min-h-0 flex-1 ${needsScroll ? "overflow-y-auto overscroll-contain" : "overflow-hidden"}`}>
+          <div style={{ height: needsScroll ? scrollHeight : "100%" }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={rows} layout="vertical" margin={{ top: 8, right: rightMargin, left: isMobile ? 0 : 12, bottom: 0 }} barCategoryGap={8} barSize={barSize(rows.length)}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
+                <XAxis type="number" domain={[0, domainMax]} allowDecimals={valueKey === "spend"} hide tickFormatter={axisFormatter(valueKey)} />
+                <YAxis dataKey="name" type="category" width={yAxisWidth} interval={0} tick={<WrappedYAxisTick />} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey={valueKey} name={valueKey === "spend" ? "Spend" : "Requests"} radius={[0, 6, 6, 0]}>
+                  {rows.map((_, index) => <Cell key={index} fill={palette[index % palette.length]} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <BarScaleAxis domainMax={domainMax} isMobile={isMobile} valueKey={valueKey} />
+      </div>
+      <ChartLegendList items={[{ label: valueKey === "spend" ? "Spend" : "Requests", color: "#79a7d8" }]} />
+    </div>
   );
 }
 
 function StackedDepartmentBar({ data: rows }: { data: Record<string, unknown>[] }) {
   const isMobile = useMediaQuery("(max-width: 767px)");
+  const yAxisWidth = isMobile ? 118 : 176;
+  const rightMargin = isMobile ? 12 : 24;
+  const stackKeys = ["Development", "Subscription", "Software"];
+  const domainMax = barDomain(rows, stackKeys);
+  const needsScroll = rows.length > (isMobile ? 5 : 8);
+  const scrollHeight = Math.max(280, rows.length * barRowHeight(rows.length));
+
   if (rows.length === 0) return <EmptyState />;
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={rows} layout="vertical" margin={isMobile ? { top: 8, right: 12, left: 0, bottom: 52 } : { top: 8, right: 96, left: 12, bottom: 8 }} barCategoryGap={8} barSize={barSize(rows.length)}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
-        <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} />
-        <YAxis dataKey="name" type="category" width={isMobile ? 118 : 176} interval={0} tick={<WrappedYAxisTick />} />
-        <Tooltip content={<CustomTooltip />} />
-        <Legend {...legendProps(isMobile)} />
-        <Bar dataKey="Development" stackId="requests" name="Development" fill="#79a7d8" radius={[0, 0, 0, 0]} />
-        <Bar dataKey="Subscription" stackId="requests" name="Subscription" fill="#8fc9a8" radius={[0, 0, 0, 0]} />
-        <Bar dataKey="Software" stackId="requests" name="Software" fill="#f6c66f" radius={[0, 6, 6, 0]} />
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="bar-chart-frame flex h-full min-h-0 flex-col md:grid md:grid-cols-[minmax(0,1fr)_auto] md:gap-3">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className={`min-h-0 flex-1 ${needsScroll ? "overflow-y-auto overscroll-contain" : "overflow-hidden"}`}>
+          <div style={{ height: needsScroll ? scrollHeight : "100%" }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={rows} layout="vertical" margin={{ top: 8, right: rightMargin, left: isMobile ? 0 : 12, bottom: 0 }} barCategoryGap={8} barSize={barSize(rows.length)}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
+                <XAxis type="number" domain={[0, domainMax]} allowDecimals={false} hide />
+                <YAxis dataKey="name" type="category" width={yAxisWidth} interval={0} tick={<WrappedYAxisTick />} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="Development" stackId="requests" name="Development" fill="#79a7d8" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Subscription" stackId="requests" name="Subscription" fill="#8fc9a8" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="Software" stackId="requests" name="Software" fill="#f6c66f" radius={[0, 6, 6, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <BarScaleAxis domainMax={domainMax} isMobile={isMobile} valueKey="requests" />
+      </div>
+      <ChartLegendList
+        items={[
+          { label: "Development", color: "#79a7d8" },
+          { label: "Subscription", color: "#8fc9a8" },
+          { label: "Software", color: "#f6c66f" }
+        ]}
+      />
+    </div>
   );
 }
 
