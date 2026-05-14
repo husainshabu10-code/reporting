@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type React from "react";
 import {
   Area,
@@ -110,8 +110,6 @@ const compareOptions: ChartTemplateOption[] = [
   { value: "stacked-bar", label: "Default: Stacked Bar" },
   { value: "grouped-bar", label: "Grouped Bar" }
 ];
-const ChartResizeContext = createContext<ChartResize>({ widthScale: 1, heightScale: 1 });
-
 export default function DashboardApp() {
   const [activePage, setActivePage] = useState("Dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -892,10 +890,24 @@ function MiniKpi({ title, value, icon, tone = "blue" }: { title: string; value: 
 }
 
 function ChartGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-flow-dense items-start gap-4 lg:grid-cols-12 xl:gap-5">{children}</div>;
+  return <motion.div layout className="grid grid-flow-dense items-start gap-4 lg:grid-cols-12 xl:gap-5">{children}</motion.div>;
 }
 
-function panelSpan(variant: PanelVariant) {
+function panelSpan(variant: PanelVariant, widthScale = 1) {
+  if (widthScale > 1.55) return "lg:col-span-12";
+  if (widthScale > 1.15) {
+    return variant === "wide" || variant === "full" ? "lg:col-span-12" : "lg:col-span-12 xl:col-span-8";
+  }
+  if (widthScale < 0.9) {
+    const narrowSpans: Record<PanelVariant, string> = {
+      compact: "lg:col-span-6 xl:col-span-4",
+      standard: "lg:col-span-6 xl:col-span-4",
+      wide: "lg:col-span-6",
+      full: "lg:col-span-12 xl:col-span-8"
+    };
+    return narrowSpans[variant];
+  }
+
   const spans: Record<PanelVariant, string> = {
     compact: "lg:col-span-6 xl:col-span-4",
     standard: "lg:col-span-6",
@@ -905,35 +917,29 @@ function panelSpan(variant: PanelVariant) {
   return spans[variant];
 }
 
-function panelViewport(variant: PanelVariant, template?: ChartTemplate) {
-  if (template === "donut" || template === "pie") return "h-[18rem] sm:h-[20rem]";
-  if (template === "line" || template === "area") return "h-[23rem] sm:h-[27rem]";
-  if (template === "horizontal-bar" || template === "stacked-bar" || template === "grouped-bar") return "h-[24rem] sm:h-[28rem]";
-  if (template === "vertical-bar") return "h-[22rem] sm:h-[25rem]";
-
-  const heights: Record<PanelVariant, string> = {
-    compact: "h-[20rem] sm:h-80",
-    standard: "h-[22rem] sm:h-96",
-    wide: "h-[24rem] sm:h-[28rem]",
-    full: "h-[26rem] sm:h-[30rem]"
+function chartViewportHeight(variant: PanelVariant, template: ChartTemplate | undefined, heightScale: number) {
+  const templateHeights: Partial<Record<ChartTemplate, number>> = {
+    donut: 320,
+    pie: 320,
+    line: 432,
+    area: 432,
+    "horizontal-bar": 448,
+    "stacked-bar": 448,
+    "grouped-bar": 448,
+    "vertical-bar": 400
   };
-  return heights[variant];
-}
-
-function chartCanvasHeight() {
-  return "100%";
+  const variantHeights: Record<PanelVariant, number> = {
+    compact: 320,
+    standard: 384,
+    wide: 448,
+    full: 480
+  };
+  const baseHeight = template ? templateHeights[template] : undefined;
+  return `${Math.round(clamp((baseHeight || variantHeights[variant]) * heightScale, 260, 760))}px`;
 }
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
-}
-
-function chartHandlesOwnHeight(template?: ChartTemplate) {
-  return template === "horizontal-bar" || template === "stacked-bar" || template === "grouped-bar";
-}
-
-function useChartResize() {
-  return useContext(ChartResizeContext);
 }
 
 function barRowHeight(count: number) {
@@ -988,7 +994,6 @@ function ChartPanel({
   onExcel: () => void;
 }) {
   const [chartResize, setChartResize] = useState<ChartResize>({ widthScale: 1, heightScale: 1 });
-  const chartOwnsHeight = chartHandlesOwnHeight(selectedTemplate);
 
   function startChartResize(event: React.PointerEvent<HTMLButtonElement>) {
     event.preventDefault();
@@ -1014,7 +1019,12 @@ function ChartPanel({
   }
 
   return (
-    <section id={id} className={`print-panel min-w-0 rounded-lg border border-line bg-white p-3 shadow-soft sm:p-4 ${panelSpan(variant)}`}>
+    <motion.section
+      id={id}
+      layout
+      transition={{ type: "spring", stiffness: 260, damping: 28 }}
+      className={`print-panel min-w-0 rounded-lg border border-line bg-white p-3 shadow-soft sm:p-4 ${panelSpan(variant, chartResize.widthScale)}`}
+    >
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-ink">{title}</h3>
@@ -1051,30 +1061,24 @@ function ChartPanel({
       ) : table ? (
         <DataTable rows={rowsForExport(tableRows || [])} />
       ) : (
-        <div className={`chart-pop relative ${panelViewport(variant, selectedTemplate)} overflow-auto overscroll-contain rounded-lg border border-line bg-white/40 p-1`}>
-          <ChartResizeContext.Provider value={chartResize}>
-            <div
-              style={{
-                height: chartOwnsHeight ? chartCanvasHeight() : `${chartResize.heightScale * 100}%`,
-                minHeight: "100%",
-                minWidth: "100%",
-                width: `${chartResize.widthScale * 100}%`
-              }}
-            >
-              {children}
-            </div>
-          </ChartResizeContext.Provider>
+        <div
+          className="chart-pop relative overflow-hidden rounded-lg border border-line bg-white/40 p-1 transition-[height] duration-300 ease-out"
+          style={{ height: chartViewportHeight(variant, selectedTemplate, chartResize.heightScale) }}
+        >
+          <div className="h-full min-w-0">
+            {children}
+          </div>
           <button
             type="button"
             className="chart-resize-handle no-print min-h-0"
             onPointerDown={startChartResize}
             onDoubleClick={() => setChartResize({ widthScale: 1, heightScale: 1 })}
             aria-label={`Resize ${title} chart`}
-            title="Drag to resize chart canvas. Double-click to reset."
+            title="Drag to resize chart card. Double-click to reset."
           />
         </div>
       )}
-    </section>
+    </motion.section>
   );
 }
 
@@ -1382,12 +1386,11 @@ function CompareChart({ template, data: rows }: { template: ChartTemplate; data:
 
 function BarViz({ data: rows, valueKey }: { data: Record<string, unknown>[]; valueKey: "requests" | "spend" }) {
   const isMobile = useMediaQuery("(max-width: 767px)");
-  const { heightScale } = useChartResize();
   const yAxisWidth = isMobile ? 118 : 176;
   const rightMargin = isMobile ? 12 : 24;
   const domainMax = barDomain(rows, [valueKey]);
   const needsScroll = rows.length > (isMobile ? 5 : 8);
-  const scrollHeight = Math.max(280, rows.length * barRowHeight(rows.length) * heightScale);
+  const scrollHeight = Math.max(280, rows.length * barRowHeight(rows.length));
 
   return (
     <div className="bar-chart-frame flex h-full min-h-0 flex-col md:grid md:grid-cols-[minmax(0,1fr)_auto] md:gap-3">
@@ -1435,7 +1438,6 @@ function VerticalBarViz({ data: rows, valueKey }: { data: Record<string, unknown
 
 function StackedDepartmentBar({ data: rows, mode = "stacked" }: { data: Record<string, unknown>[]; mode?: "stacked" | "grouped" }) {
   const isMobile = useMediaQuery("(max-width: 767px)");
-  const { heightScale } = useChartResize();
   const yAxisWidth = isMobile ? 118 : 176;
   const rightMargin = isMobile ? 12 : 24;
   const stackKeys = ["Development", "Subscription", "Software"];
@@ -1444,7 +1446,7 @@ function StackedDepartmentBar({ data: rows, mode = "stacked" }: { data: Record<s
       ? Math.max(1, ...rows.flatMap((row) => stackKeys.map((key) => Number(row[key] || 0))))
       : barDomain(rows, stackKeys);
   const needsScroll = rows.length > (isMobile ? 5 : 8);
-  const scrollHeight = Math.max(280, rows.length * barRowHeight(rows.length) * heightScale);
+  const scrollHeight = Math.max(280, rows.length * barRowHeight(rows.length));
 
   if (rows.length === 0) return <EmptyState />;
   return (

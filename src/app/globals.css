@@ -75,15 +75,13 @@ table {
 }
 
 .chart-resize-handle {
-  position: sticky;
+  position: absolute;
   right: 0.5rem;
   bottom: 0.5rem;
-  float: right;
   z-index: 12;
   display: block;
   width: 1.75rem;
   height: 1.75rem;
-  margin-top: -2rem;
   border: 1px solid var(--line);
   border-radius: 0.5rem;
   background:
