@@ -124,9 +124,23 @@ table {
 :root[data-theme="dark"] .bg-slate-50\/60,
 :root[data-theme="dark"] .bg-slate-100,
 :root[data-theme="dark"] .bg-slate-200,
+:root[data-theme="dark"] .bg-\[\#e7f0fb\],
 :root[data-theme="dark"] .bg-\[\#f6f8fb\],
 :root[data-theme="dark"] .bg-\[\#f8fafc\] {
   background-color: rgba(30, 41, 59, 0.78) !important;
+}
+
+:root[data-theme="dark"] .odd\:bg-white:nth-child(odd) {
+  background-color: rgba(23, 33, 50, 0.96) !important;
+}
+
+:root[data-theme="dark"] .even\:bg-slate-50\/60:nth-child(even) {
+  background-color: rgba(30, 41, 59, 0.72) !important;
+}
+
+:root[data-theme="dark"] .hover\:bg-slate-50:hover,
+:root[data-theme="dark"] .hover\:bg-slate-100:hover {
+  background-color: rgba(49, 65, 86, 0.82) !important;
 }
 
 :root[data-theme="dark"] .text-ink,
@@ -138,6 +152,10 @@ table {
 :root[data-theme="dark"] .text-slate-500,
 :root[data-theme="dark"] .text-slate-400 {
   color: #a9b6c8 !important;
+}
+
+:root[data-theme="dark"] .text-\[\#2d679d\] {
+  color: #b8daf7 !important;
 }
 
 :root[data-theme="dark"] .border-line {
