@@ -536,8 +536,8 @@ export default function DashboardApp() {
                   {activePage === "Budget" && (
                     <>
                       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                        <MiniKpi title="Total Spend Overview" value={formatINR(data.kpis.totalSpend.value, true)} icon={<IndianRupee size={20} />} />
-                        <MiniKpi title="Known Row Spend" value={formatINR(pageRows.reduce((sum, row) => sum + (row.amount || 0), 0), true)} icon={<WalletCards size={20} />} />
+                        <MiniKpi title="Total Spend Overview" value={formatINR(data.kpis.totalSpend.value)} icon={<IndianRupee size={20} />} />
+                        <MiniKpi title="Known Row Spend" value={formatINR(pageRows.reduce((sum, row) => sum + (row.amount || 0), 0))} icon={<WalletCards size={20} />} />
                       </div>
                       <ChartGrid>
                         <ChartPanel id="budget-dept" title="Spend by Department" variant="wide" data={departmentSpend} table={tableModes["budget-dept"]} compare={compareModes["budget-dept"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} {...chartTemplateProps("budget-dept", compareModes["budget-dept"] ? "stacked-bar" : "horizontal-bar", compareModes["budget-dept"] ? compareOptions : spendBarOptions)} onToggleTable={() => toggle(setTableModes, "budget-dept")} onToggleCompare={() => toggle(setCompareModes, "budget-dept")} onPdf={() => exportPdf("Spend by Department", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend by Department", rowsForExport(pageRows))}>
@@ -865,7 +865,7 @@ function KpiGrid() {
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
       <MiniKpi title="Total Requests" value={String(data.kpis.totalRequests.value)} icon={<BarChart3 size={20} />} tone="blue" />
       <MiniKpi title="Department with Most Requests" value={`${data.kpis.departmentWithMostRequests.value} (${data.kpis.departmentWithMostRequests.requests})`} icon={<Building2 size={20} />} tone="green" />
-      <MiniKpi title="Total Spend" value={formatINR(data.kpis.totalSpend.value, true)} icon={<IndianRupee size={20} />} tone="rose" />
+      <MiniKpi title="Total Spend" value={formatINR(data.kpis.totalSpend.value)} icon={<IndianRupee size={20} />} tone="rose" />
     </div>
   );
 }
