@@ -2,37 +2,32 @@
 
 ## Source Files
 
-- Raw data PDF: IT_Requests_Summary_Full.pdf
-- Charts/report PDF reference: Strategic_IT_Request_Analysis_Final_Revised.pdf
+- Master source: IT_HOD_Report_Merged_HQHB_Tijaarat_Financial_Rechecked.docx
+- Master table used: DOCX Table 38 only
+- Physical last table: DOCX Table 39, used only as a summary checksum after user confirmation
+- Reference PDF: Strategic_IT_Request_Report_Financial_Rechecked_Final_Continuous.pdf
 
-## Extraction Result
+## Extracted Data
 
-- Extracted 157 request rows from raw PDF pages 13-24.
-- Extracted executive KPI and financial summaries from raw PDF pages 1 and 36.
-- Extracted status totals from raw PDF page 1.
-- Extracted category financial totals from raw PDF page 1.
-- Extracted department headers from raw PDF pages 13-24.
-- Reviewed the charts/report PDF only as a visual/structural reference; no dashboard values were taken from it.
+- Request rows extracted: 244
+- Departments: 30
+- Total spend used by dashboard: INR 3,97,42,328
+- Top department by requests: HQHB & Tijaarat Raabehah (87)
 
-## Validation
+## Validation Checks
 
-- No mock data was used.
-- No placeholder values were added.
-- No assumed, inferred, or invented values were added.
-- Values that are not clearly available in the raw PDF remain unavailable or `TBD`.
-- Projects and SLA pages are hidden because project timelines/progress and SLA metrics are not clearly present in the raw PDF.
-- The original PDFs are not placed in `public/` and are excluded from deployment assets.
+- Master table grand total row: GRAND TOTAL | 244 Requests | 30 Departments | 221 Approved | 18 Pending | 3 Under Review | 2 Not Approved | All | INR 3,97,42,328 | Known
+- Status counts: Approved: 221, Pending: 18, Under Review: 3, Not Approved: 2
+- Type counts: Subscription: 111, Software: 73, Development: 60
+- Type spend: Subscription: INR 55,44,100, Software: INR 57,43,880, Development: INR 2,84,54,348
+- Reference PDF text checksum found matching request/status signals: total requests 244, approved 221, pending 18, under review 3, not approved 2, approved percentage 90.6%, pending percentage 7.4%, and HQHB/Tijaarat top-department text.
 
-## Reconciliation Notes
+## Data Integrity Notes
 
-- Row-level known spend from extracted request rows: ₹2,52,65,246
-- Raw PDF financial summary known spend: ₹2,52,53,147 (page 1)
-- Development row-level known spend: ₹1,88,57,865
-- Development summary known spend: ₹1,88,45,766 (page 1)
-- Detailed request rows with `TBD` amount: 16
-- Raw PDF summary/data-quality sections state requests with `TBD` amount: 11 (pages 1 and 12)
-- The dashboard does not invent a correction. Executive KPI/category cards use the exact summary values from page 1, while row/table views use exact request rows from pages 13-24.
-
-## Structured Output
-
-- `src/data/dashboard-data.json`
+- The source DOCX was parsed once and only DOCX Table 38 was used as the master dataset.
+- DOCX Tables 1-37 and Table 39 were used only as summary/checksum references, not as source rows.
+- The chart-reference PDF was used only as a visual/reference checksum and not as the source dataset.
+- No mock, placeholder, inferred, duplicated, or invented request rows were added.
+- The physical last DOCX table is Table 39, a Metric/Value summary. User confirmed Table 38 is the final master source table.
+- The master table contains one Not Approved request with raw amount INR 4,000. The DOCX grand total and category/type summaries exclude Not Approved amounts from known spend, so dashboard spend calculations exclude Not Approved rows while preserving the raw amount string in table/export output.
+- Original DOCX/PDF source files are not copied to public assets.

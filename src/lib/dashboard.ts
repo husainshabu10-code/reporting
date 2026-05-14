@@ -86,7 +86,7 @@ export function rowsForExport(rows: RequestRow[]) {
     Date: row.date,
     Category: row.category,
     Status: row.status,
-    Amount: row.amount === null ? "TBD" : formatINR(row.amount),
+    Amount: row.amountRaw || (row.amount === null ? "TBD" : formatINR(row.amount)),
     Description: row.description
   }));
 }
