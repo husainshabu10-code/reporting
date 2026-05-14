@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type React from "react";
 import {
   Area,
@@ -64,6 +64,7 @@ type RequestTermScope = "type" | "category" | "status";
 type PanelVariant = "compact" | "standard" | "wide" | "full";
 type ChartTemplate = "horizontal-bar" | "vertical-bar" | "donut" | "pie" | "line" | "area" | "stacked-bar" | "grouped-bar";
 type ChartTemplateOption = { value: ChartTemplate; label: string };
+type ChartResize = { widthScale: number; heightScale: number };
 
 const allRequests = data.requests as RequestRow[];
 const allDepartments = Array.from(new Set(allRequests.map((row) => row.department))).sort();
@@ -109,6 +110,7 @@ const compareOptions: ChartTemplateOption[] = [
   { value: "stacked-bar", label: "Default: Stacked Bar" },
   { value: "grouped-bar", label: "Grouped Bar" }
 ];
+const ChartResizeContext = createContext<ChartResize>({ widthScale: 1, heightScale: 1 });
 
 export default function DashboardApp() {
   const [activePage, setActivePage] = useState("Dashboard");
@@ -922,6 +924,18 @@ function chartCanvasHeight() {
   return "100%";
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function chartHandlesOwnHeight(template?: ChartTemplate) {
+  return template === "horizontal-bar" || template === "stacked-bar" || template === "grouped-bar";
+}
+
+function useChartResize() {
+  return useContext(ChartResizeContext);
+}
+
 function barRowHeight(count: number) {
   if (count <= 2) return 72;
   if (count <= 6) return 56;
@@ -973,6 +987,32 @@ function ChartPanel({
   onPdf: () => void;
   onExcel: () => void;
 }) {
+  const [chartResize, setChartResize] = useState<ChartResize>({ widthScale: 1, heightScale: 1 });
+  const chartOwnsHeight = chartHandlesOwnHeight(selectedTemplate);
+
+  function startChartResize(event: React.PointerEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startWidth = chartResize.widthScale;
+    const startHeight = chartResize.heightScale;
+
+    function onMove(moveEvent: PointerEvent) {
+      setChartResize({
+        widthScale: clamp(startWidth + (moveEvent.clientX - startX) / 420, 1, 1.8),
+        heightScale: clamp(startHeight + (moveEvent.clientY - startY) / 320, 0.8, 2.4)
+      });
+    }
+
+    function onUp() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
   return (
     <section id={id} className={`print-panel min-w-0 rounded-lg border border-line bg-white p-3 shadow-soft sm:p-4 ${panelSpan(variant)}`}>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
@@ -1011,8 +1051,27 @@ function ChartPanel({
       ) : table ? (
         <DataTable rows={rowsForExport(tableRows || [])} />
       ) : (
-        <div className={`chart-pop ${panelViewport(variant, selectedTemplate)} overflow-hidden rounded-lg border border-line bg-white/40 p-1`}>
-          <div style={{ height: chartCanvasHeight() }}>{children}</div>
+        <div className={`chart-pop relative ${panelViewport(variant, selectedTemplate)} overflow-auto overscroll-contain rounded-lg border border-line bg-white/40 p-1`}>
+          <ChartResizeContext.Provider value={chartResize}>
+            <div
+              style={{
+                height: chartOwnsHeight ? chartCanvasHeight() : `${chartResize.heightScale * 100}%`,
+                minHeight: "100%",
+                minWidth: "100%",
+                width: `${chartResize.widthScale * 100}%`
+              }}
+            >
+              {children}
+            </div>
+          </ChartResizeContext.Provider>
+          <button
+            type="button"
+            className="chart-resize-handle no-print min-h-0"
+            onPointerDown={startChartResize}
+            onDoubleClick={() => setChartResize({ widthScale: 1, heightScale: 1 })}
+            aria-label={`Resize ${title} chart`}
+            title="Drag to resize chart canvas. Double-click to reset."
+          />
         </div>
       )}
     </section>
@@ -1323,11 +1382,12 @@ function CompareChart({ template, data: rows }: { template: ChartTemplate; data:
 
 function BarViz({ data: rows, valueKey }: { data: Record<string, unknown>[]; valueKey: "requests" | "spend" }) {
   const isMobile = useMediaQuery("(max-width: 767px)");
+  const { heightScale } = useChartResize();
   const yAxisWidth = isMobile ? 118 : 176;
   const rightMargin = isMobile ? 12 : 24;
   const domainMax = barDomain(rows, [valueKey]);
   const needsScroll = rows.length > (isMobile ? 5 : 8);
-  const scrollHeight = Math.max(280, rows.length * barRowHeight(rows.length));
+  const scrollHeight = Math.max(280, rows.length * barRowHeight(rows.length) * heightScale);
 
   return (
     <div className="bar-chart-frame flex h-full min-h-0 flex-col md:grid md:grid-cols-[minmax(0,1fr)_auto] md:gap-3">
@@ -1375,6 +1435,7 @@ function VerticalBarViz({ data: rows, valueKey }: { data: Record<string, unknown
 
 function StackedDepartmentBar({ data: rows, mode = "stacked" }: { data: Record<string, unknown>[]; mode?: "stacked" | "grouped" }) {
   const isMobile = useMediaQuery("(max-width: 767px)");
+  const { heightScale } = useChartResize();
   const yAxisWidth = isMobile ? 118 : 176;
   const rightMargin = isMobile ? 12 : 24;
   const stackKeys = ["Development", "Subscription", "Software"];
@@ -1383,7 +1444,7 @@ function StackedDepartmentBar({ data: rows, mode = "stacked" }: { data: Record<s
       ? Math.max(1, ...rows.flatMap((row) => stackKeys.map((key) => Number(row[key] || 0))))
       : barDomain(rows, stackKeys);
   const needsScroll = rows.length > (isMobile ? 5 : 8);
-  const scrollHeight = Math.max(280, rows.length * barRowHeight(rows.length));
+  const scrollHeight = Math.max(280, rows.length * barRowHeight(rows.length) * heightScale);
 
   if (rows.length === 0) return <EmptyState />;
   return (

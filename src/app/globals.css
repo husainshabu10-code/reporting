@@ -74,6 +74,31 @@ table {
   filter: drop-shadow(0 8px 12px rgba(35, 50, 68, 0.18));
 }
 
+.chart-resize-handle {
+  position: sticky;
+  right: 0.5rem;
+  bottom: 0.5rem;
+  float: right;
+  z-index: 12;
+  display: block;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-top: -2rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background:
+    linear-gradient(135deg, transparent 46%, rgba(83, 97, 116, 0.38) 47%, rgba(83, 97, 116, 0.38) 53%, transparent 54%),
+    linear-gradient(135deg, transparent 62%, rgba(83, 97, 116, 0.28) 63%, rgba(83, 97, 116, 0.28) 69%, transparent 70%),
+    rgba(255, 255, 255, 0.88);
+  box-shadow: 0 8px 18px rgba(35, 50, 68, 0.12);
+  cursor: nwse-resize;
+}
+
+.chart-resize-handle:hover {
+  border-color: #79a7d8;
+  box-shadow: 0 10px 20px rgba(45, 103, 157, 0.18);
+}
+
 .bar-chart-frame,
 .bar-chart-frame > * {
   min-width: 0;
@@ -127,6 +152,13 @@ table {
 :root[data-theme="dark"] select {
   background-color: #111a29 !important;
   color: #e8eef7 !important;
+}
+
+:root[data-theme="dark"] .chart-resize-handle {
+  background:
+    linear-gradient(135deg, transparent 46%, rgba(169, 182, 200, 0.5) 47%, rgba(169, 182, 200, 0.5) 53%, transparent 54%),
+    linear-gradient(135deg, transparent 62%, rgba(169, 182, 200, 0.36) 63%, rgba(169, 182, 200, 0.36) 69%, transparent 70%),
+    rgba(17, 26, 41, 0.9);
 }
 
 :root[data-theme="dark"] input::placeholder {
