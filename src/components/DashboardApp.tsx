@@ -1505,7 +1505,7 @@ function createActivity(action: string, item: string, details: string): Activity
   return { id: `activity-${Date.now()}-${Math.random().toString(36).slice(2)}`, at: new Date().toISOString(), user: CURRENT_USER, action, item, details };
 }
 
-function tasksToRows(rows: TrackerTask[]) {
+function tasksToRows(rows: TrackerTask[]): Array<Record<string, string | number>> {
   return rows.map((task) => ({
     City: task.city,
     Area: task.zoneArea,
