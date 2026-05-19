@@ -14,6 +14,7 @@ import {
   FileText,
   Filter,
   Layers3,
+  Menu,
   Package,
   Plus,
   RefreshCcw,
@@ -164,6 +165,7 @@ export default function DashboardApp() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [reportFilters, setReportFilters] = useState<Filters>(EMPTY_FILTERS);
   const [selectedTask, setSelectedTask] = useState<TrackerTask | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [cityDraft, setCityDraft] = useState("");
   const [highlightMissing, setHighlightMissing] = useState(true);
   const [chartData, setChartData] = useState<ChartDataset | null>(null);
@@ -320,39 +322,63 @@ export default function DashboardApp() {
 
   return (
     <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
-      <header className="border-b border-[var(--color-border)] bg-[var(--color-primary)] text-white shadow-sm">
-        <div className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-5 sm:px-6 lg:px-8">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase text-[var(--color-accent-light)]">Asharah Mubarak operations</p>
-              <h1 className="mt-1 text-2xl font-semibold text-white sm:text-3xl">IT / Event Preparation Dashboard</h1>
+      {sidebarOpen && <button className="fixed inset-0 z-30 bg-[#0B4F3A]/35 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar overlay" />}
+
+      <aside className={`fixed inset-y-0 left-0 z-40 flex w-[min(18rem,86vw)] flex-col border-r border-[var(--color-border)] bg-[var(--color-primary)] text-white shadow-2xl transition-transform duration-200 lg:w-72 lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex min-h-24 items-start justify-between gap-3 border-b border-white/15 p-5">
+          <div>
+            <p className="text-xs font-semibold uppercase text-[var(--color-accent-light)]">Asharah Mubarak</p>
+            <h1 className="mt-1 text-xl font-semibold leading-tight text-white">IT / Event Preparation</h1>
+          </div>
+          <button className="rounded-md p-2 text-white hover:bg-white/10 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar">
+            <X size={18} />
+          </button>
+        </div>
+        <nav className="flex-1 space-y-1 overflow-y-auto p-4">
+          {TABS.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                className={`flex w-full min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition ${
+                  activeTab === tab.id ? "bg-[var(--color-accent)] text-[var(--color-primary)] shadow-sm" : "text-white/90 hover:bg-white/10 hover:text-white"
+                }`}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setSidebarOpen(false);
+                }}
+              >
+                <Icon size={17} /> {tab.id}
+              </button>
+            );
+          })}
+        </nav>
+        <div className="border-t border-white/15 p-4 text-xs leading-5 text-white/75">
+          City-wise readiness, contacts, equipment, reports, and timeline tracking.
+        </div>
+      </aside>
+
+      <section className="min-h-screen lg:pl-72">
+        <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-[var(--color-card)]/95 shadow-sm backdrop-blur">
+          <div className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <button className="icon-btn lg:hidden" onClick={() => setSidebarOpen(true)} aria-label="Open sidebar menu">
+                <Menu size={18} />
+              </button>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase text-[var(--color-accent)]">{activeTab}</p>
+                <h2 className="truncate text-xl font-semibold text-[var(--color-primary)] sm:text-2xl">IT / Event Preparation Dashboard</h2>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button className="btn-secondary" onClick={() => setSelectedTask(createBlankTask(cities[0] ?? "Nairobi"))}><Plus size={16} /> Add Task</button>
+              <button className="btn-primary" onClick={() => setSelectedTask(createBlankTask(cities[0] ?? "Nairobi"))}><Plus size={16} /> Add Task</button>
               <button className="btn-secondary" onClick={() => exportTaskCsv(filteredTasks, "visible-tasks")}><Download size={16} /> Export CSV</button>
               <button className="btn-secondary" onClick={() => importInputRef.current?.click()}><Upload size={16} /> Import CSV</button>
               <input ref={importInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={importCsv} />
               <button className="btn-secondary" onClick={resetDemoData}><RefreshCcw size={16} /> Reset Demo</button>
             </div>
           </div>
-          <nav className="flex gap-1 overflow-x-auto rounded-lg bg-white/10 p-1">
-            {TABS.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  className={`flex min-h-10 items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold transition ${
-                    activeTab === tab.id ? "bg-[var(--color-accent)] text-[var(--color-primary)] shadow-sm" : "text-white hover:bg-white/15"
-                  }`}
-                  onClick={() => setActiveTab(tab.id)}
-                >
-                  <Icon size={15} /> {tab.id}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      </header>
+        </header>
 
       <div className="mx-auto max-w-[1800px] space-y-5 px-4 py-5 sm:px-6 lg:px-8">
         <CityManager cityDraft={cityDraft} setCityDraft={setCityDraft} onAddCity={addCity} />
@@ -441,6 +467,7 @@ export default function DashboardApp() {
           <span>City-wise readiness, area progress, contacts, equipment, reports, and activity in one tracker.</span>
         </div>
       </footer>
+      </section>
 
       {selectedTask && (
         <TaskEditor task={selectedTask} cities={cities} onSave={upsertTask} onClose={() => setSelectedTask(null)} onDelete={deleteTask} />
