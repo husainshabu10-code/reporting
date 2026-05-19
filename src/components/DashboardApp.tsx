@@ -145,7 +145,7 @@ export default function DashboardApp() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [reportFilters, setReportFilters] = useState<Filters>(EMPTY_FILTERS);
   const [selectedTask, setSelectedTask] = useState<TrackerTask | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [cityDraft, setCityDraft] = useState("");
   const [highlightMissing, setHighlightMissing] = useState(true);
   const [chartData, setChartData] = useState<ChartDataset | null>(null);
@@ -297,7 +297,7 @@ export default function DashboardApp() {
     <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
       {sidebarOpen && <button className="fixed inset-0 z-30 bg-[#0B4F3A]/35 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar overlay" />}
 
-      <aside className={`fixed inset-y-0 left-0 z-40 flex w-[min(18rem,86vw)] flex-col border-r border-[var(--color-border)] bg-[var(--color-primary)] text-white shadow-2xl transition-transform duration-200 lg:w-72 lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`fixed inset-y-0 left-0 z-40 flex w-[min(18rem,86vw)] flex-col border-r border-[var(--color-border)] bg-[var(--color-primary)] text-white shadow-2xl transition-transform duration-200 lg:w-72 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex min-h-24 items-start justify-between gap-3 border-b border-white/15 p-5">
           <div>
             <p className="text-xs font-semibold uppercase text-[var(--color-accent-light)]">Asharah Mubarak</p>
@@ -318,7 +318,7 @@ export default function DashboardApp() {
                 }`}
                 onClick={() => {
                   setActiveTab(tab.id);
-                  setSidebarOpen(false);
+                  if (window.innerWidth < 1024) setSidebarOpen(false);
                 }}
               >
                 <Icon size={17} /> {tab.id}
@@ -331,11 +331,11 @@ export default function DashboardApp() {
         </div>
       </aside>
 
-      <section className="min-h-screen lg:pl-72">
+      <section className={`min-h-screen transition-[padding] duration-200 ${sidebarOpen ? "lg:pl-72" : ""}`}>
         <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-[var(--color-card)]/95 shadow-sm backdrop-blur">
           <div className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <button className="icon-btn lg:hidden" onClick={() => setSidebarOpen(true)} aria-label="Open sidebar menu">
+              <button className="icon-btn" onClick={() => setSidebarOpen((value) => !value)} aria-label={sidebarOpen ? "Close sidebar menu" : "Open sidebar menu"}>
                 <Menu size={18} />
               </button>
               <div className="min-w-0">
