@@ -11,15 +11,6 @@
   --mist: #f5f7fb;
 }
 
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --ink: #e8eef7;
-  --muted: #a9b6c8;
-  --line: #314156;
-  --panel: #172132;
-  --mist: #0f1724;
-}
-
 * {
   box-sizing: border-box;
 }
@@ -32,163 +23,28 @@ body {
 
 body {
   margin: 0;
-  background:
-    linear-gradient(135deg, rgba(230, 242, 255, 0.92), rgba(250, 247, 255, 0.7) 38%, rgba(245, 250, 246, 0.92)),
-    var(--mist);
+  background: #f5f7fb;
   color: var(--ink);
   font-family: Arial, Helvetica, sans-serif;
   letter-spacing: 0;
 }
 
-:root[data-theme="dark"] body {
-  background:
-    linear-gradient(135deg, rgba(31, 48, 71, 0.9), rgba(20, 28, 44, 0.84) 42%, rgba(21, 43, 42, 0.82)),
-    var(--mist);
-}
-
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
 button,
 select,
+textarea,
 input:not([type="checkbox"]):not([type="radio"]) {
   min-height: 2.5rem;
 }
 
 table {
   max-width: 100%;
-}
-
-.chart-pop .recharts-rectangle,
-.chart-pop .recharts-sector,
-.chart-pop .recharts-dot {
-  transition: opacity 180ms ease, filter 180ms ease, transform 180ms ease;
-}
-
-.chart-pop .recharts-rectangle:hover,
-.chart-pop .recharts-sector:hover {
-  opacity: 0.86;
-  filter: drop-shadow(0 8px 12px rgba(35, 50, 68, 0.18));
-}
-
-.chart-resize-handle {
-  position: absolute;
-  right: 0.5rem;
-  bottom: 0.5rem;
-  z-index: 12;
-  display: block;
-  width: 1.75rem;
-  height: 1.75rem;
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
-  background:
-    linear-gradient(135deg, transparent 46%, rgba(83, 97, 116, 0.38) 47%, rgba(83, 97, 116, 0.38) 53%, transparent 54%),
-    linear-gradient(135deg, transparent 62%, rgba(83, 97, 116, 0.28) 63%, rgba(83, 97, 116, 0.28) 69%, transparent 70%),
-    rgba(255, 255, 255, 0.88);
-  box-shadow: 0 8px 18px rgba(35, 50, 68, 0.12);
-  cursor: nwse-resize;
-}
-
-.chart-resize-handle:hover {
-  border-color: #79a7d8;
-  box-shadow: 0 10px 20px rgba(45, 103, 157, 0.18);
-}
-
-.bar-chart-frame,
-.bar-chart-frame > * {
-  min-width: 0;
-}
-
-.bar-sticky-axis {
-  pointer-events: none;
-}
-
-:root[data-theme="dark"] .bg-white,
-:root[data-theme="dark"] .bg-white\/90,
-:root[data-theme="dark"] .bg-white\/92,
-:root[data-theme="dark"] .bg-white\/82 {
-  background-color: rgba(23, 33, 50, 0.94) !important;
-}
-
-:root[data-theme="dark"] .bg-white\/70,
-:root[data-theme="dark"] .bg-white\/40 {
-  background-color: rgba(23, 33, 50, 0.68) !important;
-}
-
-:root[data-theme="dark"] .bg-slate-50,
-:root[data-theme="dark"] .bg-slate-50\/60,
-:root[data-theme="dark"] .bg-slate-100,
-:root[data-theme="dark"] .bg-slate-200,
-:root[data-theme="dark"] .bg-\[\#e7f0fb\],
-:root[data-theme="dark"] .bg-\[\#f6f8fb\],
-:root[data-theme="dark"] .bg-\[\#f8fafc\] {
-  background-color: rgba(30, 41, 59, 0.78) !important;
-}
-
-:root[data-theme="dark"] .odd\:bg-white:nth-child(odd) {
-  background-color: rgba(23, 33, 50, 0.96) !important;
-}
-
-:root[data-theme="dark"] .even\:bg-slate-50\/60:nth-child(even) {
-  background-color: rgba(30, 41, 59, 0.72) !important;
-}
-
-:root[data-theme="dark"] .hover\:bg-slate-50:hover,
-:root[data-theme="dark"] .hover\:bg-slate-100:hover {
-  background-color: rgba(49, 65, 86, 0.82) !important;
-}
-
-:root[data-theme="dark"] .text-ink,
-:root[data-theme="dark"] .text-slate-700,
-:root[data-theme="dark"] .text-slate-600 {
-  color: #e8eef7 !important;
-}
-
-:root[data-theme="dark"] .text-slate-500,
-:root[data-theme="dark"] .text-slate-400 {
-  color: #a9b6c8 !important;
-}
-
-:root[data-theme="dark"] .text-\[\#2d679d\] {
-  color: #b8daf7 !important;
-}
-
-:root[data-theme="dark"] .border-line {
-  border-color: #314156 !important;
-}
-
-:root[data-theme="dark"] .shadow-soft {
-  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.26) !important;
-}
-
-:root[data-theme="dark"] input,
-:root[data-theme="dark"] select {
-  background-color: #111a29 !important;
-  color: #e8eef7 !important;
-}
-
-:root[data-theme="dark"] .chart-resize-handle {
-  background:
-    linear-gradient(135deg, transparent 46%, rgba(169, 182, 200, 0.5) 47%, rgba(169, 182, 200, 0.5) 53%, transparent 54%),
-    linear-gradient(135deg, transparent 62%, rgba(169, 182, 200, 0.36) 63%, rgba(169, 182, 200, 0.36) 69%, transparent 70%),
-    rgba(17, 26, 41, 0.9);
-}
-
-:root[data-theme="dark"] input::placeholder {
-  color: #7f8ca1;
-}
-
-:root[data-theme="dark"] .recharts-cartesian-grid line {
-  stroke: #2b3a50;
-}
-
-:root[data-theme="dark"] .recharts-text,
-:root[data-theme="dark"] .recharts-legend-item-text {
-  fill: #a9b6c8 !important;
-  color: #a9b6c8 !important;
 }
 
 @media print {
@@ -210,6 +66,10 @@ table {
 @layer components {
   .field {
     @apply w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none transition focus:border-[#79a7d8] focus:ring-2 focus:ring-[#79a7d8]/20;
+  }
+
+  .field-label {
+    @apply text-xs font-semibold uppercase text-slate-500;
   }
 
   .btn-primary {

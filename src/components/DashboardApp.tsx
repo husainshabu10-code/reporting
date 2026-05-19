@@ -1,1548 +1,1038 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type React from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Line,
-  LineChart,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis
-} from "recharts";
-import { AnimatePresence, motion } from "framer-motion";
-import {
-  BarChart3,
-  Building2,
+  AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
+  ChevronDown,
+  CircleAlert,
   Download,
-  FileDown,
-  FileSpreadsheet,
-  Home,
-  IndianRupee,
-  Menu,
-  Moon,
+  FileQuestion,
+  Filter,
+  ListChecks,
+  Plus,
+  RefreshCcw,
   Search,
-  SlidersHorizontal,
-  Sun,
-  Table2,
-  TrendingUp,
-  WalletCards,
+  Upload,
   X
 } from "lucide-react";
-import data from "@/data/dashboard-data.json";
 import {
-  aggregateTimeline,
-  formatINR,
-  groupRequests,
-  palette,
-  rowsForExport,
-  sortRows
-} from "@/lib/dashboard";
-import type { RequestRow } from "@/lib/dashboard";
+  BUDGET_STATUSES,
+  CSV_HEADERS,
+  DOCUMENT_STATUSES,
+  EVENT_CRITICALITIES,
+  generateDefaultTasksForCities,
+  generateDefaultTasksForCity,
+  INITIAL_CITIES,
+  OWNERSHIP_TYPES,
+  PRIORITIES,
+  RISK_LEVELS,
+  STATUSES,
+  STATUS_MEANINGS,
+  STATUS_PROGRESS,
+  WORKSTREAMS,
+  ZONES,
+  createBlankTask,
+  inferArea,
+  makeTaskId,
+  taskDisplayName
+} from "@/lib/asharaTrackerData";
+import type { TrackerTask } from "@/lib/asharaTrackerData";
 
-const pages = [
-  { id: "Dashboard", icon: Home },
-  { id: "IT Requests", icon: BarChart3 },
-  { id: "Budget", icon: WalletCards },
-  { id: "Departments", icon: Building2 },
-  { id: "Trends", icon: TrendingUp }
+type ViewId =
+  | "Dashboard"
+  | "All Tasks"
+  | "City-wise Progress"
+  | "Blocked / Delayed Items"
+  | "Waaz Critical Tasks"
+  | "Vendor Pending Items"
+  | "Local Team Pending Items"
+  | "Document Pending Items"
+  | "Final Readiness View";
+
+type Filters = {
+  city: string;
+  workstream: string;
+  status: string;
+  priority: string;
+  eventCriticality: string;
+  riskLevel: string;
+  ownershipType: string;
+  documentStatus: string;
+};
+
+const STORAGE_TASKS_KEY = "ashara-it-readiness-tasks";
+const STORAGE_CITIES_KEY = "ashara-it-readiness-cities";
+const CLOSED_STATUSES = new Set(["Completed", "Tested", "Not Required"]);
+const VIEW_TABS: ViewId[] = [
+  "Dashboard",
+  "All Tasks",
+  "City-wise Progress",
+  "Blocked / Delayed Items",
+  "Waaz Critical Tasks",
+  "Vendor Pending Items",
+  "Local Team Pending Items",
+  "Document Pending Items",
+  "Final Readiness View"
 ];
 
-type SortDirection = "asc" | "desc";
-type TimelineMode = "monthly" | "quarterly" | "yearly";
-type ExportScope = "all" | "filtered";
-type RequestTermScope = "type" | "category" | "status";
-type PanelVariant = "compact" | "standard" | "wide" | "full";
-type ChartTemplate = "horizontal-bar" | "vertical-bar" | "donut" | "pie" | "line" | "area" | "stacked-bar" | "grouped-bar";
-type ChartTemplateOption = { value: ChartTemplate; label: string };
-type ChartResize = { widthScale: number; heightScale: number };
+const EMPTY_FILTERS: Filters = {
+  city: "All",
+  workstream: "All",
+  status: "All",
+  priority: "All",
+  eventCriticality: "All",
+  riskLevel: "All",
+  ownershipType: "All",
+  documentStatus: "All"
+};
 
-const allRequests = data.requests as RequestRow[];
-const allDepartments = Array.from(new Set(allRequests.map((row) => row.department))).sort();
-const months = Array.from(new Set(allRequests.map((row) => row.month).filter(Boolean) as string[])).sort();
-const defaultCompareDepartments = groupRequests(allRequests, "department")
-  .sort((a, b) => b.requests - a.requests)
-  .slice(0, 5)
-  .map((row) => row.name);
-const requestTermGroups: Array<{ title: string; scope: RequestTermScope; terms: string[] }> = [
-  { title: "Request Type", scope: "type", terms: Array.from(new Set(allRequests.map((row) => row.type))).sort() },
-  { title: "Request Category", scope: "category", terms: Array.from(new Set(allRequests.map((row) => row.category))).sort() },
-  { title: "Request Status", scope: "status", terms: Array.from(new Set(allRequests.map((row) => row.status))).sort() }
-];
-const horizontalBarOptions: ChartTemplateOption[] = [
-  { value: "horizontal-bar", label: "Default: Horizontal Bar" },
-  { value: "vertical-bar", label: "Vertical Bar" },
-  { value: "donut", label: "Donut" },
-  { value: "pie", label: "Pie" }
-];
-const spendBarOptions: ChartTemplateOption[] = [
-  { value: "horizontal-bar", label: "Default: Horizontal Bar" },
-  { value: "vertical-bar", label: "Vertical Bar" },
-  { value: "donut", label: "Donut" },
-  { value: "pie", label: "Pie" }
-];
-const donutOptions: ChartTemplateOption[] = [
-  { value: "donut", label: "Default: Donut" },
-  { value: "pie", label: "Pie" },
-  { value: "horizontal-bar", label: "Horizontal Bar" },
-  { value: "vertical-bar", label: "Vertical Bar" }
-];
-const lineOptions: ChartTemplateOption[] = [
-  { value: "line", label: "Default: Line" },
-  { value: "area", label: "Area" },
-  { value: "vertical-bar", label: "Vertical Bar" }
-];
-const areaOptions: ChartTemplateOption[] = [
-  { value: "area", label: "Default: Area" },
-  { value: "line", label: "Line" },
-  { value: "vertical-bar", label: "Vertical Bar" }
-];
-const compareOptions: ChartTemplateOption[] = [
-  { value: "stacked-bar", label: "Default: Stacked Bar" },
-  { value: "grouped-bar", label: "Grouped Bar" }
-];
 export default function DashboardApp() {
-  const [activePage, setActivePage] = useState("Dashboard");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [ready, setReady] = useState(false);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [selectedDepartments, setSelectedDepartments] = useState<string[]>(allDepartments);
-  const [requestSort, setRequestSort] = useState<SortDirection>("desc");
-  const [spendSort, setSpendSort] = useState<SortDirection>("desc");
-  const [selectedRequestTerms, setSelectedRequestTerms] = useState<string[]>([]);
-  const [compareDepartments, setCompareDepartments] = useState<string[]>(defaultCompareDepartments);
+  const [tasks, setTasks] = useState<TrackerTask[]>(() => generateDefaultTasksForCities(INITIAL_CITIES));
+  const [cities, setCities] = useState<string[]>(INITIAL_CITIES);
+  const [activeView, setActiveView] = useState<ViewId>("Dashboard");
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [search, setSearch] = useState("");
-  const [timelineMode, setTimelineMode] = useState<TimelineMode>("monthly");
-  const [fromMonth, setFromMonth] = useState(months[0] || "");
-  const [toMonth, setToMonth] = useState(months[months.length - 1] || "");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [tableModes, setTableModes] = useState<Record<string, boolean>>({});
-  const [compareModes, setCompareModes] = useState<Record<string, boolean>>({});
-  const [chartTemplates, setChartTemplates] = useState<Record<string, ChartTemplate>>({});
+  const [selectedTask, setSelectedTask] = useState<TrackerTask | null>(null);
+  const [cityDraft, setCityDraft] = useState("");
+  const [hydrated, setHydrated] = useState(false);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setReady(true), 260);
-    return () => window.clearTimeout(timer);
+    try {
+      const savedTasks = window.localStorage.getItem(STORAGE_TASKS_KEY);
+      const savedCities = window.localStorage.getItem(STORAGE_CITIES_KEY);
+      if (savedTasks) setTasks(JSON.parse(savedTasks) as TrackerTask[]);
+      if (savedCities) setCities(JSON.parse(savedCities) as string[]);
+    } catch {
+      setTasks(generateDefaultTasksForCities(INITIAL_CITIES));
+      setCities(INITIAL_CITIES);
+    } finally {
+      setHydrated(true);
+    }
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
+    if (!hydrated) return;
+    window.localStorage.setItem(STORAGE_TASKS_KEY, JSON.stringify(tasks));
+    window.localStorage.setItem(STORAGE_CITIES_KEY, JSON.stringify(cities));
+  }, [cities, hydrated, tasks]);
 
-  useEffect(() => {
-    setFiltersOpen(false);
-  }, [activePage]);
+  const presetTasks = useMemo(() => applyViewPreset(tasks, activeView), [activeView, tasks]);
+  const visibleTasks = useMemo(() => applyFiltersAndSearch(presetTasks, filters, search), [filters, presetTasks, search]);
+  const dashboardTasks = activeView === "Dashboard" ? tasks : visibleTasks;
+  const metrics = useMemo(() => getMetrics(dashboardTasks), [dashboardTasks]);
+  const cityStats = useMemo(() => getCityStats(tasks, cities), [cities, tasks]);
+  const statusRows = useMemo(() => distribution(tasks, "status"), [tasks]);
+  const workstreamRows = useMemo(() => getWorkstreamCompletion(tasks), [tasks]);
 
-  const filteredRequests = useMemo(() => {
-    const normalized = search.trim().toLowerCase();
-    const selectedTypes = selectedRequestTerms.filter((term) => term.startsWith("type:")).map((term) => term.slice("type:".length));
-    const selectedCategories = selectedRequestTerms.filter((term) => term.startsWith("category:")).map((term) => term.slice("category:".length));
-    const selectedStatuses = selectedRequestTerms.filter((term) => term.startsWith("status:")).map((term) => term.slice("status:".length));
-    return allRequests.filter((row) => {
-      const departmentMatch = selectedDepartments.includes(row.department);
-      const searchMatch = !normalized || [row.id, row.department, row.type, row.category, row.status, row.description].join(" ").toLowerCase().includes(normalized);
-      const dateMatch = !row.month || ((!fromMonth || row.month >= fromMonth) && (!toMonth || row.month <= toMonth));
-      const requestTermMatch =
-        activePage !== "IT Requests" ||
-        selectedRequestTerms.length === 0 ||
-        ((selectedTypes.length === 0 || selectedTypes.includes(row.type)) &&
-          (selectedCategories.length === 0 || selectedCategories.includes(row.category)) &&
-          (selectedStatuses.length === 0 || selectedStatuses.includes(row.status)));
-      return departmentMatch && searchMatch && dateMatch && requestTermMatch;
+  const upsertTask = (task: TrackerTask) => {
+    const savedTask = { ...task, updatedAt: new Date().toISOString() };
+    setTasks((current) => {
+      const exists = current.some((item) => item.id === savedTask.id);
+      return exists ? current.map((item) => (item.id === savedTask.id ? savedTask : item)) : [savedTask, ...current];
     });
-  }, [activePage, fromMonth, search, selectedDepartments, selectedRequestTerms, toMonth]);
+    setSelectedTask(savedTask);
+  };
 
-  const unfilteredPageRows = useMemo(() => scopedRows(activePage, allRequests), [activePage]);
-  const pageRows = useMemo(() => scopedRows(activePage, activePage === "Dashboard" ? allRequests : filteredRequests), [activePage, filteredRequests]);
+  const deleteTask = (taskId: string) => {
+    const confirmed = window.confirm("Delete this task from the tracker?");
+    if (!confirmed) return;
+    setTasks((current) => current.filter((task) => task.id !== taskId));
+    setSelectedTask(null);
+  };
 
-  const departmentRequests = useMemo(() => sortRows(groupRequests(pageRows, "department"), "requests", requestSort), [pageRows, requestSort]);
-  const departmentSpend = useMemo(() => sortRows(groupRequests(pageRows, "department"), "spend", spendSort), [pageRows, spendSort]);
-  const categoryRows = useMemo(() => sortRows(groupRequests(pageRows, "category"), "requests", requestSort), [pageRows, requestSort]);
-  const typeRows = useMemo(() => sortRows(groupRequests(pageRows, "type"), "requests", requestSort), [pageRows, requestSort]);
-  const statusRows = useMemo(() => sortRows(groupRequests(pageRows, "status"), "requests", requestSort), [pageRows, requestSort]);
-  const trendRows = useMemo(() => aggregateTimeline(pageRows, timelineMode), [pageRows, timelineMode]);
-  const spendCategoryRows = useMemo(() => sortRows(groupRequests(pageRows, "category"), "spend", spendSort), [pageRows, spendSort]);
-  const compareTypeRows = useMemo(() => groupDepartmentTypes(pageRows, compareDepartments), [compareDepartments, pageRows]);
-  const sortedRequests = useMemo(
-    () => [...pageRows].sort((a, b) => (requestSort === "asc" ? a.department.localeCompare(b.department) : b.department.localeCompare(a.department))),
-    [pageRows, requestSort]
-  );
+  const addTask = () => setSelectedTask(createBlankTask(cities[0] ?? "City 1"));
 
-  const summaryInsights = useMemo(() => {
-    const topDepartment = departmentRequests[0];
-    const topSpend = departmentSpend[0];
-    const firstTrend = trendRows[0];
-    const lastTrend = trendRows[trendRows.length - 1];
-    const movement = firstTrend && lastTrend ? lastTrend.requests - firstTrend.requests : 0;
-    return [
-      topDepartment ? `Requests are highest in ${topDepartment.name} with ${topDepartment.requests} requests.` : null,
-      topSpend ? `Spend is concentrated in ${topSpend.name} at ${formatINR(topSpend.spend || 0)}.` : null,
-      firstTrend && lastTrend ? `Request volume ${movement >= 0 ? "increased" : "decreased"} from ${firstTrend.name} to ${lastTrend.name} based on the selected data.` : null
-    ].filter(Boolean) as string[];
-  }, [departmentRequests, departmentSpend, trendRows]);
-
-  async function exportExcel(title: string, rows: unknown[]) {
-    const xlsx = await import("xlsx");
-    const worksheet = xlsx.utils.json_to_sheet(rows);
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, worksheet, "Dashboard Data");
-    xlsx.writeFile(workbook, `${slug(title)}.xlsx`);
-  }
-
-  async function exportPdf(title: string, rows: Record<string, unknown>[]) {
-    const { jsPDF } = await import("jspdf");
-    const autoTable = (await import("jspdf-autotable")).default;
-    const doc = new jsPDF({ orientation: "landscape", unit: "pt" });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 34;
-    const topic = title.replace(/\s+-\s+(Export All|Export Filtered)$/i, "");
-
-    const drawTemplate = () => {
-      doc.setDrawColor(220, 228, 239);
-      doc.setLineWidth(0.8);
-      doc.roundedRect(22, 22, pageWidth - 44, pageHeight - 44, 6, 6);
-      doc.setFillColor(246, 248, 251);
-      doc.rect(23, 23, pageWidth - 46, 54, "F");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(16);
-      doc.setTextColor(35, 50, 68);
-      doc.text("IT Request Analytics Dashboard", margin, 48);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(91, 105, 124);
-      doc.text("Detailed export from validated dashboard data", pageWidth - margin, 48, { align: "right" });
-    };
-
-    drawTemplate();
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(12);
-    doc.setTextColor(45, 103, 157);
-    doc.text(`Topic: ${topic}`, margin, 98);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(91, 105, 124);
-    doc.text(`Rows: ${rows.length} detailed request records`, margin, 116);
-
-    if (rows.length === 0) {
-      doc.setFontSize(11);
-      doc.setTextColor(91, 105, 124);
-      doc.text("No data available", margin, 146);
-    } else {
-      const columns = Object.keys(rows[0]);
-      const body = rows.map((row) =>
-        columns.map((column) => {
-          const value = row[column];
-          if (typeof value === "number" || typeof value === "string") return value;
-          if (value === null || value === undefined) return "";
-          return String(value);
-        })
-      );
-      autoTable(doc, {
-        startY: 136,
-        margin: { left: margin, right: margin, bottom: 38 },
-        head: [columns],
-        body,
-        styles: {
-          fontSize: 7.5,
-          cellPadding: 4,
-          lineColor: [226, 232, 240],
-          lineWidth: 0.25,
-          textColor: [55, 65, 81],
-          overflow: "linebreak",
-          valign: "top"
-        },
-        headStyles: {
-          fillColor: [231, 240, 251],
-          textColor: [45, 103, 157],
-          fontStyle: "bold",
-          lineColor: [210, 222, 238],
-          lineWidth: 0.4
-        },
-        alternateRowStyles: { fillColor: [250, 252, 255] },
-        columnStyles: {
-          ID: { cellWidth: 48 },
-          Department: { cellWidth: 112 },
-          Type: { cellWidth: 72 },
-          Date: { cellWidth: 58 },
-          Category: { cellWidth: 74 },
-          Status: { cellWidth: 70 },
-          Amount: { cellWidth: 72 },
-          Description: { cellWidth: "auto" }
-        },
-        didDrawPage: () => {
-          drawTemplate();
-          doc.setFont("helvetica", "normal");
-          doc.setFontSize(8);
-          doc.setTextColor(120, 132, 150);
-          doc.text(`Page ${doc.getNumberOfPages()}`, pageWidth - margin, pageHeight - 30, { align: "right" });
-        }
-      });
+  const addCity = (generateTasks: boolean) => {
+    const city = cityDraft.trim();
+    if (!city) return;
+    if (cities.some((item) => item.toLowerCase() === city.toLowerCase())) {
+      window.alert("This city already exists.");
+      return;
     }
-    doc.save(`${slug(title)}.pdf`);
-  }
+    setCities((current) => [...current, city]);
+    if (generateTasks) setTasks((current) => [...current, ...generateDefaultTasksForCity(city)]);
+    setCityDraft("");
+  };
 
-  const exportPageRows = (scope: ExportScope) => rowsForExport(scope === "all" ? unfilteredPageRows : pageRows);
-  const clearFilters = () => {
-    setSelectedDepartments(allDepartments);
-    setRequestSort("desc");
-    setSpendSort("desc");
-    setSelectedRequestTerms([]);
-    setCompareDepartments(defaultCompareDepartments);
+  const resetDemoData = () => {
+    const confirmed = window.confirm("Reset all tracker data to the default City 1, City 2, and City 3 demo setup?");
+    if (!confirmed) return;
+    setCities(INITIAL_CITIES);
+    setTasks(generateDefaultTasksForCities(INITIAL_CITIES));
+    setFilters(EMPTY_FILTERS);
     setSearch("");
-    setTimelineMode("monthly");
-    setFromMonth(months[0] || "");
-    setToMonth(months[months.length - 1] || "");
+    setSelectedTask(null);
   };
-  const selectedTemplate = (id: string, fallback: ChartTemplate, options: ChartTemplateOption[]) => {
-    const saved = chartTemplates[id];
-    return saved && options.some((option) => option.value === saved) ? saved : fallback;
+
+  const exportTasks = (rows: TrackerTask[], label: string) => downloadCsv(rows, `ashara-it-readiness-${label}.csv`);
+
+  const importCsv = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const rows = parseCsv(text);
+    const imported = rows.map(rowToTask).filter(Boolean) as TrackerTask[];
+    if (!imported.length) {
+      window.alert("No valid task rows found in this CSV.");
+      return;
+    }
+
+    setTasks((current) => {
+      const byId = new Map(current.map((task) => [task.id, task]));
+      imported.forEach((task) => byId.set(task.id, task));
+      return Array.from(byId.values());
+    });
+    setCities((current) => Array.from(new Set([...current, ...imported.map((task) => task.city).filter(Boolean)])));
+    event.target.value = "";
   };
-  const setChartTemplate = (id: string, value: ChartTemplate) => {
-    setChartTemplates((current) => ({ ...current, [id]: value }));
-  };
-  const chartTemplateProps = (id: string, fallback: ChartTemplate, options: ChartTemplateOption[]) => ({
-    templateOptions: options,
-    selectedTemplate: selectedTemplate(id, fallback, options),
-    onTemplateChange: (value: ChartTemplate) => setChartTemplate(id, value)
-  });
 
   return (
-    <div className="min-h-screen overflow-x-hidden">
-      {sidebarOpen && <button className="no-print fixed inset-0 z-30 bg-slate-900/25 backdrop-blur-[2px] lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close navigation overlay" />}
-      <aside
-        className={`no-print fixed inset-y-0 left-0 z-40 flex w-[min(18rem,86vw)] flex-col border-r border-line bg-white/92 shadow-soft backdrop-blur transition-transform duration-300 lg:w-72 lg:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="flex h-20 items-center justify-between border-b border-line px-5">
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Analytics</p>
-            <h1 className="text-lg font-semibold text-ink">IT Requests</h1>
+    <main className="min-h-screen bg-[#f5f7fb] text-[#1f2937]">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-5 sm:px-6 lg:px-8">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase text-slate-500">Internal Operations Dashboard</p>
+              <h1 className="mt-1 text-2xl font-semibold text-slate-950 sm:text-3xl">Ashara IT Readiness Master Tracker</h1>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button className="btn-secondary" onClick={addTask}>
+                <Plus size={16} /> Add Task
+              </button>
+              <button className="btn-secondary" onClick={() => exportTasks(visibleTasks, "visible-tasks")}>
+                <Download size={16} /> Export Visible CSV
+              </button>
+              <button className="btn-secondary" onClick={() => exportTasks(tasks, "full-task-list")}>
+                <Download size={16} /> Export Full CSV
+              </button>
+              <button className="btn-secondary" onClick={() => importInputRef.current?.click()}>
+                <Upload size={16} /> Import CSV
+              </button>
+              <input ref={importInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={importCsv} />
+              <button className="btn-secondary" onClick={resetDemoData}>
+                <RefreshCcw size={16} /> Reset Demo Data
+              </button>
+            </div>
           </div>
-          <button className="rounded-md p-2 text-slate-500 hover:bg-slate-100 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close menu">
-            <X size={20} />
-          </button>
-        </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-          {pages.map((page) => {
-            const Icon = page.icon;
-            return (
+
+          <nav className="flex gap-2 overflow-x-auto pb-1">
+            {VIEW_TABS.map((view) => (
               <button
-                key={page.id}
-                onClick={() => {
-                  setActivePage(page.id);
-                  setSidebarOpen(false);
-                }}
-                className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-sm font-medium transition ${
-                  activePage === page.id ? "bg-[#e7f0fb] text-[#2d679d]" : "text-slate-600 hover:bg-slate-100"
+                key={view}
+                className={`whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold transition ${
+                  activeView === view ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}
+                onClick={() => setActiveView(view)}
               >
-                <Icon size={18} />
-                {page.id}
+                {view}
               </button>
-            );
-          })}
-        </nav>
-      </aside>
+            ))}
+          </nav>
+        </div>
+      </header>
 
-      <main className="min-w-0 lg:pl-72">
-        <header className="sticky top-0 z-30 border-b border-line bg-white/82 backdrop-blur">
-          <div className="flex min-h-20 flex-col gap-3 px-4 py-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-            <div className="flex min-w-0 items-center gap-3">
-              <button className="no-print rounded-md border border-line bg-white p-2.5 text-slate-600 lg:hidden" onClick={() => setSidebarOpen(true)} aria-label="Open menu">
-                <Menu size={20} />
-              </button>
-              <div className="min-w-0">
-                <p className="text-sm text-slate-500">{activePage}</p>
-                <h2 className="text-xl font-semibold leading-tight text-ink sm:text-2xl xl:text-3xl">IT Request Analytics Dashboard</h2>
-              </div>
-            </div>
-            <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap lg:w-auto lg:items-center lg:justify-end">
-              <button
-                className="btn-secondary no-print justify-center"
-                onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-                aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
-              >
-                {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
-                {theme === "light" ? "Dark" : "Light"}
-              </button>
-              <ExportCluster
-                onPdfAll={() => exportPdf(`${activePage} - Export All`, exportPageRows("all"))}
-                onPdfFiltered={() => exportPdf(`${activePage} - Export Filtered`, exportPageRows("filtered"))}
-                onExcelAll={() => exportExcel(`${activePage} - Export All`, exportPageRows("all"))}
-                onExcelFiltered={() => exportExcel(`${activePage} - Export Filtered`, exportPageRows("filtered"))}
-              />
-            </div>
-          </div>
-        </header>
+      <div className="mx-auto max-w-[1800px] space-y-5 px-4 py-5 sm:px-6 lg:px-8">
+        <CityManager cityDraft={cityDraft} setCityDraft={setCityDraft} onAddCity={addCity} />
 
-        <div className="w-full max-w-[1800px] space-y-5 px-3 py-4 sm:space-y-6 sm:px-5 sm:py-6 lg:px-7 xl:px-8">
-          {activePage !== "Dashboard" && (
-            <FilterPanel
-              activePage={activePage}
-              selectedDepartments={selectedDepartments}
-              setSelectedDepartments={setSelectedDepartments}
-              requestSort={requestSort}
-              setRequestSort={setRequestSort}
-              spendSort={spendSort}
-              setSpendSort={setSpendSort}
-              selectedRequestTerms={selectedRequestTerms}
-              setSelectedRequestTerms={setSelectedRequestTerms}
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+          <button className="flex w-full items-center justify-between text-left lg:hidden" onClick={() => setFiltersOpen((value) => !value)}>
+            <span className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <Filter size={16} /> Filters and Search
+            </span>
+            <ChevronDown className={`transition ${filtersOpen ? "rotate-180" : ""}`} size={18} />
+          </button>
+          <div className={`${filtersOpen ? "block" : "hidden"} mt-4 lg:mt-0 lg:block`}>
+            <FiltersPanel
+              filters={filters}
+              setFilters={setFilters}
               search={search}
               setSearch={setSearch}
-              timelineMode={timelineMode}
-              setTimelineMode={setTimelineMode}
-              fromMonth={fromMonth}
-              toMonth={toMonth}
-              setFromMonth={setFromMonth}
-              setToMonth={setToMonth}
-              filtersOpen={filtersOpen}
-              setFiltersOpen={setFiltersOpen}
-              clearFilters={clearFilters}
+              cities={cities}
+              onClear={() => {
+                setFilters(EMPTY_FILTERS);
+                setSearch("");
+              }}
             />
-          )}
-
-          <AnimatePresence mode="wait">
-            <motion.section
-              key={activePage}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.22 }}
-              className="space-y-6"
-            >
-              {!ready ? (
-                <LoadingGrid />
-              ) : (
-                <>
-                  {activePage === "Dashboard" && (
-                    <>
-                      <KpiGrid />
-                      <ChartGrid>
-                        <ChartPanel
-                          id="dept-requests"
-                          title="Department-wise Requests"
-                          variant="wide"
-                          data={departmentRequests}
-                          table={tableModes["dept-requests"]}
-                          compare={compareModes["dept-requests"]}
-                          tableRows={pageRows}
-                          compareDepartments={compareDepartments}
-                          setCompareDepartments={setCompareDepartments}
-                          {...chartTemplateProps("dept-requests", compareModes["dept-requests"] ? "stacked-bar" : "horizontal-bar", compareModes["dept-requests"] ? compareOptions : horizontalBarOptions)}
-                          onToggleTable={() => toggle(setTableModes, "dept-requests")}
-                          onToggleCompare={() => toggle(setCompareModes, "dept-requests")}
-                          onPdf={() => exportPdf("Department-wise Requests", rowsForExport(pageRows))}
-                          onExcel={() => exportExcel("Department-wise Requests", rowsForExport(pageRows))}
-                        >
-                          {compareModes["dept-requests"] ? (
-                            <CompareChart template={selectedTemplate("dept-requests", "stacked-bar", compareOptions)} data={compareTypeRows} />
-                          ) : (
-                            <MetricChart template={selectedTemplate("dept-requests", "horizontal-bar", horizontalBarOptions)} data={departmentRequests} valueKey="requests" />
-                          )}
-                        </ChartPanel>
-                        <ChartPanel
-                          id="monthly-trend"
-                          title="Monthly Trend Line"
-                          variant="standard"
-                          data={trendRows}
-                          table={tableModes["monthly-trend"]}
-                          tableRows={pageRows}
-                          {...chartTemplateProps("monthly-trend", "line", lineOptions)}
-                          onToggleTable={() => toggle(setTableModes, "monthly-trend")}
-                          onPdf={() => exportPdf("Monthly Trend Line", rowsForExport(pageRows))}
-                          onExcel={() => exportExcel("Monthly Trend Line", rowsForExport(pageRows))}
-                        >
-                          <TrendChart template={selectedTemplate("monthly-trend", "line", lineOptions)} data={trendRows} valueKey="requests" />
-                        </ChartPanel>
-                        <ChartPanel
-                          id="spend-dept"
-                          title="Spend by Department"
-                          variant="wide"
-                          data={departmentSpend}
-                          table={tableModes["spend-dept"]}
-                          compare={compareModes["spend-dept"]}
-                          tableRows={pageRows}
-                          compareDepartments={compareDepartments}
-                          setCompareDepartments={setCompareDepartments}
-                          {...chartTemplateProps("spend-dept", compareModes["spend-dept"] ? "stacked-bar" : "horizontal-bar", compareModes["spend-dept"] ? compareOptions : spendBarOptions)}
-                          onToggleTable={() => toggle(setTableModes, "spend-dept")}
-                          onToggleCompare={() => toggle(setCompareModes, "spend-dept")}
-                          onPdf={() => exportPdf("Spend by Department", rowsForExport(pageRows))}
-                          onExcel={() => exportExcel("Spend by Department", rowsForExport(pageRows))}
-                        >
-                          {compareModes["spend-dept"] ? (
-                            <CompareChart template={selectedTemplate("spend-dept", "stacked-bar", compareOptions)} data={compareTypeRows} />
-                          ) : (
-                            <MetricChart template={selectedTemplate("spend-dept", "horizontal-bar", spendBarOptions)} data={departmentSpend} valueKey="spend" />
-                          )}
-                        </ChartPanel>
-                        <ChartPanel
-                          id="request-category"
-                          title="Request Category"
-                          variant="compact"
-                          data={categoryRows}
-                          table={tableModes["request-category"]}
-                          compare={compareModes["request-category"]}
-                          tableRows={pageRows}
-                          compareDepartments={compareDepartments}
-                          setCompareDepartments={setCompareDepartments}
-                          {...chartTemplateProps("request-category", compareModes["request-category"] ? "stacked-bar" : "donut", compareModes["request-category"] ? compareOptions : donutOptions)}
-                          onToggleTable={() => toggle(setTableModes, "request-category")}
-                          onToggleCompare={() => toggle(setCompareModes, "request-category")}
-                          onPdf={() => exportPdf("Request Category", rowsForExport(pageRows))}
-                          onExcel={() => exportExcel("Request Category", rowsForExport(pageRows))}
-                        >
-                          {compareModes["request-category"] ? (
-                            <CompareChart template={selectedTemplate("request-category", "stacked-bar", compareOptions)} data={compareTypeRows} />
-                          ) : (
-                            <MetricChart template={selectedTemplate("request-category", "donut", donutOptions)} data={categoryRows} valueKey="requests" />
-                          )}
-                        </ChartPanel>
-                      </ChartGrid>
-                      <Insights insights={summaryInsights} />
-                    </>
-                  )}
-
-                  {activePage === "IT Requests" && (
-                    <ChartGrid>
-                      <ChartPanel id="request-status" title="Request Status Overview" variant="compact" data={statusRows} table={tableModes["request-status"]} tableRows={pageRows} {...chartTemplateProps("request-status", "donut", donutOptions)} onToggleTable={() => toggle(setTableModes, "request-status")} onPdf={() => exportPdf("Request Status Overview", rowsForExport(pageRows))} onExcel={() => exportExcel("Request Status Overview", rowsForExport(pageRows))}>
-                        <MetricChart template={selectedTemplate("request-status", "donut", donutOptions)} data={statusRows} valueKey="requests" />
-                      </ChartPanel>
-                      <ChartPanel id="request-dept" title="Department-wise Requests" variant="wide" data={departmentRequests} table={tableModes["request-dept"]} compare={compareModes["request-dept"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} {...chartTemplateProps("request-dept", compareModes["request-dept"] ? "stacked-bar" : "horizontal-bar", compareModes["request-dept"] ? compareOptions : horizontalBarOptions)} onToggleTable={() => toggle(setTableModes, "request-dept")} onToggleCompare={() => toggle(setCompareModes, "request-dept")} onPdf={() => exportPdf("Department-wise Requests", rowsForExport(pageRows))} onExcel={() => exportExcel("Department-wise Requests", rowsForExport(pageRows))}>
-                        {compareModes["request-dept"] ? (
-                          <CompareChart template={selectedTemplate("request-dept", "stacked-bar", compareOptions)} data={compareTypeRows} />
-                        ) : (
-                          <MetricChart template={selectedTemplate("request-dept", "horizontal-bar", horizontalBarOptions)} data={departmentRequests} valueKey="requests" />
-                        )}
-                      </ChartPanel>
-                      <ChartPanel id="request-type" title="Request Category/Type Breakdown" variant="compact" data={typeRows} table={tableModes["request-type"]} tableRows={pageRows} {...chartTemplateProps("request-type", "donut", donutOptions)} onToggleTable={() => toggle(setTableModes, "request-type")} onPdf={() => exportPdf("Request Type Breakdown", rowsForExport(pageRows))} onExcel={() => exportExcel("Request Type Breakdown", rowsForExport(pageRows))}>
-                        <MetricChart template={selectedTemplate("request-type", "donut", donutOptions)} data={typeRows} valueKey="requests" />
-                      </ChartPanel>
-                      <RequestTable title="Matching Requests" rows={sortedRequests} onPdf={(exportRows) => exportPdf("Matching Requests", rowsForExport(exportRows))} onExcel={(exportRows) => exportExcel("Matching Requests", rowsForExport(exportRows))} />
-                    </ChartGrid>
-                  )}
-
-                  {activePage === "Budget" && (
-                    <>
-                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                        <MiniKpi title="Total Spend Overview" value={formatINR(data.kpis.totalSpend.value)} icon={<IndianRupee size={20} />} />
-                        <MiniKpi title="Known Row Spend" value={formatINR(pageRows.reduce((sum, row) => sum + (row.amount || 0), 0))} icon={<WalletCards size={20} />} />
-                      </div>
-                      <ChartGrid>
-                        <ChartPanel id="budget-dept" title="Spend by Department" variant="wide" data={departmentSpend} table={tableModes["budget-dept"]} compare={compareModes["budget-dept"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} {...chartTemplateProps("budget-dept", compareModes["budget-dept"] ? "stacked-bar" : "horizontal-bar", compareModes["budget-dept"] ? compareOptions : spendBarOptions)} onToggleTable={() => toggle(setTableModes, "budget-dept")} onToggleCompare={() => toggle(setCompareModes, "budget-dept")} onPdf={() => exportPdf("Spend by Department", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend by Department", rowsForExport(pageRows))}>
-                          {compareModes["budget-dept"] ? (
-                            <CompareChart template={selectedTemplate("budget-dept", "stacked-bar", compareOptions)} data={compareTypeRows} />
-                          ) : (
-                            <MetricChart template={selectedTemplate("budget-dept", "horizontal-bar", spendBarOptions)} data={departmentSpend} valueKey="spend" />
-                          )}
-                        </ChartPanel>
-                        <ChartPanel id="budget-category" title="Spend by Request/Category" variant="compact" data={spendCategoryRows} table={tableModes["budget-category"]} compare={compareModes["budget-category"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} {...chartTemplateProps("budget-category", compareModes["budget-category"] ? "stacked-bar" : "donut", compareModes["budget-category"] ? compareOptions : donutOptions)} onToggleTable={() => toggle(setTableModes, "budget-category")} onToggleCompare={() => toggle(setCompareModes, "budget-category")} onPdf={() => exportPdf("Spend by Category", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend by Category", rowsForExport(pageRows))}>
-                          {compareModes["budget-category"] ? (
-                            <CompareChart template={selectedTemplate("budget-category", "stacked-bar", compareOptions)} data={compareTypeRows} />
-                          ) : (
-                            <MetricChart template={selectedTemplate("budget-category", "donut", donutOptions)} data={spendCategoryRows} valueKey="spend" />
-                          )}
-                        </ChartPanel>
-                        <ChartPanel id="budget-trend" title="Spend Trends Over Time" variant="standard" data={trendRows} table={tableModes["budget-trend"]} tableRows={pageRows} {...chartTemplateProps("budget-trend", "area", areaOptions)} onToggleTable={() => toggle(setTableModes, "budget-trend")} onPdf={() => exportPdf("Spend Trends", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend Trends", rowsForExport(pageRows))}>
-                          <TrendChart template={selectedTemplate("budget-trend", "area", areaOptions)} data={trendRows} valueKey="spend" />
-                        </ChartPanel>
-                      </ChartGrid>
-                    </>
-                  )}
-
-                  {activePage === "Departments" && (
-                    <ChartGrid>
-                      <ChartPanel id="dept-view-requests" title="Department Requests" variant="wide" data={departmentRequests} table={tableModes["dept-view-requests"]} compare={compareModes["dept-view-requests"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} {...chartTemplateProps("dept-view-requests", compareModes["dept-view-requests"] ? "stacked-bar" : "horizontal-bar", compareModes["dept-view-requests"] ? compareOptions : horizontalBarOptions)} onToggleTable={() => toggle(setTableModes, "dept-view-requests")} onToggleCompare={() => toggle(setCompareModes, "dept-view-requests")} onPdf={() => exportPdf("Department Requests", rowsForExport(pageRows))} onExcel={() => exportExcel("Department Requests", rowsForExport(pageRows))}>
-                        {compareModes["dept-view-requests"] ? (
-                          <CompareChart template={selectedTemplate("dept-view-requests", "stacked-bar", compareOptions)} data={compareTypeRows} />
-                        ) : (
-                          <MetricChart template={selectedTemplate("dept-view-requests", "horizontal-bar", horizontalBarOptions)} data={departmentRequests} valueKey="requests" />
-                        )}
-                      </ChartPanel>
-                      <ChartPanel id="dept-view-spend" title="Department Spend" variant="wide" data={departmentSpend} table={tableModes["dept-view-spend"]} compare={compareModes["dept-view-spend"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} {...chartTemplateProps("dept-view-spend", compareModes["dept-view-spend"] ? "stacked-bar" : "horizontal-bar", compareModes["dept-view-spend"] ? compareOptions : spendBarOptions)} onToggleTable={() => toggle(setTableModes, "dept-view-spend")} onToggleCompare={() => toggle(setCompareModes, "dept-view-spend")} onPdf={() => exportPdf("Department Spend", rowsForExport(pageRows))} onExcel={() => exportExcel("Department Spend", rowsForExport(pageRows))}>
-                        {compareModes["dept-view-spend"] ? (
-                          <CompareChart template={selectedTemplate("dept-view-spend", "stacked-bar", compareOptions)} data={compareTypeRows} />
-                        ) : (
-                          <MetricChart template={selectedTemplate("dept-view-spend", "horizontal-bar", spendBarOptions)} data={departmentSpend} valueKey="spend" />
-                        )}
-                      </ChartPanel>
-                    </ChartGrid>
-                  )}
-
-                  {activePage === "Trends" && (
-                    <ChartGrid>
-                      <ChartPanel id="trend-requests" title={`${labelTimeline(timelineMode)} Request Trends`} variant={compareModes["trend-requests"] ? "wide" : "standard"} data={trendRows} table={tableModes["trend-requests"]} compare={compareModes["trend-requests"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} {...chartTemplateProps("trend-requests", compareModes["trend-requests"] ? "stacked-bar" : "line", compareModes["trend-requests"] ? compareOptions : lineOptions)} onToggleTable={() => toggle(setTableModes, "trend-requests")} onToggleCompare={() => toggle(setCompareModes, "trend-requests")} onPdf={() => exportPdf("Request Trends", rowsForExport(pageRows))} onExcel={() => exportExcel("Request Trends", rowsForExport(pageRows))}>
-                        {compareModes["trend-requests"] ? (
-                          <CompareChart template={selectedTemplate("trend-requests", "stacked-bar", compareOptions)} data={compareTypeRows} />
-                        ) : (
-                          <TrendChart template={selectedTemplate("trend-requests", "line", lineOptions)} data={trendRows} valueKey="requests" />
-                        )}
-                      </ChartPanel>
-                      <ChartPanel id="trend-spend" title={`${labelTimeline(timelineMode)} Spend Trends`} variant="standard" data={trendRows} table={tableModes["trend-spend"]} tableRows={pageRows} {...chartTemplateProps("trend-spend", "area", areaOptions)} onToggleTable={() => toggle(setTableModes, "trend-spend")} onPdf={() => exportPdf("Spend Trends", rowsForExport(pageRows))} onExcel={() => exportExcel("Spend Trends", rowsForExport(pageRows))}>
-                        <TrendChart template={selectedTemplate("trend-spend", "area", areaOptions)} data={trendRows} valueKey="spend" />
-                      </ChartPanel>
-                      <ChartPanel id="trend-category" title="Request Category Comparison" variant="wide" data={categoryRows} table={tableModes["trend-category"]} compare={compareModes["trend-category"]} tableRows={pageRows} compareDepartments={compareDepartments} setCompareDepartments={setCompareDepartments} {...chartTemplateProps("trend-category", compareModes["trend-category"] ? "stacked-bar" : "horizontal-bar", compareModes["trend-category"] ? compareOptions : horizontalBarOptions)} onToggleTable={() => toggle(setTableModes, "trend-category")} onToggleCompare={() => toggle(setCompareModes, "trend-category")} onPdf={() => exportPdf("Category Comparison", rowsForExport(pageRows))} onExcel={() => exportExcel("Category Comparison", rowsForExport(pageRows))}>
-                        {compareModes["trend-category"] ? (
-                          <CompareChart template={selectedTemplate("trend-category", "stacked-bar", compareOptions)} data={compareTypeRows} />
-                        ) : (
-                          <MetricChart template={selectedTemplate("trend-category", "horizontal-bar", horizontalBarOptions)} data={categoryRows} valueKey="requests" />
-                        )}
-                      </ChartPanel>
-                    </ChartGrid>
-                  )}
-                </>
-              )}
-            </motion.section>
-          </AnimatePresence>
-        </div>
-      </main>
-    </div>
-  );
-}
-
-function scopedRows(page: string, rows: RequestRow[]) {
-  if (page === "Budget") return rows.filter((row) => row.amount !== null);
-  return rows;
-}
-
-function toggle(setter: (updater: (current: Record<string, boolean>) => Record<string, boolean>) => void, key: string) {
-  setter((current) => ({ ...current, [key]: !current[key] }));
-}
-
-function useMediaQuery(query: string) {
-  const [matches, setMatches] = useState(false);
-
-  useEffect(() => {
-    const media = window.matchMedia(query);
-    setMatches(media.matches);
-    const listener = (event: MediaQueryListEvent) => setMatches(event.matches);
-    media.addEventListener("change", listener);
-    return () => media.removeEventListener("change", listener);
-  }, [query]);
-
-  return matches;
-}
-
-function labelTimeline(mode: TimelineMode) {
-  return mode === "monthly" ? "Monthly" : mode === "quarterly" ? "Quarterly" : "Yearly";
-}
-
-function slug(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-}
-
-function groupDepartmentTypes(rows: RequestRow[], departments: string[]) {
-  return departments.map((department) => {
-    const departmentRows = rows.filter((row) => row.department === department);
-    return {
-      name: department,
-      Development: departmentRows.filter((row) => row.type === "Development").length,
-      Subscription: departmentRows.filter((row) => row.type === "Subscription").length,
-      Software: departmentRows.filter((row) => row.type === "Software").length,
-      requests: departmentRows.length,
-      spend: departmentRows.reduce((sum, row) => sum + (row.amount || 0), 0)
-    };
-  });
-}
-
-function ExportCluster({ onPdfAll, onPdfFiltered, onExcelAll, onExcelFiltered }: { onPdfAll: () => void; onPdfFiltered: () => void; onExcelAll: () => void; onExcelFiltered: () => void }) {
-  return (
-    <div className="no-print grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end">
-      <button className="btn-secondary justify-center" onClick={onPdfAll}><FileDown size={16} /> PDF All</button>
-      <button className="btn-primary justify-center" onClick={onPdfFiltered}><Download size={16} /> PDF Filtered</button>
-      <button className="btn-secondary justify-center" onClick={onExcelAll}><FileSpreadsheet size={16} /> Excel All</button>
-      <button className="btn-secondary justify-center" onClick={onExcelFiltered}><FileSpreadsheet size={16} /> Excel Filtered</button>
-    </div>
-  );
-}
-
-function FilterPanel(props: {
-  activePage: string;
-  selectedDepartments: string[];
-  setSelectedDepartments: (value: string[]) => void;
-  requestSort: SortDirection;
-  setRequestSort: (value: SortDirection) => void;
-  spendSort: SortDirection;
-  setSpendSort: (value: SortDirection) => void;
-  selectedRequestTerms: string[];
-  setSelectedRequestTerms: (value: string[]) => void;
-  search: string;
-  setSearch: (value: string) => void;
-  timelineMode: TimelineMode;
-  setTimelineMode: (value: TimelineMode) => void;
-  fromMonth: string;
-  toMonth: string;
-  setFromMonth: (value: string) => void;
-  setToMonth: (value: string) => void;
-  filtersOpen: boolean;
-  setFiltersOpen: (value: boolean) => void;
-  clearFilters: () => void;
-}) {
-  const showTimeline = true;
-  const [requestTermsOpen, setRequestTermsOpen] = useState(false);
-  const selectedCount = props.selectedDepartments.length;
-  const allSelected = selectedCount === allDepartments.length;
-
-  function toggleDepartment(department: string) {
-    if (props.selectedDepartments.includes(department)) {
-      props.setSelectedDepartments(props.selectedDepartments.filter((item) => item !== department));
-    } else {
-      props.setSelectedDepartments([...props.selectedDepartments, department]);
-    }
-  }
-
-  function toggleRequestTerm(term: string) {
-    if (props.selectedRequestTerms.includes(term)) {
-      props.setSelectedRequestTerms(props.selectedRequestTerms.filter((item) => item !== term));
-    } else {
-      props.setSelectedRequestTerms([...props.selectedRequestTerms, term]);
-    }
-  }
-
-  return (
-    <section className="no-print relative rounded-lg border border-line bg-white/90 p-3 shadow-soft sm:p-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <label className="w-full space-y-1 lg:max-w-xl">
-          <span className="text-xs font-semibold uppercase text-slate-500">Search Requests</span>
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <input className="field pl-9" value={props.search} onChange={(event) => props.setSearch(event.target.value)} placeholder="Search request" />
           </div>
-        </label>
+        </section>
 
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
-          <button className="btn-primary justify-center" onClick={() => props.setFiltersOpen(!props.filtersOpen)}>
-            <SlidersHorizontal size={16} />
-            Filters
-          </button>
-          <button className="btn-secondary justify-center" onClick={props.clearFilters}>Clear Filters</button>
-        </div>
+        <SummaryCards metrics={metrics} />
+
+        {activeView === "Dashboard" && (
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(360px,0.8fr)]">
+            <section className="space-y-5">
+              <CityReadinessCards cityStats={cityStats} />
+              <ChartsPanel statusRows={statusRows} workstreamRows={workstreamRows} cityStats={cityStats} />
+            </section>
+            <StatusMeanings />
+          </div>
+        )}
+
+        {activeView === "City-wise Progress" && (
+          <section className="space-y-5">
+            <CityReadinessCards cityStats={cityStats} />
+            <ChartsPanel statusRows={statusRows} workstreamRows={workstreamRows} cityStats={cityStats} />
+          </section>
+        )}
+
+        {activeView !== "Dashboard" && (
+          <TaskTable tasks={visibleTasks} totalCount={presetTasks.length} onOpenTask={setSelectedTask} />
+        )}
+
+        {activeView === "Dashboard" && (
+          <TaskTable tasks={visibleTasks.slice(0, 24)} totalCount={visibleTasks.length} onOpenTask={setSelectedTask} title="Priority Task Snapshot" />
+        )}
       </div>
 
-      {props.filtersOpen && (
-        <div className="mt-4 max-h-[72vh] w-full overflow-y-auto rounded-lg border border-line bg-white p-3 shadow-soft sm:p-4 md:absolute md:right-4 md:top-[calc(100%-8px)] md:z-30 md:mt-0 md:w-[min(720px,calc(100vw-2rem))]">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr]">
-            <div>
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <span className="text-xs font-semibold uppercase text-slate-500">Departments</span>
-                <button
-                  className="text-xs font-semibold text-[#2d679d]"
-                  onClick={() => props.setSelectedDepartments(allSelected ? [] : allDepartments)}
-                >
-                  {allSelected ? "Unselect all" : "Select all"}
-                </button>
-              </div>
-              <div className="max-h-64 space-y-1 overflow-auto rounded-lg border border-line p-2">
-                {allDepartments.map((department) => (
-                  <label key={department} className="flex min-h-11 items-start gap-2 rounded-md px-2 py-2 text-sm leading-6 text-slate-700 hover:bg-slate-50">
-                    <input
-                      className="mt-1"
-                      type="checkbox"
-                      checked={props.selectedDepartments.includes(department)}
-                      onChange={() => toggleDepartment(department)}
-                    />
-                    <span>{department}</span>
-                  </label>
-                ))}
-              </div>
-              <p className="mt-2 text-xs text-slate-500">{selectedCount} departments selected</p>
-            </div>
-
-            <label className="space-y-2">
-              <span className="text-xs font-semibold uppercase text-slate-500">Requests</span>
-              <select className="field" value={props.requestSort} onChange={(event) => props.setRequestSort(event.target.value as SortDirection)}>
-                <option value="desc">High to low</option>
-                <option value="asc">Low to high</option>
-              </select>
-            </label>
-
-            <label className="space-y-2">
-              <span className="text-xs font-semibold uppercase text-slate-500">Spend</span>
-              <select className="field" value={props.spendSort} onChange={(event) => props.setSpendSort(event.target.value as SortDirection)}>
-                <option value="desc">High to low</option>
-                <option value="asc">Low to high</option>
-              </select>
-            </label>
-          </div>
-
-          {props.activePage === "IT Requests" && (
-            <div className="mt-4 border-t border-line pt-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <span className="text-xs font-semibold uppercase text-slate-500">Requests</span>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">Filter by exact request terms from the raw PDF.</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button className="btn-compact" onClick={() => setRequestTermsOpen(!requestTermsOpen)}>
-                    {requestTermsOpen ? "Hide Terms" : "Open Terms"}
-                  </button>
-                  <button className="btn-compact" onClick={() => props.setSelectedRequestTerms([])}>
-                    Clear Terms
-                  </button>
-                </div>
-              </div>
-
-              {requestTermsOpen && (
-                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {requestTermGroups.map((group) => (
-                    <div key={group.title} className="rounded-lg border border-line p-3">
-                      <h4 className="text-sm font-semibold text-ink">{group.title}</h4>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {group.terms.map((term) => {
-                          const key = `${group.scope}:${term}`;
-                          const selected = props.selectedRequestTerms.includes(key);
-                          return (
-                            <button
-                              key={key}
-                              className={`rounded-full border px-3 py-1.5 text-xs font-semibold leading-5 transition ${
-                                selected ? "border-[#79a7d8] bg-[#e7f0fb] text-[#2d679d]" : "border-line bg-white text-slate-600 hover:bg-slate-50"
-                              }`}
-                              onClick={() => toggleRequestTerm(key)}
-                            >
-                              {term}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {props.selectedRequestTerms.length > 0 && (
-                <p className="mt-3 text-xs leading-5 text-slate-500">{props.selectedRequestTerms.length} request term filters active.</p>
-              )}
-            </div>
-          )}
-
-          {showTimeline && (
-            <div className="mt-4 border-t border-line pt-4">
-              <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_1fr]">
-                <div className="space-y-2">
-                  <span className="text-xs font-semibold uppercase text-slate-500">Timeline</span>
-                  <div className="grid grid-cols-2 rounded-lg border border-line bg-slate-50 p-1 sm:grid-cols-4">
-                    {(["monthly", "quarterly", "yearly"] as TimelineMode[]).map((mode) => (
-                      <button key={mode} className={`flex-1 rounded-md px-3 py-2 text-sm capitalize ${props.timelineMode === mode ? "bg-white text-[#2d679d] shadow-sm" : "text-slate-600"}`} onClick={() => props.setTimelineMode(mode)}>
-                        {mode}
-                      </button>
-                    ))}
-                    <button className="flex-1 rounded-md px-3 py-2 text-sm text-slate-400" disabled title="Daily request counts are unavailable because the raw PDF contains month-year dates only.">
-                      daily
-                    </button>
-                  </div>
-                </div>
-                <label className="space-y-2">
-                  <span className="text-xs font-semibold uppercase text-slate-500">From Date</span>
-                  <input className="field" type="month" value={props.fromMonth} min={months[0]} max={months[months.length - 1]} onChange={(event) => props.setFromMonth(event.target.value)} />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-xs font-semibold uppercase text-slate-500">To Date</span>
-                  <input className="field" type="month" value={props.toMonth} min={months[0]} max={months[months.length - 1]} onChange={(event) => props.setToMonth(event.target.value)} />
-                </label>
-              </div>
-              <p className="mt-2 text-xs leading-5 text-slate-500">Day-wise filtering unavailable: the raw PDF provides exact month-year fields, not day-level dates.</p>
-            </div>
-          )}
-        </div>
+      {selectedTask && (
+        <TaskEditor
+          task={selectedTask}
+          cities={cities}
+          onSave={upsertTask}
+          onClose={() => setSelectedTask(null)}
+          onDelete={deleteTask}
+        />
       )}
+    </main>
+  );
+}
+
+function CityManager({
+  cityDraft,
+  setCityDraft,
+  onAddCity
+}: {
+  cityDraft: string;
+  setCityDraft: (value: string) => void;
+  onAddCity: (generateTasks: boolean) => void;
+}) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+      <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-end">
+        <label className="space-y-1">
+          <span className="text-xs font-semibold uppercase text-slate-500">Add New City</span>
+          <input className="field" value={cityDraft} onChange={(event) => setCityDraft(event.target.value)} placeholder="Enter city name" />
+        </label>
+        <button className="btn-secondary justify-center" onClick={() => onAddCity(false)}>
+          <Plus size={16} /> Add City Only
+        </button>
+        <button className="btn-primary justify-center" onClick={() => onAddCity(true)}>
+          <ListChecks size={16} /> Add City + Default Tasks
+        </button>
+      </div>
     </section>
   );
 }
 
-function KpiGrid() {
+function FiltersPanel({
+  filters,
+  setFilters,
+  search,
+  setSearch,
+  cities,
+  onClear
+}: {
+  filters: Filters;
+  setFilters: (filters: Filters) => void;
+  search: string;
+  setSearch: (search: string) => void;
+  cities: string[];
+  onClear: () => void;
+}) {
+  const update = (key: keyof Filters, value: string) => setFilters({ ...filters, [key]: value });
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-      <MiniKpi title="Total Requests" value={String(data.kpis.totalRequests.value)} icon={<BarChart3 size={20} />} tone="blue" />
-      <MiniKpi title="Department with Most Requests" value={`${data.kpis.departmentWithMostRequests.value} (${data.kpis.departmentWithMostRequests.requests})`} icon={<Building2 size={20} />} tone="green" />
-      <MiniKpi title="Total Spend" value={formatINR(data.kpis.totalSpend.value)} icon={<IndianRupee size={20} />} tone="rose" />
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <label className="space-y-1 md:col-span-2 xl:col-span-2">
+          <span className="text-xs font-semibold uppercase text-slate-500">Search</span>
+          <span className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input
+              className="field pl-9"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search task, city, owner, vendor, remarks"
+            />
+          </span>
+        </label>
+        <SelectField label="City" value={filters.city} options={cities} onChange={(value) => update("city", value)} includeAll />
+        <SelectField label="Workstream" value={filters.workstream} options={WORKSTREAMS.map((item) => item.name)} onChange={(value) => update("workstream", value)} includeAll />
+        <SelectField label="Status" value={filters.status} options={STATUSES} onChange={(value) => update("status", value)} includeAll />
+        <SelectField label="Priority" value={filters.priority} options={PRIORITIES} onChange={(value) => update("priority", value)} includeAll />
+        <SelectField label="Event Criticality" value={filters.eventCriticality} options={EVENT_CRITICALITIES} onChange={(value) => update("eventCriticality", value)} includeAll />
+        <SelectField label="Risk Level" value={filters.riskLevel} options={RISK_LEVELS} onChange={(value) => update("riskLevel", value)} includeAll />
+        <SelectField label="Ownership Type" value={filters.ownershipType} options={OWNERSHIP_TYPES} onChange={(value) => update("ownershipType", value)} includeAll />
+        <SelectField label="Document Status" value={filters.documentStatus} options={DOCUMENT_STATUSES} onChange={(value) => update("documentStatus", value)} includeAll />
+      </div>
+      <div className="flex justify-end">
+        <button className="btn-secondary" onClick={onClear}>
+          <X size={16} /> Clear Filters
+        </button>
+      </div>
     </div>
   );
 }
 
-function MiniKpi({ title, value, icon, tone = "blue" }: { title: string; value: string; icon: React.ReactNode; tone?: "blue" | "green" | "rose" }) {
-  const tones = {
-    blue: "bg-[#e7f0fb] text-[#2d679d]",
-    green: "bg-[#e8f5ee] text-[#2f7a52]",
-    rose: "bg-[#fff0f2] text-[#a04d62]"
-  };
+function SummaryCards({ metrics }: { metrics: ReturnType<typeof getMetrics> }) {
+  const cards = [
+    { label: "Total Tasks", value: metrics.total, icon: ListChecks, tone: "slate" },
+    { label: "Completed Tasks", value: metrics.completed, icon: CheckCircle2, tone: "green" },
+    { label: "In Progress Tasks", value: metrics.inProgress, icon: CalendarClock, tone: "blue" },
+    { label: "Blocked Tasks", value: metrics.blocked, icon: CircleAlert, tone: "red" },
+    { label: "Waaz Critical Pending", value: metrics.waazPending, icon: AlertTriangle, tone: "amber" },
+    { label: "Missing Documents", value: metrics.missingDocuments, icon: FileQuestion, tone: "amber" },
+    { label: "Average Readiness", value: `${metrics.averageReadiness}%`, icon: CheckCircle2, tone: "green" }
+  ];
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="print-panel rounded-lg border border-line bg-white p-4 shadow-soft sm:p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-slate-500">{title}</p>
-          <p className="mt-3 break-words text-xl font-semibold text-ink sm:text-2xl">{value}</p>
-        </div>
-        <div className={`rounded-lg p-3 ${tones[tone]}`}>{icon}</div>
-      </div>
-    </motion.div>
+    <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
+      {cards.map((card) => {
+        const Icon = card.icon;
+        return (
+          <article key={card.label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase text-slate-500">{card.label}</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-950">{card.value}</p>
+              </div>
+              <span className={`rounded-md p-2 ${toneClasses(card.tone)}`}>
+                <Icon size={18} />
+              </span>
+            </div>
+          </article>
+        );
+      })}
+    </section>
   );
 }
 
-function ChartGrid({ children }: { children: React.ReactNode }) {
-  return <motion.div layout className="grid grid-flow-dense items-start gap-4 lg:grid-cols-12 xl:gap-5">{children}</motion.div>;
+function CityReadinessCards({ cityStats }: { cityStats: CityStat[] }) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold text-slate-950">City Readiness</h2>
+        <p className="text-sm text-slate-500">{cityStats.length} cities</p>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {cityStats.map((city) => (
+          <article key={city.city} className="rounded-lg border border-slate-200 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-slate-950">{city.city}</h3>
+                <p className="mt-1 text-sm text-slate-500">{city.completed} completed / {city.total} total</p>
+              </div>
+              <StatusIndicator label={city.health} />
+            </div>
+            <div className="mt-4">
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="text-slate-500">Overall completion</span>
+                <span className="font-semibold text-slate-900">{city.completion}%</span>
+              </div>
+              <ProgressBar value={city.completion} />
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-2 text-center text-sm">
+              <MetricPill label="Blocked" value={city.blocked} tone={city.blocked ? "red" : "slate"} />
+              <MetricPill label="High Risk" value={city.highRisk} tone={city.highRisk ? "amber" : "slate"} />
+              <MetricPill label="Docs Missing" value={city.missingDocuments} tone={city.missingDocuments ? "amber" : "slate"} />
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
 }
 
-function panelSpan(variant: PanelVariant, widthScale = 1) {
-  if (widthScale > 1.55) return "lg:col-span-12";
-  if (widthScale > 1.15) {
-    return variant === "wide" || variant === "full" ? "lg:col-span-12" : "lg:col-span-12 xl:col-span-8";
-  }
-  if (widthScale < 0.9) {
-    const narrowSpans: Record<PanelVariant, string> = {
-      compact: "lg:col-span-6 xl:col-span-4",
-      standard: "lg:col-span-6 xl:col-span-4",
-      wide: "lg:col-span-6",
-      full: "lg:col-span-12 xl:col-span-8"
+function ChartsPanel({
+  statusRows,
+  workstreamRows,
+  cityStats
+}: {
+  statusRows: Array<{ name: string; value: number; percent: number }>;
+  workstreamRows: Array<{ name: string; value: number; percent: number }>;
+  cityStats: CityStat[];
+}) {
+  return (
+    <section className="grid gap-5 xl:grid-cols-3">
+      <SimpleBarChart title="Status Distribution" rows={statusRows} />
+      <SimpleBarChart title="Workstream Completion" rows={workstreamRows.slice(0, 10)} />
+      <SimpleBarChart title="City Readiness" rows={cityStats.map((city) => ({ name: city.city, value: city.completion, percent: city.completion }))} suffix="%" />
+    </section>
+  );
+}
+
+function StatusMeanings() {
+  return (
+    <aside className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+      <h2 className="text-base font-semibold text-slate-950">Status Meanings</h2>
+      <div className="mt-4 space-y-3">
+        {STATUS_MEANINGS.map((item) => (
+          <div key={item.status} className="rounded-md border border-slate-100 bg-slate-50 p-3">
+            <StatusBadge status={item.status} />
+            <p className="mt-2 text-sm leading-6 text-slate-600">{item.meaning}</p>
+          </div>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+function TaskTable({
+  tasks,
+  totalCount,
+  onOpenTask,
+  title = "Task Table"
+}: {
+  tasks: TrackerTask[];
+  totalCount: number;
+  onOpenTask: (task: TrackerTask) => void;
+  title?: string;
+}) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white shadow-soft">
+      <div className="flex flex-col gap-2 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+          <p className="text-sm text-slate-500">{tasks.length} visible of {totalCount} matching tasks</p>
+        </div>
+      </div>
+
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
+          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <tr>
+              {["City", "Workstream", "Task Name", "Area", "Owner", "Priority", "Event Criticality", "Status", "Progress %", "Risk", "Due Date", "Document Status", "Latest Update"].map((heading) => (
+                <th key={heading} className="border-b border-slate-200 px-3 py-3 font-semibold">{heading}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {tasks.map((task) => (
+              <tr key={task.id} className={`cursor-pointer border-b border-slate-100 hover:bg-slate-50 ${dueRowClass(task)}`} onClick={() => onOpenTask(task)}>
+                <td className="px-3 py-3 font-medium text-slate-900">{task.city}</td>
+                <td className="px-3 py-3 text-slate-600">{task.workstream}</td>
+                <td className="max-w-[320px] px-3 py-3 text-slate-900">{taskDisplayName(task)}</td>
+                <td className="px-3 py-3 text-slate-600">{task.zoneArea}</td>
+                <td className="px-3 py-3 text-slate-600">{task.taskOwner || "-"}</td>
+                <td className="px-3 py-3"><PriorityBadge priority={task.priority} /></td>
+                <td className="px-3 py-3 text-slate-600">{task.eventCriticality}</td>
+                <td className="px-3 py-3"><StatusBadge status={task.status} /></td>
+                <td className="px-3 py-3">
+                  <div className="min-w-28">
+                    <ProgressBar value={task.progress} compact />
+                    <span className="mt-1 block text-xs text-slate-500">{task.progress}%</span>
+                  </div>
+                </td>
+                <td className="px-3 py-3"><RiskBadge risk={task.riskLevel} /></td>
+                <td className="px-3 py-3 text-slate-600">{task.dueDate || "-"}</td>
+                <td className="px-3 py-3"><DocumentBadge status={task.documentStatus} /></td>
+                <td className="max-w-[260px] px-3 py-3 text-slate-600">{task.remarksLatestUpdate || "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="space-y-3 p-3 lg:hidden">
+        {tasks.map((task) => (
+          <button key={task.id} className={`w-full rounded-lg border border-slate-200 p-4 text-left shadow-sm ${dueRowClass(task)}`} onClick={() => onOpenTask(task)}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-slate-950">{taskDisplayName(task)}</p>
+                <p className="mt-1 text-sm text-slate-500">{task.workstream}</p>
+              </div>
+              <StatusBadge status={task.status} />
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-slate-600">
+              <span>Owner: {task.taskOwner || "-"}</span>
+              <span>Due: {task.dueDate || "-"}</span>
+              <span>Risk: {task.riskLevel}</span>
+              <span>Docs: {task.documentStatus}</span>
+            </div>
+            <div className="mt-3"><ProgressBar value={task.progress} /></div>
+          </button>
+        ))}
+      </div>
+
+      {tasks.length === 0 && <div className="p-12 text-center text-sm text-slate-500">No tasks match the selected view or filters.</div>}
+    </section>
+  );
+}
+
+function TaskEditor({
+  task,
+  cities,
+  onSave,
+  onClose,
+  onDelete
+}: {
+  task: TrackerTask;
+  cities: string[];
+  onSave: (task: TrackerTask) => void;
+  onClose: () => void;
+  onDelete: (taskId: string) => void;
+}) {
+  const [draft, setDraft] = useState<TrackerTask>(task);
+
+  useEffect(() => setDraft(task), [task]);
+
+  const updateField = <K extends keyof TrackerTask>(key: K, value: TrackerTask[K]) => {
+    setDraft((current) => {
+      const next = { ...current, [key]: value };
+      if (key === "taskName" || key === "workstream") {
+        next.zoneArea = inferArea(String(key === "taskName" ? value : next.taskName), String(key === "workstream" ? value : next.workstream));
+      }
+      if (key === "status" && !current.progressManuallyEdited) {
+        next.progress = STATUS_PROGRESS[value as TrackerTask["status"]];
+      }
+      if (key === "progress") {
+        next.progressManuallyEdited = true;
+      }
+      return next;
+    });
+  };
+
+  const save = () => {
+    const taskId = draft.id || makeTaskId(draft.city, draft.workstream, draft.taskName);
+    onSave({ ...draft, id: taskId });
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-950/30 lg:flex lg:justify-end">
+      <aside className="flex h-full w-full flex-col bg-white shadow-2xl lg:w-[560px]">
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-4">
+          <div>
+            <p className="text-xs font-semibold uppercase text-slate-500">Task Detail / Edit</p>
+            <h2 className="mt-1 text-lg font-semibold text-slate-950">{taskDisplayName(draft)}</h2>
+          </div>
+          <button className="icon-btn" onClick={onClose} aria-label="Close task editor">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+          <label className="space-y-1">
+            <span className="field-label">Task Name</span>
+            <input className="field" value={draft.taskName} onChange={(event) => updateField("taskName", event.target.value)} />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <SelectField label="City" value={draft.city} options={cities} onChange={(value) => updateField("city", value)} />
+            <SelectField label="Workstream" value={draft.workstream} options={WORKSTREAMS.map((item) => item.name)} onChange={(value) => updateField("workstream", value)} />
+            <SelectField label="Area" value={draft.zoneArea} options={ZONES} onChange={(value) => updateField("zoneArea", value as TrackerTask["zoneArea"])} />
+            <SelectField label="Ownership Type" value={draft.ownershipType} options={OWNERSHIP_TYPES} onChange={(value) => updateField("ownershipType", value as TrackerTask["ownershipType"])} />
+            <label className="space-y-1">
+              <span className="field-label">Task Owner</span>
+              <input className="field" value={draft.taskOwner} onChange={(event) => updateField("taskOwner", event.target.value)} />
+            </label>
+            <label className="space-y-1">
+              <span className="field-label">Supporting Person</span>
+              <input className="field" value={draft.supportingPerson} onChange={(event) => updateField("supportingPerson", event.target.value)} />
+            </label>
+            <SelectField label="Priority" value={draft.priority} options={PRIORITIES} onChange={(value) => updateField("priority", value as TrackerTask["priority"])} />
+            <SelectField label="Event Criticality" value={draft.eventCriticality} options={EVENT_CRITICALITIES} onChange={(value) => updateField("eventCriticality", value as TrackerTask["eventCriticality"])} />
+            <SelectField label="Status" value={draft.status} options={STATUSES} onChange={(value) => updateField("status", value as TrackerTask["status"])} />
+            <label className="space-y-1">
+              <span className="field-label">Progress %</span>
+              <input className="field" type="number" min={0} max={100} value={draft.progress} onChange={(event) => updateField("progress", clamp(Number(event.target.value), 0, 100))} />
+            </label>
+            <label className="space-y-1">
+              <span className="field-label">Due Date</span>
+              <input className="field" type="date" value={draft.dueDate} onChange={(event) => updateField("dueDate", event.target.value)} />
+            </label>
+            <label className="space-y-1">
+              <span className="field-label">Target Readiness Date</span>
+              <input className="field" type="date" value={draft.targetReadinessDate} onChange={(event) => updateField("targetReadinessDate", event.target.value)} />
+            </label>
+            <label className="space-y-1">
+              <span className="field-label">Dependency</span>
+              <input className="field" value={draft.dependency} onChange={(event) => updateField("dependency", event.target.value)} />
+            </label>
+            <label className="space-y-1">
+              <span className="field-label">Vendor Name</span>
+              <input className="field" value={draft.vendorName} onChange={(event) => updateField("vendorName", event.target.value)} />
+            </label>
+            <label className="space-y-1">
+              <span className="field-label">Vendor Contact</span>
+              <input className="field" value={draft.vendorContact} onChange={(event) => updateField("vendorContact", event.target.value)} />
+            </label>
+            <SelectField label="Budget Status" value={draft.budgetStatus} options={BUDGET_STATUSES} onChange={(value) => updateField("budgetStatus", value as TrackerTask["budgetStatus"])} />
+            <SelectField label="Document Status" value={draft.documentStatus} options={DOCUMENT_STATUSES} onChange={(value) => updateField("documentStatus", value as TrackerTask["documentStatus"])} />
+            <SelectField label="Risk Level" value={draft.riskLevel} options={RISK_LEVELS} onChange={(value) => updateField("riskLevel", value as TrackerTask["riskLevel"])} />
+            <label className="space-y-1">
+              <span className="field-label">Last Update Date</span>
+              <input className="field" type="date" value={draft.lastUpdateDate} onChange={(event) => updateField("lastUpdateDate", event.target.value)} />
+            </label>
+            <label className="space-y-1">
+              <span className="field-label">Next Follow-up Date</span>
+              <input className="field" type="date" value={draft.nextFollowUpDate} onChange={(event) => updateField("nextFollowUpDate", event.target.value)} />
+            </label>
+          </div>
+          <label className="space-y-1">
+            <span className="field-label">Blocker Reason</span>
+            <textarea className="field min-h-20" value={draft.blockerReason} onChange={(event) => updateField("blockerReason", event.target.value)} />
+          </label>
+          <label className="space-y-1">
+            <span className="field-label">Remarks / Latest Update</span>
+            <textarea className="field min-h-24" value={draft.remarksLatestUpdate} onChange={(event) => updateField("remarksLatestUpdate", event.target.value)} />
+          </label>
+          <label className="space-y-1">
+            <span className="field-label">Document Link / Attachment Reference</span>
+            <input className="field" value={draft.documentLinkAttachmentReference} onChange={(event) => updateField("documentLinkAttachmentReference", event.target.value)} placeholder="Drive link, OneDrive link, Asana reference, or file name" />
+          </label>
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-slate-200 p-4 sm:flex-row sm:justify-between">
+          <button className="btn-secondary justify-center text-red-700 hover:bg-red-50" onClick={() => onDelete(draft.id)}>Delete</button>
+          <div className="flex gap-2">
+            <button className="btn-secondary flex-1 justify-center sm:flex-none" onClick={onClose}>Cancel</button>
+            <button className="btn-primary flex-1 justify-center sm:flex-none" onClick={save}>Save Changes</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  options,
+  onChange,
+  includeAll = false
+}: {
+  label: string;
+  value: string;
+  options: readonly string[];
+  onChange: (value: string) => void;
+  includeAll?: boolean;
+}) {
+  return (
+    <label className="space-y-1">
+      <span className="field-label">{label}</span>
+      <select className="field" value={value} onChange={(event) => onChange(event.target.value)}>
+        {includeAll && <option value="All">All</option>}
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function SimpleBarChart({ title, rows, suffix = "" }: { title: string; rows: Array<{ name: string; value: number; percent: number }>; suffix?: string }) {
+  return (
+    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+      <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+      <div className="mt-4 space-y-3">
+        {rows.map((row) => (
+          <div key={row.name} className="space-y-1">
+            <div className="flex items-center justify-between gap-3 text-sm">
+              <span className="truncate text-slate-600">{row.name}</span>
+              <span className="font-semibold text-slate-900">{row.value}{suffix}</span>
+            </div>
+            <ProgressBar value={row.percent} />
+          </div>
+        ))}
+      </div>
+    </article>
+  );
+}
+
+function ProgressBar({ value, compact = false }: { value: number; compact?: boolean }) {
+  return (
+    <div className={`overflow-hidden rounded-full bg-slate-100 ${compact ? "h-2" : "h-2.5"}`}>
+      <div className="h-full rounded-full bg-[#2f6f9f]" style={{ width: `${clamp(value, 0, 100)}%` }} />
+    </div>
+  );
+}
+
+function MetricPill({ label, value, tone }: { label: string; value: number; tone: string }) {
+  return (
+    <div className={`rounded-md p-2 ${toneClasses(tone)}`}>
+      <p className="text-lg font-semibold">{value}</p>
+      <p className="text-xs">{label}</p>
+    </div>
+  );
+}
+
+function StatusIndicator({ label }: { label: CityStat["health"] }) {
+  const className =
+    label === "Good"
+      ? "bg-green-50 text-green-700 ring-green-200"
+      : label === "Critical"
+        ? "bg-red-50 text-red-700 ring-red-200"
+        : "bg-amber-50 text-amber-700 ring-amber-200";
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${className}`}>{label}</span>;
+}
+
+function StatusBadge({ status }: { status: TrackerTask["status"] }) {
+  const className =
+    status === "Completed" || status === "Tested" || status === "Not Required"
+      ? "bg-green-50 text-green-700 ring-green-200"
+      : status === "Blocked"
+        ? "bg-red-50 text-red-700 ring-red-200"
+        : status === "Ready for Testing"
+          ? "bg-blue-50 text-blue-700 ring-blue-200"
+          : status === "In Progress" || status === "Under Review"
+            ? "bg-amber-50 text-amber-700 ring-amber-200"
+            : "bg-slate-100 text-slate-700 ring-slate-200";
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${className}`}>{status}</span>;
+}
+
+function PriorityBadge({ priority }: { priority: TrackerTask["priority"] }) {
+  const className = priority === "Critical" ? "bg-red-50 text-red-700" : priority === "High" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-700";
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{priority}</span>;
+}
+
+function RiskBadge({ risk }: { risk: TrackerTask["riskLevel"] }) {
+  const className = risk === "High" ? "bg-red-50 text-red-700" : risk === "Medium" ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700";
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{risk}</span>;
+}
+
+function DocumentBadge({ status }: { status: TrackerTask["documentStatus"] }) {
+  const className = status === "Final Attached" ? "bg-green-50 text-green-700" : status === "Draft Attached" ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700";
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{status}</span>;
+}
+
+type CityStat = {
+  city: string;
+  total: number;
+  completed: number;
+  blocked: number;
+  highRisk: number;
+  missingDocuments: number;
+  completion: number;
+  health: "Good" | "Attention Needed" | "Critical";
+};
+
+function getMetrics(rows: TrackerTask[]) {
+  const total = rows.length;
+  const completed = rows.filter((task) => task.status === "Completed").length;
+  const inProgress = rows.filter((task) => ["In Progress", "Under Review", "Ready for Testing"].includes(task.status)).length;
+  const blocked = rows.filter((task) => task.status === "Blocked").length;
+  const waazPending = rows.filter((task) => task.eventCriticality === "Waaz Critical" && !["Completed", "Tested"].includes(task.status)).length;
+  const missingDocuments = rows.filter((task) => ["Not Attached", "Needs Revision"].includes(task.documentStatus)).length;
+  const averageReadiness = total ? Math.round(rows.reduce((sum, task) => sum + Number(task.progress || 0), 0) / total) : 0;
+  return { total, completed, inProgress, blocked, waazPending, missingDocuments, averageReadiness };
+}
+
+function getCityStats(tasks: TrackerTask[], cities: string[]): CityStat[] {
+  return cities.map((city) => {
+    const rows = tasks.filter((task) => task.city === city);
+    const total = rows.length;
+    const completion = total ? Math.round(rows.reduce((sum, task) => sum + task.progress, 0) / total) : 0;
+    const blocked = rows.filter((task) => task.status === "Blocked").length;
+    const highRisk = rows.filter((task) => task.riskLevel === "High").length;
+    const missingDocuments = rows.filter((task) => ["Not Attached", "Needs Revision"].includes(task.documentStatus)).length;
+    const health = blocked > 0 || highRisk > 5 || completion < 35 ? "Critical" : completion < 75 || highRisk > 0 ? "Attention Needed" : "Good";
+    return {
+      city,
+      total,
+      completed: rows.filter((task) => task.status === "Completed").length,
+      blocked,
+      highRisk,
+      missingDocuments,
+      completion,
+      health
     };
-    return narrowSpans[variant];
-  }
-
-  const spans: Record<PanelVariant, string> = {
-    compact: "lg:col-span-6 xl:col-span-4",
-    standard: "lg:col-span-6",
-    wide: "lg:col-span-12 xl:col-span-8",
-    full: "lg:col-span-12"
-  };
-  return spans[variant];
+  });
 }
 
-function chartViewportHeight(variant: PanelVariant, template: ChartTemplate | undefined, heightScale: number) {
-  const templateHeights: Partial<Record<ChartTemplate, number>> = {
-    donut: 320,
-    pie: 320,
-    line: 432,
-    area: 432,
-    "horizontal-bar": 448,
-    "stacked-bar": 448,
-    "grouped-bar": 448,
-    "vertical-bar": 400
+function distribution<T extends keyof TrackerTask>(tasks: TrackerTask[], key: T) {
+  const total = Math.max(tasks.length, 1);
+  const counts = tasks.reduce<Record<string, number>>((acc, task) => {
+    const value = String(task[key] || "Blank");
+    acc[value] = (acc[value] || 0) + 1;
+    return acc;
+  }, {});
+  return Object.entries(counts).map(([name, value]) => ({ name, value, percent: Math.round((value / total) * 100) }));
+}
+
+function getWorkstreamCompletion(tasks: TrackerTask[]) {
+  return WORKSTREAMS.map((workstream) => {
+    const rows = tasks.filter((task) => task.workstream === workstream.name);
+    const value = rows.length ? Math.round(rows.reduce((sum, task) => sum + task.progress, 0) / rows.length) : 0;
+    return { name: workstream.name, value, percent: value };
+  });
+}
+
+function applyViewPreset(tasks: TrackerTask[], activeView: ViewId) {
+  const today = todayStart();
+  if (activeView === "Blocked / Delayed Items") return tasks.filter((task) => task.status === "Blocked" || (isOverdue(task, today) && !isClosed(task)));
+  if (activeView === "Waaz Critical Tasks") return tasks.filter((task) => task.eventCriticality === "Waaz Critical" && !["Completed", "Tested"].includes(task.status));
+  if (activeView === "Vendor Pending Items") return tasks.filter((task) => task.ownershipType === "Vendor" && task.status !== "Completed");
+  if (activeView === "Local Team Pending Items") return tasks.filter((task) => task.ownershipType === "Local City IT" && task.status !== "Completed");
+  if (activeView === "Document Pending Items") return tasks.filter((task) => ["Not Attached", "Needs Revision"].includes(task.documentStatus));
+  if (activeView === "Final Readiness View") return tasks.filter((task) => !isClosed(task));
+  return tasks;
+}
+
+function applyFiltersAndSearch(tasks: TrackerTask[], filters: Filters, search: string) {
+  const normalized = search.trim().toLowerCase();
+  return tasks.filter((task) => {
+    const filterMatch =
+      (filters.city === "All" || task.city === filters.city) &&
+      (filters.workstream === "All" || task.workstream === filters.workstream) &&
+      (filters.status === "All" || task.status === filters.status) &&
+      (filters.priority === "All" || task.priority === filters.priority) &&
+      (filters.eventCriticality === "All" || task.eventCriticality === filters.eventCriticality) &&
+      (filters.riskLevel === "All" || task.riskLevel === filters.riskLevel) &&
+      (filters.ownershipType === "All" || task.ownershipType === filters.ownershipType) &&
+      (filters.documentStatus === "All" || task.documentStatus === filters.documentStatus);
+    if (!filterMatch) return false;
+    if (!normalized) return true;
+    return [task.taskName, task.city, task.taskOwner, task.vendorName, task.remarksLatestUpdate, task.workstream, task.zoneArea]
+      .join(" ")
+      .toLowerCase()
+      .includes(normalized);
+  });
+}
+
+function downloadCsv(rows: TrackerTask[], filename: string) {
+  const header = CSV_HEADERS.map((item) => escapeCsv(item.label)).join(",");
+  const body = rows.map((row) => CSV_HEADERS.map((item) => escapeCsv(String(row[item.key] ?? ""))).join(",")).join("\n");
+  const blob = new Blob([[header, body].filter(Boolean).join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function parseCsv(text: string) {
+  const rows: string[][] = [];
+  let current = "";
+  let row: string[] = [];
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      current += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      row.push(current);
+      current = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(current);
+      rows.push(row);
+      row = [];
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+  row.push(current);
+  rows.push(row);
+  const [headerRow, ...dataRows] = rows.filter((item) => item.some((cell) => cell.trim()));
+  if (!headerRow) return [];
+  return dataRows.map((dataRow) =>
+    Object.fromEntries(headerRow.map((heading, index) => [heading.trim(), dataRow[index]?.trim() ?? ""]))
+  );
+}
+
+function rowToTask(row: Record<string, string>): TrackerTask | null {
+  const get = (label: string) => row[label] ?? row[toCamelKey(label)] ?? "";
+  const city = get("City") || "Imported City";
+  const workstream = get("Workstream") || WORKSTREAMS[0].name;
+  const taskName = get("Task Name") || "Imported readiness task";
+  const now = new Date().toISOString();
+  const status = optionOrDefault(get("Status"), STATUSES, "Not Started");
+  const progressValue = get("Progress %");
+  const progressRaw = Number(progressValue);
+  const hasProgressValue = progressValue.trim() !== "" && Number.isFinite(progressRaw);
+  return {
+    id: get("Task ID") || makeTaskId(city, workstream, taskName),
+    city,
+    zoneArea: optionOrDefault(get("Zone / Area"), ZONES, inferArea(taskName, workstream)),
+    workstream,
+    taskName,
+    ownershipType: optionOrDefault(get("Ownership Type"), OWNERSHIP_TYPES, "Joint"),
+    taskOwner: get("Task Owner"),
+    supportingPerson: get("Supporting Person"),
+    priority: optionOrDefault(get("Priority"), PRIORITIES, "Medium"),
+    eventCriticality: optionOrDefault(get("Event Criticality"), EVENT_CRITICALITIES, "Operations Critical"),
+    status,
+    progress: hasProgressValue ? clamp(progressRaw, 0, 100) : STATUS_PROGRESS[status],
+    dueDate: get("Due Date"),
+    targetReadinessDate: get("Target Readiness Date"),
+    dependency: get("Dependency"),
+    vendorName: get("Vendor Name"),
+    vendorContact: get("Vendor Contact"),
+    budgetStatus: optionOrDefault(get("Budget Status"), BUDGET_STATUSES, "Not Required"),
+    documentStatus: optionOrDefault(get("Document Status"), DOCUMENT_STATUSES, "Not Attached"),
+    riskLevel: optionOrDefault(get("Risk Level"), RISK_LEVELS, "Medium"),
+    blockerReason: get("Blocker Reason"),
+    lastUpdateDate: get("Last Update Date"),
+    nextFollowUpDate: get("Next Follow-up Date"),
+    remarksLatestUpdate: get("Remarks / Latest Update"),
+    documentLinkAttachmentReference: get("Document Link / Attachment Reference"),
+    progressManuallyEdited: hasProgressValue,
+    createdAt: get("Created At") || now,
+    updatedAt: now
   };
-  const variantHeights: Record<PanelVariant, number> = {
-    compact: 320,
-    standard: 384,
-    wide: 448,
-    full: 480
-  };
-  const baseHeight = template ? templateHeights[template] : undefined;
-  return `${Math.round(clamp((baseHeight || variantHeights[variant]) * heightScale, 260, 760))}px`;
+}
+
+function optionOrDefault<T extends string>(value: string, options: readonly T[], fallback: T): T {
+  return options.includes(value as T) ? (value as T) : fallback;
+}
+
+function escapeCsv(value: string) {
+  return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+function toCamelKey(label: string) {
+  const clean = label.replace(/%/g, "").replace(/\//g, " ");
+  return clean
+    .toLowerCase()
+    .replace(/[^a-z0-9]+(.)/g, (_, chr: string) => chr.toUpperCase())
+    .replace(/[^a-z0-9]/g, "");
 }
 
 function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
+  return Math.min(max, Math.max(min, Math.round(value || 0)));
 }
 
-function barRowHeight(count: number) {
-  if (count <= 2) return 72;
-  if (count <= 6) return 56;
-  if (count <= 14) return 44;
-  return 38;
+function todayStart() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
 }
 
-function barSize(count: number) {
-  if (count <= 2) return 26;
-  if (count <= 6) return 30;
-  if (count <= 14) return 32;
-  return 34;
+function isClosed(task: TrackerTask) {
+  return CLOSED_STATUSES.has(task.status);
 }
 
-function ChartPanel({
-  id,
-  title,
-  variant = "standard",
-  data: rows,
-  tableRows,
-  table,
-  compare = false,
-  compareDepartments,
-  setCompareDepartments,
-  templateOptions,
-  selectedTemplate,
-  onTemplateChange,
-  children,
-  onToggleTable,
-  onToggleCompare,
-  onPdf,
-  onExcel
-}: {
-  id: string;
-  title: string;
-  variant?: PanelVariant;
-  data: Record<string, unknown>[];
-  tableRows?: RequestRow[];
-  table?: boolean;
-  compare?: boolean;
-  compareDepartments?: string[];
-  setCompareDepartments?: (value: string[]) => void;
-  templateOptions?: ChartTemplateOption[];
-  selectedTemplate?: ChartTemplate;
-  onTemplateChange?: (value: ChartTemplate) => void;
-  children: React.ReactNode;
-  onToggleTable: () => void;
-  onToggleCompare?: () => void;
-  onPdf: () => void;
-  onExcel: () => void;
-}) {
-  const [chartResize, setChartResize] = useState<ChartResize>({ widthScale: 1, heightScale: 1 });
-
-  function startChartResize(event: React.PointerEvent<HTMLButtonElement>) {
-    event.preventDefault();
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const startWidth = chartResize.widthScale;
-    const startHeight = chartResize.heightScale;
-
-    function onMove(moveEvent: PointerEvent) {
-      setChartResize({
-        widthScale: clamp(startWidth + (moveEvent.clientX - startX) / 420, 1, 1.8),
-        heightScale: clamp(startHeight + (moveEvent.clientY - startY) / 320, 0.8, 2.4)
-      });
-    }
-
-    function onUp() {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    }
-
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  }
-
-  return (
-    <motion.section
-      id={id}
-      layout
-      transition={{ type: "spring", stiffness: 260, damping: 28 }}
-      className={`print-panel min-w-0 rounded-lg border border-line bg-white p-3 shadow-soft sm:p-4 ${panelSpan(variant, chartResize.widthScale)}`}
-    >
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h3 className="text-base font-semibold text-ink">{title}</h3>
-          <p className="text-sm text-slate-500">{rows.length ? `${rows.length} data points` : "No data available"}</p>
-        </div>
-        <div className="no-print grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
-          {templateOptions && selectedTemplate && onTemplateChange && (
-            <select
-              className="field col-span-2 h-10 min-w-44 py-1.5 text-xs font-semibold sm:col-span-1 sm:w-auto"
-              value={selectedTemplate}
-              onChange={(event) => onTemplateChange(event.target.value as ChartTemplate)}
-              aria-label={`${title} chart template`}
-            >
-              {templateOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          )}
-          {onToggleCompare && (
-            <button className={`btn-compact justify-center ${compare ? "bg-[#e8f5ee] text-[#2f7a52]" : ""}`} onClick={onToggleCompare}>
-              Compare Mode
-            </button>
-          )}
-          <button className="btn-compact justify-center" onClick={onToggleTable}><Table2 size={15} /> View as Table</button>
-          <button className="icon-btn" onClick={onPdf} aria-label={`Export ${title} PDF`}><FileDown size={16} /></button>
-          <button className="icon-btn" onClick={onExcel} aria-label={`Export ${title} Excel`}><FileSpreadsheet size={16} /></button>
-        </div>
-      </div>
-      {compare && compareDepartments && setCompareDepartments && (
-        <CompareDepartmentPicker selectedDepartments={compareDepartments} setSelectedDepartments={setCompareDepartments} />
-      )}
-      {rows.length === 0 ? (
-        <EmptyState />
-      ) : table ? (
-        <DataTable rows={rowsForExport(tableRows || [])} />
-      ) : (
-        <div
-          className="chart-pop relative overflow-hidden rounded-lg border border-line bg-white/40 p-1 transition-[height] duration-300 ease-out"
-          style={{ height: chartViewportHeight(variant, selectedTemplate, chartResize.heightScale) }}
-        >
-          <div className="h-full min-w-0">
-            {children}
-          </div>
-          <button
-            type="button"
-            className="chart-resize-handle no-print min-h-0"
-            onPointerDown={startChartResize}
-            onDoubleClick={() => setChartResize({ widthScale: 1, heightScale: 1 })}
-            aria-label={`Resize ${title} chart`}
-            title="Drag to resize chart card. Double-click to reset."
-          />
-        </div>
-      )}
-    </motion.section>
-  );
+function isOverdue(task: TrackerTask, today = todayStart()) {
+  if (!task.dueDate) return false;
+  return new Date(`${task.dueDate}T00:00:00`) < today && !isClosed(task);
 }
 
-function CompareDepartmentPicker({
-  selectedDepartments,
-  setSelectedDepartments
-}: {
-  selectedDepartments: string[];
-  setSelectedDepartments: (value: string[]) => void;
-}) {
-  function toggleDepartment(department: string) {
-    if (selectedDepartments.includes(department)) {
-      setSelectedDepartments(selectedDepartments.filter((item) => item !== department));
-    } else {
-      setSelectedDepartments([...selectedDepartments, department]);
-    }
-  }
-
-  return (
-    <div className="no-print mb-4 rounded-lg border border-line bg-[#f8fafc] p-3">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-xs font-semibold uppercase text-slate-500">Compare Departments</p>
-          <p className="mt-1 text-xs leading-5 text-slate-500">Selected departments appear as stacked bars split by request type.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button className="btn-compact" onClick={() => setSelectedDepartments(defaultCompareDepartments)}>Top Departments</button>
-          <button className="btn-compact" onClick={() => setSelectedDepartments([])}>Clear</button>
-        </div>
-      </div>
-      <div className="flex max-h-32 flex-wrap gap-2 overflow-auto">
-        {allDepartments.map((department) => {
-          const selected = selectedDepartments.includes(department);
-          return (
-            <button
-              key={department}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold leading-5 transition ${
-                selected ? "border-[#79a7d8] bg-[#e7f0fb] text-[#2d679d]" : "border-line bg-white text-slate-600 hover:bg-slate-50"
-              }`}
-              onClick={() => toggleDepartment(department)}
-            >
-              {department}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
+function isDueSoon(task: TrackerTask) {
+  if (!task.dueDate || isClosed(task)) return false;
+  const diff = new Date(`${task.dueDate}T00:00:00`).getTime() - todayStart().getTime();
+  return diff >= 0 && diff <= 3 * 24 * 60 * 60 * 1000;
 }
 
-function DataTable({ rows }: { rows: Record<string, unknown>[] }) {
-  if (!rows.length) return <EmptyState />;
-  const keys = Object.keys(rows[0]);
-  return (
-    <div className="max-h-80 max-w-full overflow-auto overscroll-x-contain rounded-lg border border-line">
-      <table className="w-full min-w-[720px] border-collapse text-left text-xs sm:text-sm">
-        <thead className="sticky top-0 bg-slate-50 text-xs uppercase text-slate-500">
-          <tr>{keys.map((key) => <th key={key} className="border-b border-line px-2.5 py-2 sm:px-3">{key}</th>)}</tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr key={index} className="odd:bg-white even:bg-slate-50/60">
-              {keys.map((key) => <td key={key} className="border-b border-line px-2.5 py-2.5 leading-6 text-slate-700 sm:px-3 sm:py-3">{String(row[key] ?? "")}</td>)}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+function dueRowClass(task: TrackerTask) {
+  if (isOverdue(task)) return "bg-red-50/70";
+  if (isDueSoon(task)) return "bg-amber-50/70";
+  return "";
 }
 
-function RequestTable({
-  title,
-  rows,
-  onPdf,
-  onExcel
-}: {
-  title: string;
-  rows: RequestRow[];
-  onPdf: (rows: RequestRow[]) => void;
-  onExcel: (rows: RequestRow[]) => void;
-}) {
-  const [tableSearch, setTableSearch] = useState("");
-  const visibleRows = useMemo(() => {
-    const normalized = tableSearch.trim().toLowerCase();
-    if (!normalized) return rows;
-    return rows.filter((row) =>
-      [row.id, row.department, row.type, row.category, row.status, row.month, row.description, row.amountRaw]
-        .join(" ")
-        .toLowerCase()
-        .includes(normalized)
-    );
-  }, [rows, tableSearch]);
-
-  return (
-    <section className="print-panel min-w-0 rounded-lg border border-line bg-white p-3 shadow-soft sm:p-4 lg:col-span-12">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h3 className="text-base font-semibold">{title}</h3>
-          <p className="text-sm text-slate-500">{visibleRows.length} of {rows.length} requests</p>
-        </div>
-        <div className="no-print flex gap-2">
-          <button className="icon-btn" onClick={() => onPdf(visibleRows)} aria-label="Export table PDF"><FileDown size={16} /></button>
-          <button className="icon-btn" onClick={() => onExcel(visibleRows)} aria-label="Export table Excel"><FileSpreadsheet size={16} /></button>
-        </div>
-      </div>
-      <label className="no-print mb-4 block max-w-xl space-y-1">
-        <span className="text-xs font-semibold uppercase text-slate-500">Search Matching Requests</span>
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-          <input className="field pl-9" value={tableSearch} onChange={(event) => setTableSearch(event.target.value)} placeholder="Search inside matching requests" />
-        </div>
-      </label>
-      <DataTable rows={rowsForExport(visibleRows)} />
-    </section>
-  );
-}
-
-function EmptyState() {
-  return <div className="flex h-64 items-center justify-center rounded-lg border border-dashed border-line bg-slate-50 px-4 text-center text-sm text-slate-500 sm:h-80">No data available</div>;
-}
-
-function NoData({ title }: { title: string }) {
-  return (
-    <section className="print-panel min-w-0 rounded-lg border border-line bg-white p-3 shadow-soft sm:p-4 lg:col-span-6 xl:col-span-4">
-      <h3 className="text-base font-semibold">{title}</h3>
-      <div className="mt-4"><EmptyState /></div>
-    </section>
-  );
-}
-
-function LoadingGrid() {
-  return (
-    <div className="grid gap-4 lg:grid-cols-2 xl:gap-5">
-      {Array.from({ length: 6 }).map((_, index) => (
-        <div key={index} className="h-80 animate-pulse rounded-lg border border-line bg-white/70 p-4 shadow-soft">
-          <div className="h-5 w-1/3 rounded bg-slate-200" />
-          <div className="mt-8 h-56 rounded bg-slate-100" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function Insights({ insights }: { insights: string[] }) {
-  return (
-    <section className="rounded-lg border border-line bg-white p-4 shadow-soft sm:p-5">
-      <h3 className="text-base font-semibold">Show Insights</h3>
-      <div className="mt-3 grid gap-3 lg:grid-cols-3">
-        {insights.map((item) => (
-          <p key={item} className="rounded-lg bg-[#f6f8fb] p-3 text-sm text-slate-700">{item}</p>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; payload?: Record<string, unknown> }>; label?: string }) {
-  if (!active || !payload?.length) return null;
-  const total = payload[0]?.payload && typeof payload[0].payload.total === "number" ? payload[0].payload.total : null;
-  return (
-    <div className="rounded-lg border border-line bg-white px-3 py-2 text-sm shadow-soft">
-      <p className="font-semibold text-ink">{label || String(payload[0].payload?.name || "")}</p>
-      {payload.map((item) => (
-        <p key={item.name} className="text-slate-600">
-          {item.name}: {item.name.toLowerCase().includes("spend") ? formatINR(item.value) : item.value}
-          {total ? ` (${((item.value / total) * 100).toFixed(1)}%)` : ""}
-        </p>
-      ))}
-    </div>
-  );
-}
-
-function wrapLabel(value: string, maxLength = 18) {
-  const words = value.split(" ");
-  const lines: string[] = [];
-  let current = "";
-
-  words.forEach((word) => {
-    const next = current ? `${current} ${word}` : word;
-    if (next.length > maxLength && current) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = next;
-    }
-  });
-
-  if (current) lines.push(current);
-  return lines.slice(0, 3);
-}
-
-function WrappedYAxisTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: { value: string } }) {
-  const lines = wrapLabel(String(payload?.value || ""), 20);
-  return (
-    <g transform={`translate(${x},${y})`}>
-      <text x={-8} y={0} textAnchor="end" fill="var(--muted)" fontSize={11}>
-        {lines.map((line, index) => (
-          <tspan key={`${line}-${index}`} x={-8} dy={index === 0 ? -((lines.length - 1) * 7) : 14}>
-            {line}
-          </tspan>
-        ))}
-      </text>
-    </g>
-  );
-}
-
-function VerticalXAxisTick({ x = 0, y = 0, payload }: { x?: number; y?: number; payload?: { value: string } }) {
-  return (
-    <g transform={`translate(${x},${y + 10})`}>
-      <text transform="rotate(-90)" textAnchor="end" fill="var(--muted)" fontSize={11}>
-        {String(payload?.value || "")}
-      </text>
-    </g>
-  );
-}
-
-function legendProps(isMobile: boolean) {
-  return isMobile
-    ? { align: "center" as const, verticalAlign: "bottom" as const, layout: "horizontal" as const }
-    : { align: "right" as const, verticalAlign: "middle" as const, layout: "vertical" as const };
-}
-
-function axisFormatter(valueKey: "requests" | "spend") {
-  return (value: number | string) => (valueKey === "spend" ? formatINR(Number(value), true) : String(value));
-}
-
-function barDomain(rows: Record<string, unknown>[], keys: string[]) {
-  const maxValue = Math.max(
-    0,
-    ...rows.map((row) => keys.reduce((sum, key) => sum + Number(row[key] || 0), 0))
-  );
-  return Math.max(1, maxValue);
-}
-
-function BarScaleAxis({
-  domainMax,
-  isMobile,
-  valueKey
-}: {
-  domainMax: number;
-  isMobile: boolean;
-  valueKey: "requests" | "spend";
-}) {
-  const yAxisWidth = isMobile ? 118 : 176;
-  const rightMargin = isMobile ? 12 : 24;
-
-  return (
-    <div className="bar-sticky-axis h-12 flex-none bg-white/90">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={[{ name: "axis" }]} layout="vertical" margin={{ top: 0, right: rightMargin, left: isMobile ? 0 : 12, bottom: 4 }}>
-          <XAxis type="number" domain={[0, domainMax]} allowDecimals={valueKey === "spend"} tick={{ fontSize: 12 }} tickFormatter={axisFormatter(valueKey)} />
-          <YAxis dataKey="name" type="category" width={yAxisWidth} tick={false} axisLine={false} tickLine={false} />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-function ChartLegendList({ items }: { items: Array<{ label: string; color: string }> }) {
-  return (
-    <div className="bar-legend flex flex-wrap gap-2 px-2 pb-1 pt-2 text-xs font-semibold text-slate-600 md:w-28 md:flex-col md:justify-center md:px-0 md:py-2">
-      {items.map((item) => (
-        <div key={item.label} className="flex items-center gap-2 leading-5">
-          <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-          <span>{item.label}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function MetricChart({
-  template,
-  data: rows,
-  valueKey = "requests"
-}: {
-  template: ChartTemplate;
-  data: Record<string, unknown>[];
-  valueKey?: "requests" | "spend";
-}) {
-  if (template === "vertical-bar") return <VerticalBarViz data={rows} valueKey={valueKey} />;
-  if (template === "donut") return <DonutViz data={rows} valueKey={valueKey} shape="donut" />;
-  if (template === "pie") return <DonutViz data={rows} valueKey={valueKey} shape="pie" />;
-  return <BarViz data={rows} valueKey={valueKey} />;
-}
-
-function TrendChart({
-  template,
-  data: rows,
-  valueKey = "requests"
-}: {
-  template: ChartTemplate;
-  data: Record<string, unknown>[];
-  valueKey?: "requests" | "spend";
-}) {
-  if (template === "area") return <AreaViz data={rows} valueKey={valueKey} />;
-  if (template === "vertical-bar") return <VerticalBarViz data={rows} valueKey={valueKey} />;
-  return <LineViz data={rows} valueKey={valueKey} />;
-}
-
-function CompareChart({ template, data: rows }: { template: ChartTemplate; data: Record<string, unknown>[] }) {
-  return <StackedDepartmentBar data={rows} mode={template === "grouped-bar" ? "grouped" : "stacked"} />;
-}
-
-function BarViz({ data: rows, valueKey }: { data: Record<string, unknown>[]; valueKey: "requests" | "spend" }) {
-  const isMobile = useMediaQuery("(max-width: 767px)");
-  const yAxisWidth = isMobile ? 118 : 176;
-  const rightMargin = isMobile ? 12 : 24;
-  const domainMax = barDomain(rows, [valueKey]);
-  const needsScroll = rows.length > (isMobile ? 5 : 8);
-  const scrollHeight = Math.max(280, rows.length * barRowHeight(rows.length));
-
-  return (
-    <div className="bar-chart-frame flex h-full min-h-0 flex-col md:grid md:grid-cols-[minmax(0,1fr)_auto] md:gap-3">
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className={`min-h-0 flex-1 ${needsScroll ? "overflow-y-auto overscroll-contain" : "overflow-hidden"}`}>
-          <div style={{ height: needsScroll ? scrollHeight : "100%" }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={rows} layout="vertical" margin={{ top: 8, right: rightMargin, left: isMobile ? 0 : 12, bottom: 0 }} barCategoryGap={8} barSize={barSize(rows.length)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
-                <XAxis type="number" domain={[0, domainMax]} allowDecimals={valueKey === "spend"} hide tickFormatter={axisFormatter(valueKey)} />
-                <YAxis dataKey="name" type="category" width={yAxisWidth} interval={0} tick={<WrappedYAxisTick />} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey={valueKey} name={valueKey === "spend" ? "Spend" : "Requests"} radius={[0, 6, 6, 0]}>
-                  {rows.map((_, index) => <Cell key={index} fill={palette[index % palette.length]} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-        <BarScaleAxis domainMax={domainMax} isMobile={isMobile} valueKey={valueKey} />
-      </div>
-      <ChartLegendList items={[{ label: valueKey === "spend" ? "Spend" : "Requests", color: "#79a7d8" }]} />
-    </div>
-  );
-}
-
-function VerticalBarViz({ data: rows, valueKey }: { data: Record<string, unknown>[]; valueKey: "requests" | "spend" }) {
-  const isMobile = useMediaQuery("(max-width: 767px)");
-
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={rows} margin={isMobile ? { top: 8, right: 12, left: 0, bottom: 92 } : { top: 8, right: 82, left: 8, bottom: 92 }} barCategoryGap={10} barSize={barSize(rows.length)}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
-        <XAxis dataKey="name" tick={<VerticalXAxisTick />} height={82} interval={0} />
-        <YAxis tick={{ fontSize: 12 }} tickFormatter={axisFormatter(valueKey)} />
-        <Tooltip content={<CustomTooltip />} />
-        <Legend {...legendProps(isMobile)} />
-        <Bar dataKey={valueKey} name={valueKey === "spend" ? "Spend" : "Requests"} radius={[6, 6, 0, 0]}>
-          {rows.map((_, index) => <Cell key={index} fill={palette[index % palette.length]} />)}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-function StackedDepartmentBar({ data: rows, mode = "stacked" }: { data: Record<string, unknown>[]; mode?: "stacked" | "grouped" }) {
-  const isMobile = useMediaQuery("(max-width: 767px)");
-  const yAxisWidth = isMobile ? 118 : 176;
-  const rightMargin = isMobile ? 12 : 24;
-  const stackKeys = ["Development", "Subscription", "Software"];
-  const domainMax =
-    mode === "grouped"
-      ? Math.max(1, ...rows.flatMap((row) => stackKeys.map((key) => Number(row[key] || 0))))
-      : barDomain(rows, stackKeys);
-  const needsScroll = rows.length > (isMobile ? 5 : 8);
-  const scrollHeight = Math.max(280, rows.length * barRowHeight(rows.length));
-
-  if (rows.length === 0) return <EmptyState />;
-  return (
-    <div className="bar-chart-frame flex h-full min-h-0 flex-col md:grid md:grid-cols-[minmax(0,1fr)_auto] md:gap-3">
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className={`min-h-0 flex-1 ${needsScroll ? "overflow-y-auto overscroll-contain" : "overflow-hidden"}`}>
-          <div style={{ height: needsScroll ? scrollHeight : "100%" }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={rows} layout="vertical" margin={{ top: 8, right: rightMargin, left: isMobile ? 0 : 12, bottom: 0 }} barCategoryGap={8} barSize={barSize(rows.length)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
-                <XAxis type="number" domain={[0, domainMax]} allowDecimals={false} hide />
-                <YAxis dataKey="name" type="category" width={yAxisWidth} interval={0} tick={<WrappedYAxisTick />} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="Development" stackId={mode === "stacked" ? "requests" : undefined} name="Development" fill="#79a7d8" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Subscription" stackId={mode === "stacked" ? "requests" : undefined} name="Subscription" fill="#8fc9a8" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="Software" stackId={mode === "stacked" ? "requests" : undefined} name="Software" fill="#f6c66f" radius={[0, 6, 6, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-        <BarScaleAxis domainMax={domainMax} isMobile={isMobile} valueKey="requests" />
-      </div>
-      <ChartLegendList
-        items={[
-          { label: "Development", color: "#79a7d8" },
-          { label: "Subscription", color: "#8fc9a8" },
-          { label: "Software", color: "#f6c66f" }
-        ]}
-      />
-    </div>
-  );
-}
-
-function LineViz({ data: rows, valueKey = "requests" }: { data: Record<string, unknown>[]; valueKey?: "requests" | "spend" }) {
-  const isMobile = useMediaQuery("(max-width: 767px)");
-  const label = valueKey === "spend" ? "Spend" : "Requests";
-
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={rows} margin={isMobile ? { top: 8, right: 12, left: 0, bottom: 92 } : { top: 8, right: 82, left: 8, bottom: 82 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
-        <XAxis dataKey="name" tick={<VerticalXAxisTick />} height={82} interval={0} />
-        <YAxis tick={{ fontSize: 12 }} tickFormatter={axisFormatter(valueKey)} />
-        <Tooltip content={<CustomTooltip />} />
-        <Legend {...legendProps(isMobile)} />
-        <Line type="monotone" dataKey={valueKey} name={label} stroke="#79a7d8" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 7 }} />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
-
-function AreaViz({ data: rows, valueKey = "spend" }: { data: Record<string, unknown>[]; valueKey?: "requests" | "spend" }) {
-  const isMobile = useMediaQuery("(max-width: 767px)");
-  const label = valueKey === "spend" ? "Spend" : "Requests";
-
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={rows} margin={isMobile ? { top: 8, right: 12, left: 0, bottom: 92 } : { top: 8, right: 82, left: 8, bottom: 82 }}>
-        <defs>
-          <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#8fc9a8" stopOpacity={0.5} />
-            <stop offset="95%" stopColor="#8fc9a8" stopOpacity={0.05} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" />
-        <XAxis dataKey="name" tick={<VerticalXAxisTick />} height={82} interval={0} />
-        <YAxis tick={{ fontSize: 12 }} tickFormatter={axisFormatter(valueKey)} />
-        <Tooltip content={<CustomTooltip />} />
-        <Legend {...legendProps(isMobile)} />
-        <Area type="monotone" dataKey={valueKey} name={label} stroke="#4d9b70" strokeWidth={3} fill="url(#spendFill)" />
-      </AreaChart>
-    </ResponsiveContainer>
-  );
-}
-
-function DonutViz({
-  data: rows,
-  valueKey = "requests",
-  shape = "donut"
-}: {
-  data: Record<string, unknown>[];
-  valueKey?: "requests" | "spend";
-  shape?: "donut" | "pie";
-}) {
-  const isMobile = useMediaQuery("(max-width: 767px)");
-  const total = rows.reduce((sum, row) => sum + Number(row[valueKey] || 0), 0);
-  const withTotal = rows.map((row) => ({ ...row, total }));
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <PieChart margin={isMobile ? { top: 8, right: 8, left: 8, bottom: 56 } : { top: 8, right: 86, left: 8, bottom: 8 }}>
-        <Pie data={withTotal} dataKey={valueKey} nameKey="name" innerRadius={shape === "donut" ? (isMobile ? 46 : 62) : 0} outerRadius={isMobile ? 78 : 98} paddingAngle={3}>
-          {rows.map((_, index) => <Cell key={index} fill={palette[index % palette.length]} />)}
-        </Pie>
-        <Tooltip content={<CustomTooltip />} />
-        <Legend {...legendProps(isMobile)} />
-      </PieChart>
-    </ResponsiveContainer>
-  );
+function toneClasses(tone: string) {
+  if (tone === "green") return "bg-green-50 text-green-700";
+  if (tone === "blue") return "bg-blue-50 text-blue-700";
+  if (tone === "red") return "bg-red-50 text-red-700";
+  if (tone === "amber") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-700";
 }
