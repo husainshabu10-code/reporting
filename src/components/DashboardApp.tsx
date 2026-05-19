@@ -145,7 +145,7 @@ export default function DashboardApp() {
     setSelectedTask(null);
   };
 
-  const addTask = () => setSelectedTask(createBlankTask(cities[0] ?? "City 1"));
+  const addTask = () => setSelectedTask(createBlankTask(cities[0] ?? "Nairobi"));
 
   const addCity = (generateTasks: boolean) => {
     const city = cityDraft.trim();
@@ -160,7 +160,7 @@ export default function DashboardApp() {
   };
 
   const resetDemoData = () => {
-    const confirmed = window.confirm("Reset all tracker data to the default City 1, City 2, and City 3 demo setup?");
+    const confirmed = window.confirm("Reset all tracker data to the default Ashara city setup?");
     if (!confirmed) return;
     setCities(INITIAL_CITIES);
     setTasks(generateDefaultTasksForCities(INITIAL_CITIES));

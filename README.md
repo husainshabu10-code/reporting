@@ -22,7 +22,7 @@ npm run build
 Placeholder city names are defined in `src/lib/asharaTrackerData.ts`:
 
 ```ts
-export const INITIAL_CITIES = ["City 1", "City 2", "City 3"];
+export const INITIAL_CITIES = ["Nairobi", "Mombasa", "Daresalam", "Mumbai", "Surat", "Pune", "Nagpur", "Colombo"];
 ```
 
 Replace those values with the actual city names before first use, or add cities from the dashboard using **Add City + Default Tasks**. Existing browser data is stored in localStorage, so use **Reset Demo Data** after changing the constants if you want to regenerate the default local demo set.

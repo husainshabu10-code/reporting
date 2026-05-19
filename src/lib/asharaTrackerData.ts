@@ -1,4 +1,4 @@
-export const INITIAL_CITIES = ["City 1", "City 2", "City 3"];
+export const INITIAL_CITIES = ["Nairobi", "Mombasa", "Daresalam", "Mumbai", "Surat", "Pune", "Nagpur", "Colombo"];
 
 export const ZONES = [
   "Masjid",
@@ -354,7 +354,7 @@ export function createDefaultTask(city: string, workstream: string, taskName: st
   };
 }
 
-export function createBlankTask(city = INITIAL_CITIES[0] ?? "City 1"): TrackerTask {
+export function createBlankTask(city = INITIAL_CITIES[0] ?? "Nairobi"): TrackerTask {
   const now = new Date().toISOString();
   return {
     ...createDefaultTask(city, WORKSTREAMS[0].name, "New readiness task"),
