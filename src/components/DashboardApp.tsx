@@ -31,7 +31,6 @@ import {
   PROGRESS_VALUES,
   RISK_LEVELS,
   STATUSES,
-  STATUS_MEANINGS,
   STATUS_PROGRESS,
   WORKSTREAMS,
   ZONES,
@@ -460,7 +459,6 @@ function DashboardPage({
         <FiltersPanel filters={filters} setFilters={setFilters} sourceTasks={sourceTasks} />
       </Panel>
       <ChartGrid charts={charts} onShowData={onShowData} />
-      <StatusMeanings />
     </section>
   );
 }
@@ -895,22 +893,6 @@ function PieLikeChart({ dataset, chartKind }: { dataset: ChartDataset; chartKind
         ))}
       </div>
     </div>
-  );
-}
-
-function StatusMeanings() {
-  return (
-    <Panel>
-      <h2 className="section-title">Status meanings</h2>
-      <div className="mt-4 grid gap-3 md:grid-cols-3">
-        {STATUS_MEANINGS.map((item) => (
-          <div key={item.status} className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-            <StatusBadge status={item.status} />
-            <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">{item.meaning}</p>
-          </div>
-        ))}
-      </div>
-    </Panel>
   );
 }
 
