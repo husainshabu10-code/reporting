@@ -15,7 +15,6 @@ import {
   Filter,
   Layers3,
   Menu,
-  Package,
   Plus,
   RefreshCcw,
   Search,
@@ -48,7 +47,7 @@ import {
 } from "@/lib/asharaTrackerData";
 import type { AttachmentReference, TrackerTask, VendorEntry } from "@/lib/asharaTrackerData";
 
-type TabId = "Dashboard" | "Compare" | "Master List" | "Contacts" | "Equipments" | "Area" | "Activity" | "Report" | "Timeline";
+type TabId = "Dashboard" | "Compare" | "Master List" | "Contacts" | "Area" | "Activity" | "Report" | "Timeline";
 type ReportFormat = "Charts only" | "Tables only" | "Both charts and tables";
 type SortKey = "city" | "workstream" | "taskName" | "zoneArea" | "taskOwner" | "status" | "progress" | "dueDate" | "riskLevel";
 
@@ -80,20 +79,6 @@ type Contact = {
   notes: string;
 };
 
-type Equipment = {
-  id: string;
-  city: string;
-  equipmentName: string;
-  workstream: string;
-  relatedTask: string;
-  averagePriceInr: number;
-  image: string;
-  vendor: string;
-  quantity: number;
-  category: string;
-  notes: string;
-};
-
 type ActivityEntry = {
   id: string;
   at: string;
@@ -120,7 +105,6 @@ type ChartKind = "Bar" | "Pie" | "Donut";
 const STORAGE_TASKS_KEY = "ashara-it-readiness-tasks";
 const STORAGE_CITIES_KEY = "ashara-it-readiness-cities";
 const STORAGE_CONTACTS_KEY = "ashara-it-readiness-contacts";
-const STORAGE_EQUIPMENT_KEY = "ashara-it-readiness-equipment";
 const STORAGE_ACTIVITY_KEY = "ashara-it-readiness-activity";
 const CURRENT_USER = "Admin";
 const ATTACHMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx"];
@@ -130,7 +114,6 @@ const TABS: Array<{ id: TabId; icon: LucideIcon }> = [
   { id: "Compare", icon: Layers3 },
   { id: "Master List", icon: FileSpreadsheet },
   { id: "Contacts", icon: Users },
-  { id: "Equipments", icon: Package },
   { id: "Area", icon: Filter },
   { id: "Activity", icon: Activity },
   { id: "Report", icon: FileText },
@@ -157,7 +140,6 @@ export default function DashboardApp() {
   const [tasks, setTasks] = useState<TrackerTask[]>(() => normalizeTasks(generateDefaultTasksForCities(INITIAL_CITIES)));
   const [cities, setCities] = useState<string[]>(INITIAL_CITIES);
   const [contacts, setContacts] = useState<Contact[]>(() => createDefaultContacts(INITIAL_CITIES));
-  const [equipment, setEquipment] = useState<Equipment[]>(() => createDefaultEquipment(INITIAL_CITIES));
   const [activity, setActivity] = useState<ActivityEntry[]>(() => [
     createActivity("Dashboard created", "Ashara tracker", "Initial local tracker data generated.")
   ]);
@@ -176,7 +158,6 @@ export default function DashboardApp() {
   const [sortKey, setSortKey] = useState<SortKey>("dueDate");
   const [sortAsc, setSortAsc] = useState(true);
   const [contactDraft, setContactDraft] = useState<Contact>(() => blankContact(INITIAL_CITIES[0]));
-  const [equipmentFilters, setEquipmentFilters] = useState({ city: "All", workstream: "All", task: "All", vendor: "All", category: "All", maxPrice: "" });
   const [reportFormat, setReportFormat] = useState<ReportFormat>("Both charts and tables");
   const [hydrated, setHydrated] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
@@ -186,12 +167,10 @@ export default function DashboardApp() {
       const savedTasks = window.localStorage.getItem(STORAGE_TASKS_KEY);
       const savedCities = window.localStorage.getItem(STORAGE_CITIES_KEY);
       const savedContacts = window.localStorage.getItem(STORAGE_CONTACTS_KEY);
-      const savedEquipment = window.localStorage.getItem(STORAGE_EQUIPMENT_KEY);
       const savedActivity = window.localStorage.getItem(STORAGE_ACTIVITY_KEY);
       if (savedTasks) setTasks(normalizeTasks(JSON.parse(savedTasks) as TrackerTask[]));
       if (savedCities) setCities(JSON.parse(savedCities) as string[]);
       if (savedContacts) setContacts(JSON.parse(savedContacts) as Contact[]);
-      if (savedEquipment) setEquipment(JSON.parse(savedEquipment) as Equipment[]);
       if (savedActivity) setActivity(JSON.parse(savedActivity) as ActivityEntry[]);
     } catch {
       setTasks(normalizeTasks(generateDefaultTasksForCities(INITIAL_CITIES)));
@@ -205,9 +184,8 @@ export default function DashboardApp() {
     window.localStorage.setItem(STORAGE_TASKS_KEY, JSON.stringify(tasks));
     window.localStorage.setItem(STORAGE_CITIES_KEY, JSON.stringify(cities));
     window.localStorage.setItem(STORAGE_CONTACTS_KEY, JSON.stringify(contacts));
-    window.localStorage.setItem(STORAGE_EQUIPMENT_KEY, JSON.stringify(equipment));
     window.localStorage.setItem(STORAGE_ACTIVITY_KEY, JSON.stringify(activity));
-  }, [activity, cities, contacts, equipment, hydrated, tasks]);
+  }, [activity, cities, contacts, hydrated, tasks]);
 
   const filteredTasks = useMemo(() => applyFilters(tasks, filters), [filters, tasks]);
   const reportTasks = useMemo(() => applyFilters(tasks, reportFilters), [reportFilters, tasks]);
@@ -219,7 +197,6 @@ export default function DashboardApp() {
   const areaCharts = useMemo(() => buildAreaCharts(areaRows), [areaRows]);
   const reportCharts = useMemo(() => buildDashboardCharts(reportTasks, getCityStats(reportTasks, cities)), [cities, reportTasks]);
   const sortedMasterTasks = useMemo(() => sortTasks(filteredTasks, sortKey, sortAsc), [filteredTasks, sortAsc, sortKey]);
-  const visibleEquipment = useMemo(() => filterEquipment(equipment, equipmentFilters), [equipment, equipmentFilters]);
 
   const logActivity = (action: string, item: string, details: string) => {
     setActivity((current) => [createActivity(action, item, details), ...current].slice(0, 250));
@@ -271,8 +248,7 @@ export default function DashboardApp() {
     setCities(INITIAL_CITIES);
     setTasks(normalizeTasks(generateDefaultTasksForCities(INITIAL_CITIES)));
     setContacts(createDefaultContacts(INITIAL_CITIES));
-    setEquipment(createDefaultEquipment(INITIAL_CITIES));
-    setActivity([createActivity("Demo data reset", "Ashara tracker", "Default tasks, contacts, and equipment restored.")]);
+    setActivity([createActivity("Demo data reset", "Ashara tracker", "Default tasks and contacts restored.")]);
     setFilters(EMPTY_FILTERS);
   };
 
@@ -354,7 +330,7 @@ export default function DashboardApp() {
           })}
         </nav>
         <div className="border-t border-white/15 p-4 text-xs leading-5 text-white/75">
-          City-wise readiness, contacts, equipment, reports, and timeline tracking.
+          City-wise readiness, contacts, reports, and timeline tracking.
         </div>
       </aside>
 
@@ -433,10 +409,6 @@ export default function DashboardApp() {
           <ContactsPage contacts={contacts} cities={cities} setContactDraft={setContactDraft} contactDraft={contactDraft} saveContact={saveContact} />
         )}
 
-        {activeTab === "Equipments" && (
-          <EquipmentPage equipment={visibleEquipment} allEquipment={equipment} filters={equipmentFilters} setFilters={setEquipmentFilters} tasks={tasks} />
-        )}
-
         {activeTab === "Area" && (
           <AreaPage cities={cities} selectedCity={areaCity} setSelectedCity={setAreaCity} areaRows={areaRows} charts={areaCharts} onShowData={setChartData} />
         )}
@@ -464,7 +436,7 @@ export default function DashboardApp() {
       <footer className="border-t border-[var(--color-border)] bg-[var(--color-card)]">
         <div className="mx-auto flex max-w-[1800px] flex-col gap-1 px-4 py-4 text-sm text-[var(--color-text-muted)] sm:px-6 lg:px-8">
           <span className="font-semibold text-[var(--color-primary)]">Asharah Mubarak IT / Event Preparation Dashboard</span>
-          <span>City-wise readiness, area progress, contacts, equipment, reports, and activity in one tracker.</span>
+          <span>City-wise readiness, area progress, contacts, reports, and activity in one tracker.</span>
         </div>
       </footer>
       </section>
@@ -656,55 +628,6 @@ function ContactsPage({
               ))}
             </div>
           </Panel>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function EquipmentPage({
-  equipment,
-  allEquipment,
-  filters,
-  setFilters,
-  tasks
-}: {
-  equipment: Equipment[];
-  allEquipment: Equipment[];
-  filters: { city: string; workstream: string; task: string; vendor: string; category: string; maxPrice: string };
-  setFilters: (filters: { city: string; workstream: string; task: string; vendor: string; category: string; maxPrice: string }) => void;
-  tasks: TrackerTask[];
-}) {
-  return (
-    <section className="animate-fade-in space-y-5">
-      <Panel>
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-          <SelectField label="City" value={filters.city} options={unique(allEquipment.map((item) => item.city))} includeAll onChange={(value) => setFilters({ ...filters, city: value })} />
-          <SelectField label="Workstream" value={filters.workstream} options={WORKSTREAMS.map((item) => item.name)} includeAll onChange={(value) => setFilters({ ...filters, workstream: value })} />
-          <SelectField label="Task" value={filters.task} options={unique(tasks.map((item) => item.taskName))} includeAll onChange={(value) => setFilters({ ...filters, task: value })} />
-          <SelectField label="Vendor" value={filters.vendor} options={unique(allEquipment.map((item) => item.vendor).filter(Boolean))} includeAll onChange={(value) => setFilters({ ...filters, vendor: value })} />
-          <SelectField label="Category" value={filters.category} options={unique(allEquipment.map((item) => item.category))} includeAll onChange={(value) => setFilters({ ...filters, category: value })} />
-          <InputField label="Max INR price" value={filters.maxPrice} onChange={(value) => setFilters({ ...filters, maxPrice: value })} />
-        </div>
-      </Panel>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {equipment.map((item) => (
-          <article key={item.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-soft transition hover:-translate-y-0.5">
-            <img className="h-36 w-full rounded-md border border-[var(--color-border)] object-cover" src={item.image} alt={item.equipmentName} />
-            <div className="mt-3 flex items-start justify-between gap-3">
-              <div>
-                <h3 className="font-semibold text-[var(--color-primary)]">{item.equipmentName}</h3>
-                <p className="text-sm text-[var(--color-text-muted)]">{item.city} / {item.category}</p>
-              </div>
-              <span className="badge-gold">{formatInr(item.averagePriceInr)}</span>
-            </div>
-            <div className="mt-3 space-y-1 text-sm text-[var(--color-text-muted)]">
-              <p>Workstream: {item.workstream}</p>
-              <p>Related task: {item.relatedTask}</p>
-              <p>Vendor: {item.vendor || "Pending"} / Qty: {item.quantity || "-"}</p>
-              <p>{item.notes}</p>
-            </div>
-          </article>
         ))}
       </div>
     </section>
@@ -1533,47 +1456,12 @@ function groupByValue<T extends Record<string, unknown>>(rows: T[], key: keyof T
   }, {});
 }
 
-function filterEquipment(rows: Equipment[], filters: { city: string; workstream: string; task: string; vendor: string; category: string; maxPrice: string }) {
-  return rows.filter((item) =>
-    (filters.city === "All" || item.city === filters.city) &&
-    (filters.workstream === "All" || item.workstream === filters.workstream) &&
-    (filters.task === "All" || item.relatedTask === filters.task) &&
-    (filters.vendor === "All" || item.vendor === filters.vendor) &&
-    (filters.category === "All" || item.category === filters.category) &&
-    (!filters.maxPrice || item.averagePriceInr <= Number(filters.maxPrice))
-  );
-}
-
 function createDefaultContacts(cities: string[]): Contact[] {
   return cities.map((city) => ({ ...blankContact(city), id: `contact-${city.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, name: `${city} IT POC`, role: "City IT SPOC", workstreamHandled: "City IT Coordination & Governance", notes: "Replace with actual POC details." }));
 }
 
 function blankContact(city: string): Contact {
   return { id: `contact-${Date.now()}`, name: "", city, phone: "", email: "", role: "", workstreamHandled: WORKSTREAMS[0].name, customResponsibility: "", notes: "" };
-}
-
-function createDefaultEquipment(cities: string[]): Equipment[] {
-  const templates = [
-    ["Wi-Fi access point", "Wi-Fi & Access Points", "Wi-Fi coverage plan prepared", 8500, "Networking", "AP for public and internal SSIDs"],
-    ["Barcode scanner", "Scanning, E-Pass & Checkpoint IT", "Scanner/device quantity finalized", 4200, "Scanning", "Checkpoint scanning device"],
-    ["UPS 1 KVA", "Power Backup & UPS", "UPS requirement finalized", 11500, "Power", "Critical IT backup power"],
-    ["Network switch", "Network Design, VLANs & Firewall", "VLAN plan finalized", 14500, "Networking", "Managed switch for VLAN segmentation"]
-  ];
-  return cities.flatMap((city) =>
-    templates.map(([name, workstream, task, price, category, notes]) => ({
-      id: `equipment-${city}-${name}`.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-      city,
-      equipmentName: String(name),
-      workstream: String(workstream),
-      relatedTask: String(task),
-      averagePriceInr: Number(price),
-      image: equipmentImage(String(name), String(category)),
-      vendor: "",
-      quantity: 0,
-      category: String(category),
-      notes: String(notes)
-    }))
-  );
 }
 
 function createActivity(action: string, item: string, details: string): ActivityEntry {
@@ -1789,10 +1677,6 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, Math.round(value || 0)));
 }
 
-function formatInr(value: number) {
-  return `INR ${value.toLocaleString("en-IN")}`;
-}
-
 function escapeCsv(value: string) {
   return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
@@ -1819,9 +1703,4 @@ function downloadBlob(content: string, filename: string, type: string) {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
-}
-
-function equipmentImage(name: string, category: string) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><rect width="640" height="360" fill="#FAF7EF"/><rect x="48" y="48" width="544" height="264" rx="18" fill="#FFFFFF" stroke="#E8DDC5" stroke-width="4"/><circle cx="142" cy="132" r="42" fill="#0B4F3A"/><path d="M240 128h250M240 178h180M240 228h220" stroke="#C9A227" stroke-width="18" stroke-linecap="round"/><text x="142" y="262" text-anchor="middle" font-family="Arial" font-size="24" font-weight="700" fill="#0B4F3A">${escapeHtml(category)}</text><text x="320" y="92" text-anchor="middle" font-family="Arial" font-size="30" font-weight="700" fill="#1F2933">${escapeHtml(name)}</text></svg>`;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
