@@ -29,6 +29,7 @@ export const STATUSES = [
 export const BUDGET_STATUSES = ["Not Required", "Quote Pending", "Quote Received", "Approval Pending", "Approved", "Paid"] as const;
 export const DOCUMENT_STATUSES = ["Not Attached", "Draft Attached", "Final Attached", "Needs Revision"] as const;
 export const RISK_LEVELS = ["High", "Medium", "Low"] as const;
+export const PROGRESS_VALUES = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
 
 export type Zone = (typeof ZONES)[number];
 export type OwnershipType = (typeof OWNERSHIP_TYPES)[number];
@@ -38,10 +39,22 @@ export type Status = (typeof STATUSES)[number];
 export type BudgetStatus = (typeof BUDGET_STATUSES)[number];
 export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number];
 export type RiskLevel = (typeof RISK_LEVELS)[number];
+export type ProgressValue = (typeof PROGRESS_VALUES)[number];
 
 export type Workstream = {
   name: string;
   tasks: string[];
+};
+
+export type VendorEntry = {
+  name: string;
+  contact: string;
+};
+
+export type AttachmentReference = {
+  name: string;
+  type: string;
+  addedAt: string;
 };
 
 export type TrackerTask = {
@@ -62,6 +75,7 @@ export type TrackerTask = {
   dependency: string;
   vendorName: string;
   vendorContact: string;
+  vendors: VendorEntry[];
   budgetStatus: BudgetStatus;
   documentStatus: DocumentStatus;
   riskLevel: RiskLevel;
@@ -70,6 +84,7 @@ export type TrackerTask = {
   nextFollowUpDate: string;
   remarksLatestUpdate: string;
   documentLinkAttachmentReference: string;
+  attachments: AttachmentReference[];
   progressManuallyEdited?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -80,8 +95,8 @@ export const STATUS_PROGRESS: Record<Status, number> = {
   "Info Awaited": 10,
   "Under Review": 20,
   "In Progress": 50,
-  Blocked: 35,
-  "Ready for Testing": 75,
+  Blocked: 30,
+  "Ready for Testing": 80,
   Tested: 90,
   Completed: 100,
   "Not Required": 100
@@ -281,8 +296,8 @@ export const CSV_HEADERS: Array<{ key: keyof TrackerTask; label: string }> = [
   { key: "dueDate", label: "Due Date" },
   { key: "targetReadinessDate", label: "Target Readiness Date" },
   { key: "dependency", label: "Dependency" },
-  { key: "vendorName", label: "Vendor Name" },
-  { key: "vendorContact", label: "Vendor Contact" },
+  { key: "vendorName", label: "Primary Vendor Name" },
+  { key: "vendorContact", label: "Primary Vendor Contact" },
   { key: "budgetStatus", label: "Budget Status" },
   { key: "documentStatus", label: "Document Status" },
   { key: "riskLevel", label: "Risk Level" },
@@ -309,7 +324,7 @@ export function inferArea(taskName: string, workstreamName = ""): Zone {
 }
 
 export function taskDisplayName(task: Pick<TrackerTask, "city" | "zoneArea" | "taskName">) {
-  return `${task.city} – ${task.zoneArea} – ${task.taskName}`;
+  return toSentenceCase(task.taskName);
 }
 
 export function makeTaskId(city: string, workstream: string, taskName: string) {
@@ -327,7 +342,7 @@ export function createDefaultTask(city: string, workstream: string, taskName: st
     city,
     zoneArea: inferArea(taskName, workstream),
     workstream,
-    taskName,
+    taskName: toSentenceCase(taskName),
     ownershipType: "Joint",
     taskOwner: "",
     supportingPerson: "",
@@ -340,6 +355,7 @@ export function createDefaultTask(city: string, workstream: string, taskName: st
     dependency: "",
     vendorName: "",
     vendorContact: "",
+    vendors: [{ name: "", contact: "" }],
     budgetStatus: "Not Required",
     documentStatus: "Not Attached",
     riskLevel: "Medium",
@@ -348,10 +364,18 @@ export function createDefaultTask(city: string, workstream: string, taskName: st
     nextFollowUpDate: "",
     remarksLatestUpdate: "",
     documentLinkAttachmentReference: "",
+    attachments: [],
     progressManuallyEdited: false,
     createdAt: now,
     updatedAt: now
   };
+}
+
+export function toSentenceCase(value: string) {
+  const cleaned = value.trim().replace(/\s+/g, " ");
+  if (!cleaned) return "";
+  const lower = cleaned.toLowerCase();
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
 }
 
 export function createBlankTask(city = INITIAL_CITIES[0] ?? "Nairobi"): TrackerTask {

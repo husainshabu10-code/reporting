@@ -57,6 +57,18 @@ table {
   max-width: 100%;
 }
 
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media print {
   body {
     background: white;
@@ -176,5 +188,50 @@ table {
   .icon-btn:hover {
     background: var(--color-accent-light);
     border-color: var(--color-accent);
+  }
+
+  .section-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+
+  .tab-choice {
+    min-height: 2.25rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-card);
+    padding: 0.4rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+  }
+
+  .tab-choice:hover {
+    background: var(--color-accent-light);
+    border-color: var(--color-accent);
+    transform: translateY(-1px);
+  }
+
+  .tab-choice-active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+  }
+
+  .badge-gold {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    background: var(--color-accent-light);
+    padding: 0.25rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+
+  .animate-fade-in {
+    animation: fade-in 180ms ease-out both;
   }
 }
