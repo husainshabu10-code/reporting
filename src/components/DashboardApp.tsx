@@ -192,13 +192,13 @@ export default function DashboardApp() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f5f7fb] text-[#1f2937]">
-      <header className="border-b border-slate-200 bg-white">
+    <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+      <header className="border-b border-[var(--color-border)] bg-[var(--color-primary)] text-white shadow-sm">
         <div className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-5 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase text-slate-500">Internal Operations Dashboard</p>
-              <h1 className="mt-1 text-2xl font-semibold text-slate-950 sm:text-3xl">Ashara IT Readiness Master Tracker</h1>
+              <p className="text-xs font-semibold uppercase text-[var(--color-accent-light)]">Internal Operations Dashboard</p>
+              <h1 className="mt-1 text-2xl font-semibold text-white sm:text-3xl">Ashara IT Readiness Master Tracker</h1>
             </div>
             <div className="flex flex-wrap gap-2">
               <button className="btn-secondary" onClick={addTask}>
@@ -225,7 +225,7 @@ export default function DashboardApp() {
               <button
                 key={view}
                 className={`whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold transition ${
-                  activeView === view ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  activeView === view ? "bg-[var(--color-accent)] text-[var(--color-primary)]" : "bg-white/10 text-white hover:bg-white/20"
                 }`}
                 onClick={() => setActiveView(view)}
               >
@@ -239,9 +239,9 @@ export default function DashboardApp() {
       <div className="mx-auto max-w-[1800px] space-y-5 px-4 py-5 sm:px-6 lg:px-8">
         <CityManager cityDraft={cityDraft} setCityDraft={setCityDraft} onAddCity={addCity} />
 
-        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+        <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-soft">
           <button className="flex w-full items-center justify-between text-left lg:hidden" onClick={() => setFiltersOpen((value) => !value)}>
-            <span className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+            <span className="flex items-center gap-2 text-sm font-semibold text-[var(--color-primary)]">
               <Filter size={16} /> Filters and Search
             </span>
             <ChevronDown className={`transition ${filtersOpen ? "rotate-180" : ""}`} size={18} />
@@ -289,6 +289,13 @@ export default function DashboardApp() {
         )}
       </div>
 
+      <footer className="border-t border-[var(--color-border)] bg-[var(--color-card)]">
+        <div className="mx-auto flex max-w-[1800px] flex-col gap-1 px-4 py-4 text-sm text-[var(--color-text-muted)] sm:px-6 lg:px-8">
+          <span className="font-semibold text-[var(--color-primary)]">Ashara IT Readiness Master Tracker</span>
+          <span>Internal event operations dashboard for city-wise IT preparedness.</span>
+        </div>
+      </footer>
+
       {selectedTask && (
         <TaskEditor
           task={selectedTask}
@@ -312,10 +319,10 @@ function CityManager({
   onAddCity: (generateTasks: boolean) => void;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+    <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-soft">
       <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-end">
         <label className="space-y-1">
-          <span className="text-xs font-semibold uppercase text-slate-500">Add New City</span>
+          <span className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Add New City</span>
           <input className="field" value={cityDraft} onChange={(event) => setCityDraft(event.target.value)} placeholder="Enter city name" />
         </label>
         <button className="btn-secondary justify-center" onClick={() => onAddCity(false)}>
@@ -349,9 +356,9 @@ function FiltersPanel({
     <div className="space-y-4">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <label className="space-y-1 md:col-span-2 xl:col-span-2">
-          <span className="text-xs font-semibold uppercase text-slate-500">Search</span>
+          <span className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Search</span>
           <span className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-accent)]" size={16} />
             <input
               className="field pl-9"
               value={search}
@@ -382,7 +389,7 @@ function SummaryCards({ metrics }: { metrics: ReturnType<typeof getMetrics> }) {
   const cards = [
     { label: "Total Tasks", value: metrics.total, icon: ListChecks, tone: "slate" },
     { label: "Completed Tasks", value: metrics.completed, icon: CheckCircle2, tone: "green" },
-    { label: "In Progress Tasks", value: metrics.inProgress, icon: CalendarClock, tone: "blue" },
+    { label: "In Progress Tasks", value: metrics.inProgress, icon: CalendarClock, tone: "gold" },
     { label: "Blocked Tasks", value: metrics.blocked, icon: CircleAlert, tone: "red" },
     { label: "Waaz Critical Pending", value: metrics.waazPending, icon: AlertTriangle, tone: "amber" },
     { label: "Missing Documents", value: metrics.missingDocuments, icon: FileQuestion, tone: "amber" },
@@ -393,11 +400,11 @@ function SummaryCards({ metrics }: { metrics: ReturnType<typeof getMetrics> }) {
       {cards.map((card) => {
         const Icon = card.icon;
         return (
-          <article key={card.label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+          <article key={card.label} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-soft">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase text-slate-500">{card.label}</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-950">{card.value}</p>
+                <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">{card.label}</p>
+                <p className="mt-2 text-2xl font-semibold text-[var(--color-primary)]">{card.value}</p>
               </div>
               <span className={`rounded-md p-2 ${toneClasses(card.tone)}`}>
                 <Icon size={18} />
@@ -412,25 +419,25 @@ function SummaryCards({ metrics }: { metrics: ReturnType<typeof getMetrics> }) {
 
 function CityReadinessCards({ cityStats }: { cityStats: CityStat[] }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+    <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-soft">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold text-slate-950">City Readiness</h2>
-        <p className="text-sm text-slate-500">{cityStats.length} cities</p>
+        <h2 className="text-base font-semibold text-[var(--color-primary)]">City Readiness</h2>
+        <p className="text-sm text-[var(--color-text-muted)]">{cityStats.length} cities</p>
       </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {cityStats.map((city) => (
-          <article key={city.city} className="rounded-lg border border-slate-200 p-4">
+          <article key={city.city} className="rounded-lg border border-[var(--color-border)] p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="font-semibold text-slate-950">{city.city}</h3>
-                <p className="mt-1 text-sm text-slate-500">{city.completed} completed / {city.total} total</p>
+                <h3 className="font-semibold text-[var(--color-text)]">{city.city}</h3>
+                <p className="mt-1 text-sm text-[var(--color-text-muted)]">{city.completed} completed / {city.total} total</p>
               </div>
               <StatusIndicator label={city.health} />
             </div>
             <div className="mt-4">
               <div className="mb-2 flex items-center justify-between text-sm">
-                <span className="text-slate-500">Overall completion</span>
-                <span className="font-semibold text-slate-900">{city.completion}%</span>
+                <span className="text-[var(--color-text-muted)]">Overall completion</span>
+                <span className="font-semibold text-[var(--color-primary)]">{city.completion}%</span>
               </div>
               <ProgressBar value={city.completion} />
             </div>
@@ -466,13 +473,13 @@ function ChartsPanel({
 
 function StatusMeanings() {
   return (
-    <aside className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-      <h2 className="text-base font-semibold text-slate-950">Status Meanings</h2>
+    <aside className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-soft">
+      <h2 className="text-base font-semibold text-[var(--color-primary)]">Status Meanings</h2>
       <div className="mt-4 space-y-3">
         {STATUS_MEANINGS.map((item) => (
-          <div key={item.status} className="rounded-md border border-slate-100 bg-slate-50 p-3">
+          <div key={item.status} className="rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
             <StatusBadge status={item.status} />
-            <p className="mt-2 text-sm leading-6 text-slate-600">{item.meaning}</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--color-text-muted)]">{item.meaning}</p>
           </div>
         ))}
       </div>
@@ -492,44 +499,44 @@ function TaskTable({
   title?: string;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white shadow-soft">
-      <div className="flex flex-col gap-2 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+    <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft">
+      <div className="flex flex-col gap-2 border-b border-[var(--color-border)] p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-base font-semibold text-slate-950">{title}</h2>
-          <p className="text-sm text-slate-500">{tasks.length} visible of {totalCount} matching tasks</p>
+          <h2 className="text-base font-semibold text-[var(--color-primary)]">{title}</h2>
+          <p className="text-sm text-[var(--color-text-muted)]">{tasks.length} visible of {totalCount} matching tasks</p>
         </div>
       </div>
 
       <div className="hidden overflow-x-auto lg:block">
         <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+          <thead className="bg-[var(--color-accent-light)] text-xs uppercase text-[var(--color-primary)]">
             <tr>
               {["City", "Workstream", "Task Name", "Area", "Owner", "Priority", "Event Criticality", "Status", "Progress %", "Risk", "Due Date", "Document Status", "Latest Update"].map((heading) => (
-                <th key={heading} className="border-b border-slate-200 px-3 py-3 font-semibold">{heading}</th>
+                <th key={heading} className="border-b border-[var(--color-border)] px-3 py-3 font-semibold">{heading}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {tasks.map((task) => (
-              <tr key={task.id} className={`cursor-pointer border-b border-slate-100 hover:bg-slate-50 ${dueRowClass(task)}`} onClick={() => onOpenTask(task)}>
-                <td className="px-3 py-3 font-medium text-slate-900">{task.city}</td>
-                <td className="px-3 py-3 text-slate-600">{task.workstream}</td>
-                <td className="max-w-[320px] px-3 py-3 text-slate-900">{taskDisplayName(task)}</td>
-                <td className="px-3 py-3 text-slate-600">{task.zoneArea}</td>
-                <td className="px-3 py-3 text-slate-600">{task.taskOwner || "-"}</td>
+              <tr key={task.id} className={`cursor-pointer border-b border-[var(--color-border)] hover:bg-[var(--color-bg)] ${dueRowClass(task)}`} onClick={() => onOpenTask(task)}>
+                <td className="px-3 py-3 font-medium text-[var(--color-primary)]">{task.city}</td>
+                <td className="px-3 py-3 text-[var(--color-text-muted)]">{task.workstream}</td>
+                <td className="max-w-[320px] px-3 py-3 text-[var(--color-text)]">{taskDisplayName(task)}</td>
+                <td className="px-3 py-3 text-[var(--color-text-muted)]">{task.zoneArea}</td>
+                <td className="px-3 py-3 text-[var(--color-text-muted)]">{task.taskOwner || "-"}</td>
                 <td className="px-3 py-3"><PriorityBadge priority={task.priority} /></td>
-                <td className="px-3 py-3 text-slate-600">{task.eventCriticality}</td>
+                <td className="px-3 py-3 text-[var(--color-text-muted)]">{task.eventCriticality}</td>
                 <td className="px-3 py-3"><StatusBadge status={task.status} /></td>
                 <td className="px-3 py-3">
                   <div className="min-w-28">
                     <ProgressBar value={task.progress} compact />
-                    <span className="mt-1 block text-xs text-slate-500">{task.progress}%</span>
+                    <span className="mt-1 block text-xs text-[var(--color-text-muted)]">{task.progress}%</span>
                   </div>
                 </td>
                 <td className="px-3 py-3"><RiskBadge risk={task.riskLevel} /></td>
-                <td className="px-3 py-3 text-slate-600">{task.dueDate || "-"}</td>
+                <td className="px-3 py-3 text-[var(--color-text-muted)]">{task.dueDate || "-"}</td>
                 <td className="px-3 py-3"><DocumentBadge status={task.documentStatus} /></td>
-                <td className="max-w-[260px] px-3 py-3 text-slate-600">{task.remarksLatestUpdate || "-"}</td>
+                <td className="max-w-[260px] px-3 py-3 text-[var(--color-text-muted)]">{task.remarksLatestUpdate || "-"}</td>
               </tr>
             ))}
           </tbody>
@@ -538,15 +545,15 @@ function TaskTable({
 
       <div className="space-y-3 p-3 lg:hidden">
         {tasks.map((task) => (
-          <button key={task.id} className={`w-full rounded-lg border border-slate-200 p-4 text-left shadow-sm ${dueRowClass(task)}`} onClick={() => onOpenTask(task)}>
+          <button key={task.id} className={`w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 text-left shadow-sm ${dueRowClass(task)}`} onClick={() => onOpenTask(task)}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-semibold text-slate-950">{taskDisplayName(task)}</p>
-                <p className="mt-1 text-sm text-slate-500">{task.workstream}</p>
+                <p className="font-semibold text-[var(--color-text)]">{taskDisplayName(task)}</p>
+                <p className="mt-1 text-sm text-[var(--color-text-muted)]">{task.workstream}</p>
               </div>
               <StatusBadge status={task.status} />
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-slate-600">
+            <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-[var(--color-text-muted)]">
               <span>Owner: {task.taskOwner || "-"}</span>
               <span>Due: {task.dueDate || "-"}</span>
               <span>Risk: {task.riskLevel}</span>
@@ -557,7 +564,7 @@ function TaskTable({
         ))}
       </div>
 
-      {tasks.length === 0 && <div className="p-12 text-center text-sm text-slate-500">No tasks match the selected view or filters.</div>}
+      {tasks.length === 0 && <div className="p-12 text-center text-sm text-[var(--color-text-muted)]">No tasks match the selected view or filters.</div>}
     </section>
   );
 }
@@ -601,12 +608,12 @@ function TaskEditor({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/30 lg:flex lg:justify-end">
-      <aside className="flex h-full w-full flex-col bg-white shadow-2xl lg:w-[560px]">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-4">
+    <div className="fixed inset-0 z-50 bg-[#0B4F3A]/35 lg:flex lg:justify-end">
+      <aside className="flex h-full w-full flex-col bg-[var(--color-card)] shadow-2xl lg:w-[560px]">
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--color-border)] p-4">
           <div>
-            <p className="text-xs font-semibold uppercase text-slate-500">Task Detail / Edit</p>
-            <h2 className="mt-1 text-lg font-semibold text-slate-950">{taskDisplayName(draft)}</h2>
+            <p className="text-xs font-semibold uppercase text-[var(--color-accent)]">Task Detail / Edit</p>
+            <h2 className="mt-1 text-lg font-semibold text-[var(--color-primary)]">{taskDisplayName(draft)}</h2>
           </div>
           <button className="icon-btn" onClick={onClose} aria-label="Close task editor">
             <X size={18} />
@@ -684,8 +691,8 @@ function TaskEditor({
           </label>
         </div>
 
-        <div className="flex flex-col gap-2 border-t border-slate-200 p-4 sm:flex-row sm:justify-between">
-          <button className="btn-secondary justify-center text-red-700 hover:bg-red-50" onClick={() => onDelete(draft.id)}>Delete</button>
+        <div className="flex flex-col gap-2 border-t border-[var(--color-border)] p-4 sm:flex-row sm:justify-between">
+          <button className="btn-secondary justify-center text-[var(--color-important)] hover:bg-[#7A1F2B]/10" onClick={() => onDelete(draft.id)}>Delete</button>
           <div className="flex gap-2">
             <button className="btn-secondary flex-1 justify-center sm:flex-none" onClick={onClose}>Cancel</button>
             <button className="btn-primary flex-1 justify-center sm:flex-none" onClick={save}>Save Changes</button>
@@ -724,14 +731,14 @@ function SelectField({
 
 function SimpleBarChart({ title, rows, suffix = "" }: { title: string; rows: Array<{ name: string; value: number; percent: number }>; suffix?: string }) {
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-      <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+    <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-soft">
+      <h2 className="text-base font-semibold text-[var(--color-primary)]">{title}</h2>
       <div className="mt-4 space-y-3">
         {rows.map((row) => (
           <div key={row.name} className="space-y-1">
             <div className="flex items-center justify-between gap-3 text-sm">
-              <span className="truncate text-slate-600">{row.name}</span>
-              <span className="font-semibold text-slate-900">{row.value}{suffix}</span>
+              <span className="truncate text-[var(--color-text-muted)]">{row.name}</span>
+              <span className="font-semibold text-[var(--color-primary)]">{row.value}{suffix}</span>
             </div>
             <ProgressBar value={row.percent} />
           </div>
@@ -743,8 +750,8 @@ function SimpleBarChart({ title, rows, suffix = "" }: { title: string; rows: Arr
 
 function ProgressBar({ value, compact = false }: { value: number; compact?: boolean }) {
   return (
-    <div className={`overflow-hidden rounded-full bg-slate-100 ${compact ? "h-2" : "h-2.5"}`}>
-      <div className="h-full rounded-full bg-[#2f6f9f]" style={{ width: `${clamp(value, 0, 100)}%` }} />
+    <div className={`overflow-hidden rounded-full bg-[var(--color-accent-light)] ${compact ? "h-2" : "h-2.5"}`}>
+      <div className="h-full rounded-full bg-[var(--color-secondary)]" style={{ width: `${clamp(value, 0, 100)}%` }} />
     </div>
   );
 }
@@ -761,39 +768,56 @@ function MetricPill({ label, value, tone }: { label: string; value: number; tone
 function StatusIndicator({ label }: { label: CityStat["health"] }) {
   const className =
     label === "Good"
-      ? "bg-green-50 text-green-700 ring-green-200"
+      ? "bg-[var(--color-primary)] text-white ring-[var(--color-primary)]"
       : label === "Critical"
-        ? "bg-red-50 text-red-700 ring-red-200"
-        : "bg-amber-50 text-amber-700 ring-amber-200";
+        ? "bg-[var(--color-important)] text-white ring-[var(--color-important)]"
+        : "bg-[var(--color-accent-light)] text-[var(--color-primary)] ring-[var(--color-accent)]";
   return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${className}`}>{label}</span>;
 }
 
 function StatusBadge({ status }: { status: TrackerTask["status"] }) {
   const className =
     status === "Completed" || status === "Tested" || status === "Not Required"
-      ? "bg-green-50 text-green-700 ring-green-200"
+      ? "bg-[var(--color-primary)] text-white ring-[var(--color-primary)]"
       : status === "Blocked"
-        ? "bg-red-50 text-red-700 ring-red-200"
-        : status === "Ready for Testing"
-          ? "bg-blue-50 text-blue-700 ring-blue-200"
-          : status === "In Progress" || status === "Under Review"
-            ? "bg-amber-50 text-amber-700 ring-amber-200"
-            : "bg-slate-100 text-slate-700 ring-slate-200";
+        ? "bg-[var(--color-important)] text-white ring-[var(--color-important)]"
+      : status === "Ready for Testing"
+          ? "bg-[var(--color-secondary)] text-white ring-[var(--color-secondary)]"
+      : status === "In Progress" || status === "Under Review"
+            ? "bg-[var(--color-accent)] text-[var(--color-primary)] ring-[var(--color-accent)]"
+            : status === "Not Started"
+              ? "bg-[#F4F1EA] text-[var(--color-text-muted)] ring-[var(--color-border)]"
+              : "bg-[var(--color-accent-light)] text-[var(--color-text)] ring-[var(--color-border)]";
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${className}`}>{status}</span>;
 }
 
 function PriorityBadge({ priority }: { priority: TrackerTask["priority"] }) {
-  const className = priority === "Critical" ? "bg-red-50 text-red-700" : priority === "High" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-700";
+  const className =
+    priority === "Critical"
+      ? "bg-[var(--color-important)] text-white"
+      : priority === "High"
+        ? "bg-[var(--color-accent)] text-[var(--color-primary)]"
+        : "bg-[var(--color-accent-light)] text-[var(--color-text)]";
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{priority}</span>;
 }
 
 function RiskBadge({ risk }: { risk: TrackerTask["riskLevel"] }) {
-  const className = risk === "High" ? "bg-red-50 text-red-700" : risk === "Medium" ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700";
+  const className =
+    risk === "High"
+      ? "bg-[var(--color-important)] text-white"
+      : risk === "Medium"
+        ? "bg-[var(--color-accent)] text-[var(--color-primary)]"
+        : "bg-[var(--color-primary)] text-white";
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{risk}</span>;
 }
 
 function DocumentBadge({ status }: { status: TrackerTask["documentStatus"] }) {
-  const className = status === "Final Attached" ? "bg-green-50 text-green-700" : status === "Draft Attached" ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700";
+  const className =
+    status === "Final Attached"
+      ? "bg-[var(--color-primary)] text-white"
+      : status === "Draft Attached"
+        ? "bg-[var(--color-secondary)] text-white"
+        : "bg-[var(--color-accent-light)] text-[var(--color-text)]";
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{status}</span>;
 }
 
@@ -1024,15 +1048,15 @@ function isDueSoon(task: TrackerTask) {
 }
 
 function dueRowClass(task: TrackerTask) {
-  if (isOverdue(task)) return "bg-red-50/70";
-  if (isDueSoon(task)) return "bg-amber-50/70";
+  if (isOverdue(task)) return "bg-[#7A1F2B]/10";
+  if (isDueSoon(task)) return "bg-[var(--color-accent-light)]";
   return "";
 }
 
 function toneClasses(tone: string) {
-  if (tone === "green") return "bg-green-50 text-green-700";
-  if (tone === "blue") return "bg-blue-50 text-blue-700";
-  if (tone === "red") return "bg-red-50 text-red-700";
-  if (tone === "amber") return "bg-amber-50 text-amber-700";
-  return "bg-slate-100 text-slate-700";
+  if (tone === "green") return "bg-[var(--color-primary)] text-white";
+  if (tone === "gold") return "bg-[var(--color-accent)] text-[var(--color-primary)]";
+  if (tone === "red") return "bg-[var(--color-important)] text-white";
+  if (tone === "amber") return "bg-[var(--color-accent-light)] text-[var(--color-text)]";
+  return "bg-[#F4F1EA] text-[var(--color-text-muted)]";
 }
