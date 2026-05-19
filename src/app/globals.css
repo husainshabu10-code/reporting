@@ -231,6 +231,30 @@ table {
     color: var(--color-primary);
   }
 
+  .chart-toggle {
+    min-height: 2rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-card);
+    padding: 0.25rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+  }
+
+  .chart-toggle:hover {
+    background: var(--color-accent-light);
+    border-color: var(--color-accent);
+    transform: translateY(-1px);
+  }
+
+  .chart-toggle-active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+  }
+
   .animate-fade-in {
     animation: fade-in 180ms ease-out both;
   }

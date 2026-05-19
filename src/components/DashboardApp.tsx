@@ -114,6 +114,7 @@ type ChartDataset = {
   rows: ChartRow[];
   suffix?: string;
 };
+type ChartKind = "Bar" | "Pie" | "Donut";
 
 const STORAGE_TASKS_KEY = "ashara-it-readiness-tasks";
 const STORAGE_CITIES_KEY = "ashara-it-readiness-cities";
@@ -904,25 +905,72 @@ function ChartGrid({ charts, onShowData }: { charts: ChartDataset[]; onShowData:
 }
 
 function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData: (dataset: ChartDataset) => void }) {
+  const [chartKind, setChartKind] = useState<ChartKind>("Bar");
+
   return (
     <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-soft">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <h2 className="section-title">{dataset.title}</h2>
-        <button className="btn-compact" onClick={() => onShowData(dataset)}>Data</button>
+        <div className="flex flex-wrap gap-2">
+          {(["Bar", "Pie", "Donut"] as ChartKind[]).map((kind) => (
+            <button key={kind} className={`chart-toggle ${chartKind === kind ? "chart-toggle-active" : ""}`} onClick={() => setChartKind(kind)}>
+              {kind}
+            </button>
+          ))}
+          <button className="btn-compact" onClick={() => onShowData(dataset)}>Data</button>
+        </div>
       </div>
-      <div className="mt-4 space-y-3">
-        {dataset.rows.length === 0 && <p className="text-sm text-[var(--color-text-muted)]">No chart data available.</p>}
-        {dataset.rows.map((row) => (
-          <div key={row.label} className="space-y-1">
-            <div className="flex items-center justify-between gap-3 text-sm">
+      <ChartVisual dataset={dataset} chartKind={chartKind} />
+    </article>
+  );
+}
+
+function ChartVisual({ dataset, chartKind }: { dataset: ChartDataset; chartKind: ChartKind }) {
+  if (dataset.rows.length === 0) return <p className="mt-4 text-sm text-[var(--color-text-muted)]">No chart data available.</p>;
+  if (chartKind === "Pie" || chartKind === "Donut") return <PieLikeChart dataset={dataset} chartKind={chartKind} />;
+
+  return (
+    <div className="mt-4 space-y-3">
+      {dataset.rows.map((row) => (
+        <div key={row.label} className="space-y-1">
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="truncate text-[var(--color-text-muted)]">{row.label}</span>
+            <span className="font-semibold text-[var(--color-primary)]">{row.value}{dataset.suffix}</span>
+          </div>
+          <ProgressBar value={row.percent} tone={row.status} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PieLikeChart({ dataset, chartKind }: { dataset: ChartDataset; chartKind: "Pie" | "Donut" }) {
+  const rows = dataset.rows.filter((row) => row.value > 0 || row.percent > 0);
+  const gradient = conicGradient(rows.length ? rows : dataset.rows);
+  const total = dataset.rows.reduce((sum, row) => sum + row.value, 0);
+
+  return (
+    <div className="mt-4 grid gap-4 md:grid-cols-[180px_1fr] md:items-center">
+      <div className="mx-auto flex h-44 w-44 items-center justify-center rounded-full border border-[var(--color-border)] shadow-inner" style={{ background: gradient }}>
+        {chartKind === "Donut" && (
+          <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-card)] text-center">
+            <span className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Total</span>
+            <span className="text-xl font-semibold text-[var(--color-primary)]">{total}</span>
+          </div>
+        )}
+      </div>
+      <div className="space-y-2">
+        {dataset.rows.map((row, index) => (
+          <div key={row.label} className="flex items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm">
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="h-3 w-3 flex-none rounded-full" style={{ background: chartColor(row, index) }} />
               <span className="truncate text-[var(--color-text-muted)]">{row.label}</span>
-              <span className="font-semibold text-[var(--color-primary)]">{row.value}{dataset.suffix}</span>
-            </div>
-            <ProgressBar value={row.percent} tone={row.status} />
+            </span>
+            <span className="font-semibold text-[var(--color-primary)]">{row.value}{dataset.suffix}</span>
           </div>
         ))}
       </div>
-    </article>
+    </div>
   );
 }
 
@@ -1665,6 +1713,29 @@ function toneClass(tone: string) {
   if (tone === "warning") return "bg-[var(--color-accent)] text-[var(--color-primary)]";
   if (tone === "critical") return "bg-[var(--color-important)] text-white";
   return "bg-[#F4F1EA] text-[var(--color-text-muted)]";
+}
+
+function chartColor(row: ChartRow, index: number) {
+  if (row.status === "good") return "var(--color-secondary)";
+  if (row.status === "warning") return "var(--color-accent)";
+  if (row.status === "critical") return "var(--color-important)";
+  if (row.status === "muted") return "#9CA3AF";
+  const palette = ["var(--color-primary)", "var(--color-secondary)", "var(--color-accent)", "var(--color-important)", "#9CA3AF"];
+  return palette[index % palette.length];
+}
+
+function conicGradient(rows: ChartRow[]) {
+  const total = rows.reduce((sum, row) => sum + Math.max(0, row.value || row.percent), 0);
+  if (!rows.length || total <= 0) return "conic-gradient(#9CA3AF 0deg 360deg)";
+  let cursor = 0;
+  const stops = rows.map((row, index) => {
+    const amount = Math.max(0, row.value || row.percent);
+    const start = cursor;
+    const end = cursor + (amount / total) * 360;
+    cursor = end;
+    return `${chartColor(row, index)} ${start.toFixed(2)}deg ${end.toFixed(2)}deg`;
+  });
+  return `conic-gradient(${stops.join(", ")})`;
 }
 
 function chartStatus(label: string): ChartRow["status"] {
