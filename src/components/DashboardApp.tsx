@@ -364,13 +364,9 @@ export default function DashboardApp() {
             filters={filters}
             setFilters={setFilters}
             sourceTasks={tasks}
-            filteredTasks={filteredTasks}
             metrics={metrics}
             charts={dashboardCharts}
-            highlightMissing={highlightMissing}
-            setHighlightMissing={setHighlightMissing}
             onShowData={setChartData}
-            onOpenTask={setSelectedTask}
           />
         )}
 
@@ -453,24 +449,16 @@ function DashboardPage({
   filters,
   setFilters,
   sourceTasks,
-  filteredTasks,
   metrics,
   charts,
-  highlightMissing,
-  setHighlightMissing,
-  onShowData,
-  onOpenTask
+  onShowData
 }: {
   filters: Filters;
   setFilters: (filters: Filters) => void;
   sourceTasks: TrackerTask[];
-  filteredTasks: TrackerTask[];
   metrics: ReturnType<typeof getMetrics>;
   charts: ChartDataset[];
-  highlightMissing: boolean;
-  setHighlightMissing: (value: boolean) => void;
   onShowData: (dataset: ChartDataset) => void;
-  onOpenTask: (task: TrackerTask) => void;
 }) {
   return (
     <section className="animate-fade-in space-y-5">
@@ -480,11 +468,6 @@ function DashboardPage({
       <SummaryCards metrics={metrics} />
       <ChartGrid charts={charts} onShowData={onShowData} />
       <StatusMeanings />
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="section-title">Priority task snapshot</h2>
-        <Toggle checked={highlightMissing} onChange={setHighlightMissing} label="Highlight missing required fields" />
-      </div>
-      <TaskTable tasks={filteredTasks.slice(0, 32)} onOpenTask={onOpenTask} highlightMissing={highlightMissing} />
     </section>
   );
 }
