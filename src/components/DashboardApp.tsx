@@ -4,10 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import {
   Activity,
-  AlertTriangle,
   BarChart3,
   CalendarClock,
-  CheckCircle2,
   ChevronDown,
   Download,
   FileSpreadsheet,
@@ -189,7 +187,6 @@ export default function DashboardApp() {
 
   const filteredTasks = useMemo(() => applyFilters(tasks, filters), [filters, tasks]);
   const reportTasks = useMemo(() => applyFilters(tasks, reportFilters), [reportFilters, tasks]);
-  const metrics = useMemo(() => getMetrics(filteredTasks), [filteredTasks]);
   const cityStats = useMemo(() => getCityStats(tasks, cities), [cities, tasks]);
   const dashboardCharts = useMemo(() => buildDashboardCharts(filteredTasks, cityStats), [cityStats, filteredTasks]);
   const compareCharts = useMemo(() => buildCompareCharts(tasks, compareCities), [compareCities, tasks]);
@@ -364,7 +361,6 @@ export default function DashboardApp() {
             filters={filters}
             setFilters={setFilters}
             sourceTasks={tasks}
-            metrics={metrics}
             charts={dashboardCharts}
             onShowData={setChartData}
           />
@@ -449,14 +445,12 @@ function DashboardPage({
   filters,
   setFilters,
   sourceTasks,
-  metrics,
   charts,
   onShowData
 }: {
   filters: Filters;
   setFilters: (filters: Filters) => void;
   sourceTasks: TrackerTask[];
-  metrics: ReturnType<typeof getMetrics>;
   charts: ChartDataset[];
   onShowData: (dataset: ChartDataset) => void;
 }) {
@@ -465,7 +459,6 @@ function DashboardPage({
       <Panel>
         <FiltersPanel filters={filters} setFilters={setFilters} sourceTasks={sourceTasks} />
       </Panel>
-      <SummaryCards metrics={metrics} />
       <ChartGrid charts={charts} onShowData={onShowData} />
       <StatusMeanings />
     </section>
@@ -824,35 +817,6 @@ function FiltersPanel({ filters, setFilters, sourceTasks }: { filters: Filters; 
         </>
       )}
     </div>
-  );
-}
-
-function SummaryCards({ metrics }: { metrics: ReturnType<typeof getMetrics> }) {
-  const cards = [
-    { label: "Total Tasks", value: metrics.total, icon: BarChart3, tone: "muted" },
-    { label: "Completed", value: metrics.completed, icon: CheckCircle2, tone: "good" },
-    { label: "In Progress", value: metrics.inProgress, icon: CalendarClock, tone: "warning" },
-    { label: "Delayed / Blocked", value: metrics.delayed, icon: AlertTriangle, tone: "critical" },
-    { label: "Missing Required", value: metrics.missingRequired, icon: FileText, tone: "critical" },
-    { label: "Average Progress", value: `${metrics.averageReadiness}%`, icon: CheckCircle2, tone: "good" }
-  ];
-  return (
-    <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-      {cards.map((card) => {
-        const Icon = card.icon;
-        return (
-          <article key={card.label} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-soft transition hover:-translate-y-0.5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">{card.label}</p>
-                <p className="mt-2 text-2xl font-semibold text-[var(--color-primary)]">{card.value}</p>
-              </div>
-              <span className={`rounded-md p-2 ${toneClass(card.tone)}`}><Icon size={18} /></span>
-            </div>
-          </article>
-        );
-      })}
-    </section>
   );
 }
 
@@ -1300,18 +1264,6 @@ function applyFilters(rows: TrackerTask[], filters: Filters) {
       searchMatch
     );
   });
-}
-
-function getMetrics(rows: TrackerTask[]) {
-  const total = rows.length || 1;
-  return {
-    total: rows.length,
-    completed: rows.filter(isClosed).length,
-    inProgress: rows.filter((task) => ["In Progress", "Under Review", "Ready for Testing"].includes(task.status)).length,
-    delayed: rows.filter((task) => task.status === "Blocked" || isOverdue(task)).length,
-    missingRequired: rows.filter((task) => missingFields(task).length > 0).length,
-    averageReadiness: Math.round(rows.reduce((sum, task) => sum + task.progress, 0) / total)
-  };
 }
 
 function getCityStats(rows: TrackerTask[], cities: string[]) {
