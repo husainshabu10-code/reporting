@@ -770,32 +770,59 @@ function CityManager({ cityDraft, setCityDraft, onAddCity }: { cityDraft: string
 }
 
 function FiltersPanel({ filters, setFilters, sourceTasks }: { filters: Filters; setFilters: (filters: Filters) => void; sourceTasks: TrackerTask[] }) {
+  const [open, setOpen] = useState(false);
   const scoped = filters.city === "All" ? sourceTasks : sourceTasks.filter((task) => task.city === filters.city);
   const update = (key: keyof Filters, value: string) => setFilters({ ...filters, [key]: value });
+  const activeCount = Object.entries(filters).filter(([key, value]) => key !== "search" && value && value !== "All").length + (filters.search ? 1 : 0);
+
   return (
-    <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <label className="space-y-1 md:col-span-2">
-          <span className="field-label">Search</span>
-          <span className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-accent)]" size={16} />
-            <input className="field pl-9" value={filters.search} onChange={(event) => update("search", event.target.value)} placeholder="Search task, city, owner, vendor, notes" />
-          </span>
-        </label>
-        <SelectField label="City" value={filters.city} options={unique(sourceTasks.map((task) => task.city))} includeAll onChange={(value) => update("city", value)} />
-        <SelectField label="Workstream" value={filters.workstream} options={unique(scoped.map((task) => task.workstream))} includeAll onChange={(value) => update("workstream", value)} />
-        <SelectField label="Status" value={filters.status} options={STATUSES} includeAll onChange={(value) => update("status", value)} />
-        <SelectField label="Area" value={filters.area} options={ZONES} includeAll onChange={(value) => update("area", value)} />
-        <SelectField label="Vendor" value={filters.vendor} options={unique(scoped.flatMap((task) => task.vendors.map((vendor) => vendor.name).filter(Boolean)))} includeAll onChange={(value) => update("vendor", value)} />
-        <SelectField label="POC / Owner" value={filters.poc} options={unique(scoped.flatMap((task) => [task.taskOwner, task.supportingPerson]).filter(Boolean))} includeAll onChange={(value) => update("poc", value)} />
-        <SelectField label="Progress" value={filters.progress} options={PROGRESS_VALUES.map(String)} includeAll onChange={(value) => update("progress", value)} />
-        <SelectField label="Priority" value={filters.priority} options={PRIORITIES} includeAll onChange={(value) => update("priority", value)} />
-        <SelectField label="Risk" value={filters.riskLevel} options={RISK_LEVELS} includeAll onChange={(value) => update("riskLevel", value)} />
-        <SelectField label="Document" value={filters.documentStatus} options={DOCUMENT_STATUSES} includeAll onChange={(value) => update("documentStatus", value)} />
-        <InputField label="Due from" type="date" value={filters.dueFrom} onChange={(value) => update("dueFrom", value)} />
-        <InputField label="Due to" type="date" value={filters.dueTo} onChange={(value) => update("dueTo", value)} />
+    <div className="relative">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button className="btn-primary" onClick={() => setOpen((value) => !value)}>
+          <Filter size={16} /> Filter {activeCount ? `(${activeCount})` : ""}
+        </button>
+        <p className="text-sm text-[var(--color-text-muted)]">Open filters from the button and choose only what you need.</p>
       </div>
-      <div className="flex justify-end"><button className="btn-secondary" onClick={() => setFilters(EMPTY_FILTERS)}><X size={16} /> Clear Filters</button></div>
+
+      {open && (
+        <>
+          <button className="fixed inset-0 z-20 cursor-default bg-transparent" onClick={() => setOpen(false)} aria-label="Close filter panel" />
+          <div className="absolute left-0 top-12 z-30 w-[min(72rem,calc(100vw-2rem))] rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-2xl animate-fade-in">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="section-title">Filters</h2>
+                <p className="text-sm text-[var(--color-text-muted)]">Selections apply immediately to this page.</p>
+              </div>
+              <button className="icon-btn" onClick={() => setOpen(false)} aria-label="Close filters"><X size={16} /></button>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+              <label className="space-y-1 md:col-span-2">
+                <span className="field-label">Search</span>
+                <span className="relative block">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-accent)]" size={16} />
+                  <input className="field pl-9" value={filters.search} onChange={(event) => update("search", event.target.value)} placeholder="Search task, city, owner, vendor, notes" />
+                </span>
+              </label>
+              <SelectField label="City" value={filters.city} options={unique(sourceTasks.map((task) => task.city))} includeAll onChange={(value) => update("city", value)} />
+              <SelectField label="Workstream" value={filters.workstream} options={unique(scoped.map((task) => task.workstream))} includeAll onChange={(value) => update("workstream", value)} />
+              <SelectField label="Status" value={filters.status} options={STATUSES} includeAll onChange={(value) => update("status", value)} />
+              <SelectField label="Area" value={filters.area} options={ZONES} includeAll onChange={(value) => update("area", value)} />
+              <SelectField label="Vendor" value={filters.vendor} options={unique(scoped.flatMap((task) => task.vendors.map((vendor) => vendor.name).filter(Boolean)))} includeAll onChange={(value) => update("vendor", value)} />
+              <SelectField label="POC / Owner" value={filters.poc} options={unique(scoped.flatMap((task) => [task.taskOwner, task.supportingPerson]).filter(Boolean))} includeAll onChange={(value) => update("poc", value)} />
+              <SelectField label="Progress" value={filters.progress} options={PROGRESS_VALUES.map(String)} includeAll onChange={(value) => update("progress", value)} />
+              <SelectField label="Priority" value={filters.priority} options={PRIORITIES} includeAll onChange={(value) => update("priority", value)} />
+              <SelectField label="Risk" value={filters.riskLevel} options={RISK_LEVELS} includeAll onChange={(value) => update("riskLevel", value)} />
+              <SelectField label="Document" value={filters.documentStatus} options={DOCUMENT_STATUSES} includeAll onChange={(value) => update("documentStatus", value)} />
+              <InputField label="Due from" type="date" value={filters.dueFrom} onChange={(value) => update("dueFrom", value)} />
+              <InputField label="Due to" type="date" value={filters.dueTo} onChange={(value) => update("dueTo", value)} />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button className="btn-secondary" onClick={() => setFilters(EMPTY_FILTERS)}><X size={16} /> Clear Filters</button>
+              <button className="btn-primary" onClick={() => setOpen(false)}>Apply</button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
