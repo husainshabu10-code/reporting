@@ -357,6 +357,31 @@ table {
     animation: fade-in 220ms ease-out both;
   }
 
+  .chart-masonry {
+    column-count: 1;
+    column-gap: 1rem;
+  }
+
+  .chart-masonry > * {
+    display: inline-block;
+    width: 100%;
+    margin-bottom: 1rem;
+    break-inside: avoid;
+    vertical-align: top;
+  }
+
+  @media (min-width: 1024px) {
+    .chart-masonry {
+      column-count: 2;
+    }
+  }
+
+  @media (min-width: 1536px) {
+    .chart-masonry {
+      column-count: 3;
+    }
+  }
+
   .motion-card {
     transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease, background-color 200ms ease;
   }

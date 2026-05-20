@@ -877,7 +877,7 @@ function FiltersPanel({ filters, setFilters, sourceTasks }: { filters: Filters; 
 
 function ChartGrid({ charts, onShowData }: { charts: ChartDataset[]; onShowData: (dataset: ChartDataset) => void }) {
   return (
-    <section className="grid min-w-0 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
+    <section className="chart-masonry min-w-0">
       {charts.map((chart) => <ChartCard key={chart.id} dataset={chart} onShowData={onShowData} />)}
     </section>
   );
@@ -886,10 +886,21 @@ function ChartGrid({ charts, onShowData }: { charts: ChartDataset[]; onShowData:
 function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData: (dataset: ChartDataset) => void }) {
   const [chartKind, setChartKind] = useState<ChartKind>(dataset.defaultKind);
   const [collapsed, setCollapsed] = useState(false);
+  const [bodyMounted, setBodyMounted] = useState(true);
 
   const resetChart = () => {
     setChartKind(dataset.defaultKind);
+    setBodyMounted(true);
     setCollapsed(false);
+  };
+
+  const toggleCollapsed = () => {
+    if (collapsed) {
+      setBodyMounted(true);
+      window.requestAnimationFrame(() => setCollapsed(false));
+      return;
+    }
+    setCollapsed(true);
   };
 
   return (
@@ -898,31 +909,38 @@ function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData:
         <h2 className="section-title break-words pt-2">{dataset.title}</h2>
         <button
           className="icon-btn flex-none"
-          onClick={() => setCollapsed((value) => !value)}
+          onClick={toggleCollapsed}
           aria-label={collapsed ? `Expand ${dataset.title}` : `Collapse ${dataset.title}`}
           aria-expanded={!collapsed}
         >
           <ChevronDown className={`transition-transform duration-300 ${collapsed ? "-rotate-90" : "rotate-0"}`} size={18} />
         </button>
       </div>
-      <div className={`grid overflow-hidden transition-all duration-300 ease-in-out ${collapsed ? "grid-rows-[0fr] px-3 pb-0 opacity-0 sm:px-4" : "grid-rows-[1fr] px-3 pb-3 opacity-100 sm:px-4 sm:pb-4"}`}>
-        <div className="min-h-0 overflow-hidden">
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-            <select className="chart-select" value={chartKind} onChange={(event) => setChartKind(event.target.value as ChartKind)}>
-              <option value="Bar">Bar chart</option>
-              <option value="Line">Line chart</option>
-              <option value="Pie">Pie chart</option>
-              <option value="Donut">Donut chart</option>
-              <option value="Progress">Progress bars</option>
-            </select>
-            <button className="btn-compact justify-center" onClick={() => onShowData(dataset)}>View data</button>
-            <button className="btn-compact justify-center" onClick={() => downloadChartVisual(dataset, chartKind, "png")}>PNG</button>
-            <button className="btn-compact justify-center" onClick={() => downloadChartVisual(dataset, chartKind, "pdf")}>PDF</button>
-            <button className="btn-compact justify-center" onClick={resetChart}>Reset</button>
+      {bodyMounted && (
+        <div
+          className={`grid overflow-hidden transition-all duration-300 ease-in-out ${collapsed ? "grid-rows-[0fr] px-3 pb-0 opacity-0 sm:px-4" : "grid-rows-[1fr] px-3 pb-3 opacity-100 sm:px-4 sm:pb-4"}`}
+          onTransitionEnd={(event) => {
+            if (event.currentTarget === event.target && collapsed) setBodyMounted(false);
+          }}
+        >
+          <div className="min-h-0 overflow-hidden">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+              <select className="chart-select" value={chartKind} onChange={(event) => setChartKind(event.target.value as ChartKind)}>
+                <option value="Bar">Bar chart</option>
+                <option value="Line">Line chart</option>
+                <option value="Pie">Pie chart</option>
+                <option value="Donut">Donut chart</option>
+                <option value="Progress">Progress bars</option>
+              </select>
+              <button className="btn-compact justify-center" onClick={() => onShowData(dataset)}>View data</button>
+              <button className="btn-compact justify-center" onClick={() => downloadChartVisual(dataset, chartKind, "png")}>PNG</button>
+              <button className="btn-compact justify-center" onClick={() => downloadChartVisual(dataset, chartKind, "pdf")}>PDF</button>
+              <button className="btn-compact justify-center" onClick={resetChart}>Reset</button>
+            </div>
+            <ChartVisual dataset={dataset} chartKind={chartKind} />
           </div>
-          <ChartVisual dataset={dataset} chartKind={chartKind} />
         </div>
-      </div>
+      )}
     </article>
   );
 }
