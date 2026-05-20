@@ -32,13 +32,13 @@ export const RISK_LEVELS = ["High", "Medium", "Low"] as const;
 export const PROGRESS_VALUES = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
 
 export type Zone = (typeof ZONES)[number];
-export type OwnershipType = (typeof OWNERSHIP_TYPES)[number];
-export type Priority = (typeof PRIORITIES)[number];
-export type EventCriticality = (typeof EVENT_CRITICALITIES)[number];
-export type Status = (typeof STATUSES)[number];
-export type BudgetStatus = (typeof BUDGET_STATUSES)[number];
-export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number];
-export type RiskLevel = (typeof RISK_LEVELS)[number];
+export type OwnershipType = (typeof OWNERSHIP_TYPES)[number] | "";
+export type Priority = (typeof PRIORITIES)[number] | "";
+export type EventCriticality = (typeof EVENT_CRITICALITIES)[number] | "";
+export type Status = (typeof STATUSES)[number] | "";
+export type BudgetStatus = (typeof BUDGET_STATUSES)[number] | "";
+export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number] | "";
+export type RiskLevel = (typeof RISK_LEVELS)[number] | "";
 export type ProgressValue = (typeof PROGRESS_VALUES)[number];
 
 export type Workstream = {
@@ -90,7 +90,7 @@ export type TrackerTask = {
   updatedAt: string;
 };
 
-export const STATUS_PROGRESS: Record<Status, number> = {
+export const STATUS_PROGRESS: Record<(typeof STATUSES)[number], number> = {
   "Not Started": 0,
   "Info Awaited": 10,
   "Under Review": 20,
@@ -114,171 +114,69 @@ export const STATUS_MEANINGS: Array<{ status: Status; meaning: string }> = [
   { status: "Not Required", meaning: "Confirmed not needed for that city/area." }
 ];
 
-export const WORKSTREAMS: Workstream[] = [
-  {
-    name: "City IT Coordination & Governance",
-    tasks: [
-      "City IT SPOC confirmed",
-      "Local IT team list collected",
-      "Daily reporting format agreed",
-      "Escalation matrix finalized",
-      "IT scope confirmed with city"
-    ]
-  },
-  {
-    name: "Site Survey & Requirement Collection",
-    tasks: [
-      "Masjid / main venue IT survey completed",
-      "SHZ OFFICES survey completed",
-      "Central offices survey completed",
-      "Relay / AV coordination points confirmed",
-      "Checkpoints and scanning locations mapped",
-      "Power points and backup availability checked"
-    ]
-  },
-  {
-    name: "ISP & Internet Connectivity",
-    tasks: [
-      "ISP requirement finalized",
-      "Main ISP quotation received",
-      "Backup ISP quotation received",
-      "ISP line installation completed",
-      "ISP line testing completed",
-      "Static IP / public IP requirement checked",
-      "ISP contact and escalation shared"
-    ]
-  },
-  {
-    name: "Network Design, VLANs & Firewall",
-    tasks: [
-      "Network HLD prepared",
-      "IP plan prepared",
-      "VLAN plan finalized",
-      "Firewall policy finalized",
-      "ITS app access rule configured",
-      "Public Wi-Fi access rules configured",
-      "Network diagram attached"
-    ]
-  },
-  {
-    name: "Cabling & Construction Coordination",
-    tasks: [
-      "Cable route plan shared with construction team",
-      "LAN point requirement finalized",
-      "Fiber requirement checked",
-      "Cabling vendor finalized",
-      "Cabling work started",
-      "Cabling testing completed",
-      "Cable labeling completed"
-    ]
-  },
-  {
-    name: "Hardware Procurement & Inventory",
-    tasks: [
-      "Required hardware list finalized",
-      "Existing inventory checked",
-      "Buy vs rent decision completed",
-      "Quotations received",
-      "Approval received",
-      "Hardware delivered",
-      "Inventory serial numbers recorded",
-      "Accessories arranged"
-    ]
-  },
-  {
-    name: "Wi-Fi & Access Points",
-    tasks: [
-      "Wi-Fi coverage plan prepared",
-      "AP quantity finalized",
-      "AP mounting locations confirmed",
-      "Public Wi-Fi SSID configured",
-      "Internal SSID configured",
-      "Captive portal or password policy finalized",
-      "Wi-Fi load test completed"
-    ]
-  },
-  {
-    name: "Servers, Applications & Services",
-    tasks: [
-      "Server requirement finalized",
-      "Application dependency list prepared",
-      "Server setup completed",
-      "Backup process configured",
-      "Application testing completed",
-      "Access credentials secured",
-      "Recovery plan documented"
-    ]
-  },
-  {
-    name: "Scanning, E-Pass & Checkpoint IT",
-    tasks: [
-      "Checkpoint list finalized",
-      "Scanner/device quantity finalized",
-      "Device allocation completed",
-      "Checkpoint internet tested",
-      "ITS/e-pass scanning tested",
-      "Backup process for scanning failure prepared",
-      "Checkpoint IT support assigned"
-    ]
-  },
-  {
-    name: "Printers, Office IT & Department Support",
-    tasks: [
-      "Department IT requirements collected",
-      "Printer requirement finalized",
-      "Printer setup completed",
-      "Office LAN/Wi-Fi tested",
-      "Shared folders / access requirements checked",
-      "SHZ OFFICES IT setup completed",
-      "Support contact shared with departments"
-    ]
-  },
-  {
-    name: "Power Backup & UPS",
-    tasks: [
-      "Critical IT power points identified",
-      "UPS requirement finalized",
-      "Generator backup coordination completed",
-      "Power failover test completed",
-      "Spare adapters and extensions arranged"
-    ]
-  },
-  {
-    name: "Testing, Dry Run & Readiness",
-    tasks: [
-      "Full network test completed",
-      "Main ISP failover tested",
-      "Scanning dry run completed",
-      "Office IT dry run completed",
-      "Waaz-time firewall rules tested",
-      "Post-waaz internet rules tested",
-      "Final readiness sign-off received"
-    ]
-  },
-  {
-    name: "Event-Day Operations",
-    tasks: [
-      "IT command center setup completed",
-      "Shift roster finalized",
-      "Daily issue log maintained",
-      "Vendor standby confirmed",
-      "Spare equipment kept ready",
-      "Daily city status update received"
-    ]
-  },
-  {
-    name: "Post-Event Closure & Handover",
-    tasks: [
-      "Equipment collected",
-      "Inventory returned and verified",
-      "Vendor bills collected",
-      "Incident report prepared",
-      "Final city IT report prepared",
-      "Lessons learned documented",
-      "Documents archived"
-    ]
-  }
+const CSV_TASK_ROWS: Array<{ zoneArea: Zone; workstream: string; taskName: string }> = [
+  { zoneArea: "General", workstream: "City IT Coordination & Governance", taskName: "City IT SPOC confirmed" },
+  { zoneArea: "General", workstream: "City IT Coordination & Governance", taskName: "Local IT team list collected" },
+  { zoneArea: "General", workstream: "City IT Coordination & Governance", taskName: "Escalation matrix finalized" },
+  { zoneArea: "General", workstream: "City IT Coordination & Governance", taskName: "IT scope confirmed with city" },
+  { zoneArea: "Masjid", workstream: "Site Survey & Requirement Collection", taskName: "Masjid / main venue IT survey completed" },
+  { zoneArea: "SHZ OFFICES", workstream: "Site Survey & Requirement Collection", taskName: "SHZ OFFICES survey completed" },
+  { zoneArea: "Central Offices", workstream: "Site Survey & Requirement Collection", taskName: "Central offices survey completed" },
+  { zoneArea: "Checkpoints", workstream: "Site Survey & Requirement Collection", taskName: "Checkpoints and scanning locations mapped" },
+  { zoneArea: "General", workstream: "Site Survey & Requirement Collection", taskName: "Power points and backup availability checked" },
+  { zoneArea: "General", workstream: "ISP & Internet Connectivity", taskName: "ISP requirement finalized" },
+  { zoneArea: "General", workstream: "ISP & Internet Connectivity", taskName: "Main ISP quotation received" },
+  { zoneArea: "General", workstream: "ISP & Internet Connectivity", taskName: "Backup ISP quotation received" },
+  { zoneArea: "General", workstream: "ISP & Internet Connectivity", taskName: "ISP line installation completed" },
+  { zoneArea: "General", workstream: "ISP & Internet Connectivity", taskName: "ISP line testing completed" },
+  { zoneArea: "General", workstream: "ISP & Internet Connectivity", taskName: "Static IP / public IP requirement checked" },
+  { zoneArea: "General", workstream: "ISP & Internet Connectivity", taskName: "ISP contact and escalation shared" },
+  { zoneArea: "General", workstream: "Network Design, VLANs & Firewall", taskName: "Network HLD prepared" },
+  { zoneArea: "General", workstream: "Network Design, VLANs & Firewall", taskName: "IP plan prepared" },
+  { zoneArea: "General", workstream: "Network Design, VLANs & Firewall", taskName: "VLAN plan finalized" },
+  { zoneArea: "General", workstream: "Network Design, VLANs & Firewall", taskName: "Firewall policy finalized" },
+  { zoneArea: "General", workstream: "Network Design, VLANs & Firewall", taskName: "ITS app access rule configured" },
+  { zoneArea: "Public Wi-Fi Area", workstream: "Network Design, VLANs & Firewall", taskName: "Public Wi-Fi access rules configured" },
+  { zoneArea: "General", workstream: "Network Design, VLANs & Firewall", taskName: "Network diagram attached" },
+  { zoneArea: "Construction", workstream: "Cabling & Construction Coordination", taskName: "Cable route plan shared with construction team" },
+  { zoneArea: "Construction", workstream: "Cabling & Construction Coordination", taskName: "LAN point requirement finalized" },
+  { zoneArea: "Construction", workstream: "Cabling & Construction Coordination", taskName: "Fiber requirement checked" },
+  { zoneArea: "Construction", workstream: "Cabling & Construction Coordination", taskName: "Cabling vendor finalized" },
+  { zoneArea: "General", workstream: "Hardware Procurement & Inventory", taskName: "Required hardware list finalized" },
+  { zoneArea: "General", workstream: "Hardware Procurement & Inventory", taskName: "Existing inventory checked" },
+  { zoneArea: "General", workstream: "Hardware Procurement & Inventory", taskName: "Quotations received" },
+  { zoneArea: "General", workstream: "Wi-Fi & Access Points", taskName: "Wi-Fi coverage plan prepared" },
+  { zoneArea: "General", workstream: "Wi-Fi & Access Points", taskName: "AP quantity finalized" },
+  { zoneArea: "General", workstream: "Wi-Fi & Access Points", taskName: "AP mounting locations confirmed" },
+  { zoneArea: "Public Wi-Fi Area", workstream: "Wi-Fi & Access Points", taskName: "Public Wi-Fi SSID configured" },
+  { zoneArea: "General", workstream: "Wi-Fi & Access Points", taskName: "Internal SSID configured" },
+  { zoneArea: "General", workstream: "Wi-Fi & Access Points", taskName: "Wi-Fi load test completed" },
+  { zoneArea: "General", workstream: "Servers, Applications & Services", taskName: "Server requirement finalized" },
+  { zoneArea: "General", workstream: "Servers, Applications & Services", taskName: "Server setup completed" },
+  { zoneArea: "General", workstream: "Servers, Applications & Services", taskName: "Backup process configured" },
+  { zoneArea: "General", workstream: "Servers, Applications & Services", taskName: "Application testing completed" },
+  { zoneArea: "General", workstream: "Servers, Applications & Services", taskName: "Access credentials secured" },
+  { zoneArea: "General", workstream: "Servers, Applications & Services", taskName: "Recovery plan documented" },
+  { zoneArea: "Checkpoints", workstream: "Scanning, E-Pass & Checkpoint IT", taskName: "Checkpoint list finalized" },
+  { zoneArea: "Checkpoints", workstream: "Scanning, E-Pass & Checkpoint IT", taskName: "Scanner/device quantity finalized" },
+  { zoneArea: "Checkpoints", workstream: "Scanning, E-Pass & Checkpoint IT", taskName: "Device allocation completed" },
+  { zoneArea: "Checkpoints", workstream: "Scanning, E-Pass & Checkpoint IT", taskName: "ITS/e-pass scanning tested" },
+  { zoneArea: "Checkpoints", workstream: "Scanning, E-Pass & Checkpoint IT", taskName: "Backup process for scanning failure prepared" },
+  { zoneArea: "Checkpoints", workstream: "Scanning, E-Pass & Checkpoint IT", taskName: "Checkpoint IT support assigned" },
+  { zoneArea: "Central Offices", workstream: "Printers, Office IT & Department Support", taskName: "Department IT requirements collected" },
+  { zoneArea: "Central Offices", workstream: "Printers, Office IT & Department Support", taskName: "Printer requirement finalized" },
+  { zoneArea: "Central Offices", workstream: "Printers, Office IT & Department Support", taskName: "Office LAN/Wi-Fi planned" },
+  { zoneArea: "SHZ OFFICES", workstream: "Printers, Office IT & Department Support", taskName: "SHZ OFFICES IT setup completed" },
+  { zoneArea: "Central Offices", workstream: "Printers, Office IT & Department Support", taskName: "Support contact shared with departments" },
+  { zoneArea: "General", workstream: "Power Backup & UPS", taskName: "Critical IT power points identified" },
+  { zoneArea: "General", workstream: "Power Backup & UPS", taskName: "UPS requirement finalized" },
+  { zoneArea: "General", workstream: "Power Backup & UPS", taskName: "Generator backup coordination completed" },
+  { zoneArea: "General", workstream: "Power Backup & UPS", taskName: "Power failover test completed" },
+  { zoneArea: "General", workstream: "Power Backup & UPS", taskName: "Spare adapters and extensions arranged" }
 ];
+
+
+export const WORKSTREAMS: Workstream[] = buildWorkstreams(CSV_TASK_ROWS);
 
 export const CSV_HEADERS: Array<{ key: keyof TrackerTask; label: string }> = [
   { key: "id", label: "Task ID" },
@@ -335,20 +233,20 @@ export function makeTaskId(city: string, workstream: string, taskName: string) {
     .replace(/(^-|-$)/g, "");
 }
 
-export function createDefaultTask(city: string, workstream: string, taskName: string): TrackerTask {
+export function createDefaultTask(city: string, workstream: string, taskName: string, zoneArea: Zone = inferArea(taskName, workstream)): TrackerTask {
   const now = new Date().toISOString();
   return {
     id: makeTaskId(city, workstream, taskName),
     city,
-    zoneArea: inferArea(taskName, workstream),
+    zoneArea,
     workstream,
     taskName: toSentenceCase(taskName),
-    ownershipType: "Joint",
+    ownershipType: "",
     taskOwner: "",
     supportingPerson: "",
-    priority: "Medium",
-    eventCriticality: inferCriticality(taskName, workstream),
-    status: "Not Started",
+    priority: "",
+    eventCriticality: "",
+    status: "",
     progress: 0,
     dueDate: "",
     targetReadinessDate: "",
@@ -356,9 +254,9 @@ export function createDefaultTask(city: string, workstream: string, taskName: st
     vendorName: "",
     vendorContact: "",
     vendors: [],
-    budgetStatus: "Not Required",
-    documentStatus: "Not Attached",
-    riskLevel: "Medium",
+    budgetStatus: "",
+    documentStatus: "",
+    riskLevel: "",
     blockerReason: "",
     lastUpdateDate: "",
     nextFollowUpDate: "",
@@ -390,7 +288,7 @@ export function createBlankTask(city = INITIAL_CITIES[0] ?? "Nairobi"): TrackerT
 
 export function generateDefaultTasksForCities(cities: string[]) {
   return cities.flatMap((city) =>
-    WORKSTREAMS.flatMap((workstream) => workstream.tasks.map((taskName) => createDefaultTask(city, workstream.name, taskName)))
+    CSV_TASK_ROWS.map((row) => createDefaultTask(city, row.workstream, row.taskName, row.zoneArea))
   );
 }
 
@@ -405,4 +303,12 @@ function inferCriticality(taskName: string, workstream: string): EventCriticalit
   }
   if (value.includes("department") || value.includes("printer") || value.includes("office")) return "Department Support";
   return "Operations Critical";
+}
+
+function buildWorkstreams(rows: Array<{ workstream: string; taskName: string }>): Workstream[] {
+  const byName = new Map<string, string[]>();
+  rows.forEach((row) => {
+    byName.set(row.workstream, [...(byName.get(row.workstream) || []), row.taskName]);
+  });
+  return Array.from(byName.entries()).map(([name, tasks]) => ({ name, tasks }));
 }

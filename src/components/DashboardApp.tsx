@@ -109,6 +109,8 @@ const STORAGE_TASKS_KEY = "ashara-it-readiness-tasks";
 const STORAGE_CITIES_KEY = "ashara-it-readiness-cities";
 const STORAGE_CONTACTS_KEY = "ashara-it-readiness-contacts";
 const STORAGE_ACTIVITY_KEY = "ashara-it-readiness-activity";
+const STORAGE_DATA_VERSION_KEY = "ashara-it-readiness-data-version";
+const CURRENT_DATA_VERSION = "csv-full-task-list-2026-05-20";
 const CURRENT_USER = "Admin";
 const ATTACHMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx"];
 const CLOSED_STATUSES = new Set(["Completed", "Tested", "Not Required"]);
@@ -175,10 +177,19 @@ export default function DashboardApp() {
       const savedCities = window.localStorage.getItem(STORAGE_CITIES_KEY);
       const savedContacts = window.localStorage.getItem(STORAGE_CONTACTS_KEY);
       const savedActivity = window.localStorage.getItem(STORAGE_ACTIVITY_KEY);
-      if (savedTasks) setTasks(normalizeTasks(JSON.parse(savedTasks) as TrackerTask[]));
-      if (savedCities) setCities(JSON.parse(savedCities) as string[]);
+      const savedVersion = window.localStorage.getItem(STORAGE_DATA_VERSION_KEY);
+      const parsedCities = savedCities ? JSON.parse(savedCities) as string[] : INITIAL_CITIES;
+      const parsedActivity = savedActivity ? JSON.parse(savedActivity) as ActivityEntry[] : activity;
+      if (savedVersion !== CURRENT_DATA_VERSION) {
+        setCities(parsedCities);
+        setTasks(normalizeTasks(generateDefaultTasksForCities(parsedCities)));
+        setActivity([createActivity("Task data replaced", "CSV task list", "Existing task data replaced with the imported full task list for every city."), ...parsedActivity].slice(0, 250));
+      } else if (savedTasks) {
+        setTasks(normalizeTasks(JSON.parse(savedTasks) as TrackerTask[]));
+        setCities(parsedCities);
+        setActivity(parsedActivity);
+      }
       if (savedContacts) setContacts(JSON.parse(savedContacts) as Contact[]);
-      if (savedActivity) setActivity(JSON.parse(savedActivity) as ActivityEntry[]);
     } catch {
       setTasks(normalizeTasks(generateDefaultTasksForCities(INITIAL_CITIES)));
     } finally {
@@ -196,6 +207,7 @@ export default function DashboardApp() {
     window.localStorage.setItem(STORAGE_CITIES_KEY, JSON.stringify(cities));
     window.localStorage.setItem(STORAGE_CONTACTS_KEY, JSON.stringify(contacts));
     window.localStorage.setItem(STORAGE_ACTIVITY_KEY, JSON.stringify(activity));
+    window.localStorage.setItem(STORAGE_DATA_VERSION_KEY, CURRENT_DATA_VERSION);
   }, [activity, cities, contacts, hydrated, tasks]);
 
   const filteredTasks = useMemo(() => applyFilters(tasks, filters), [filters, tasks]);
@@ -1165,7 +1177,7 @@ function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: Tracker
       const next = { ...current, [key]: value };
       if (key === "taskName") next.taskName = toSentenceCase(String(value));
       if (key === "taskName" || key === "workstream") next.zoneArea = inferArea(String(key === "taskName" ? value : next.taskName), String(key === "workstream" ? value : next.workstream));
-      if (key === "status" && !current.progressManuallyEdited) next.progress = STATUS_PROGRESS[value as TrackerTask["status"]];
+      if (key === "status" && !current.progressManuallyEdited) next.progress = value ? STATUS_PROGRESS[value as (typeof STATUSES)[number]] : 0;
       if (key === "progress") next.progressManuallyEdited = true;
       return next;
     });
@@ -1462,17 +1474,17 @@ function StatusBadge({ status }: { status: TrackerTask["status"] }) {
         : status === "Not Started"
           ? "bg-[#F4F1EA] text-[var(--color-text-muted)]"
           : "bg-[var(--color-accent-light)] text-[var(--color-text)]";
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{status}</span>;
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{status || "-"}</span>;
 }
 
 function RiskBadge({ risk }: { risk: TrackerTask["riskLevel"] }) {
   const className = risk === "High" ? "bg-[var(--color-important)] text-white" : risk === "Medium" ? "bg-[var(--color-accent)] text-[var(--color-primary)]" : "bg-[var(--color-primary)] text-white";
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{risk}</span>;
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{risk || "-"}</span>;
 }
 
 function DocumentBadge({ status }: { status: TrackerTask["documentStatus"] }) {
   const className = status === "Final Attached" ? "bg-[var(--color-primary)] text-white" : status === "Draft Attached" ? "bg-[var(--color-secondary)] text-white" : "bg-[var(--color-accent-light)] text-[var(--color-text)]";
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{status}</span>;
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{status || "-"}</span>;
 }
 
 const MASTER_FIELDS: SortKey[] = ["city", "workstream", "taskName", "zoneArea", "taskOwner", "status", "progress", "dueDate", "riskLevel"];
