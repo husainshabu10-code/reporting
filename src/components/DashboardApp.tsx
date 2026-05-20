@@ -1614,7 +1614,7 @@ function missingFields(task: TrackerTask) {
     ["Priority", Boolean(task.priority)],
     ["Event Criticality", Boolean(task.eventCriticality)],
     ["Status", Boolean(task.status)],
-    ["Progress %", task.progress !== null && task.progress !== undefined && PROGRESS_VALUES.includes(nearestProgress(task.progress))],
+    ["Progress %", task.progress !== null && task.progress !== undefined && PROGRESS_VALUES.some((value) => value === nearestProgress(task.progress))],
     ["Due Date", Boolean(task.dueDate)],
     ["Budget Status", Boolean(task.budgetStatus)]
   ];
