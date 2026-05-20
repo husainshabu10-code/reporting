@@ -49,6 +49,7 @@ type TabId = "Dashboard" | "Compare" | "Master List" | "Contacts" | "Area" | "Ac
 type ReportFormat = "Charts only" | "Tables only" | "Both charts and tables";
 type ExcelReportFormat = "Table only" | "Table with chart summaries";
 type SortKey = "city" | "workstream" | "taskName" | "zoneArea" | "taskOwner" | "status" | "progress" | "dueDate" | "riskLevel";
+type TableField = "city" | "workstream" | "taskName" | "zoneArea" | "taskOwner" | "vendors" | "status" | "progress" | "riskLevel" | "dueDate" | "documentStatus";
 
 type Filters = {
   city: string;
@@ -1056,6 +1057,8 @@ function GroupedTaskTable({ tasks, groupBy, subgroupBy, onOpenTask, highlightMis
 }
 
 function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { tasks: TrackerTask[]; onOpenTask: (task: TrackerTask) => void; highlightMissing: boolean; compact?: boolean }) {
+  const cellClass = (task: TrackerTask, field: TableField) => `cell-box ${highlightMissing && isMissingTableField(task, field) ? "missing-cell-box" : ""}`;
+
   return (
     <section className={`${compact ? "" : "motion-card rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft"}`}>
       {!compact && (
@@ -1069,48 +1072,49 @@ function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { t
       <div className="hidden overflow-x-auto lg:block">
         <table className="w-full min-w-[1240px] border-collapse text-left text-sm">
           <thead className="bg-[var(--color-accent-light)] text-xs uppercase text-[var(--color-primary)]">
-            <tr>{["City", "Workstream", "Task", "Area", "Owner", "Vendors", "Status", "Progress", "Risk", "Due", "Docs", "Missing"].map((heading) => <th key={heading} className="border-b border-[var(--color-border)] px-3 py-3 font-semibold">{heading}</th>)}</tr>
+            <tr>{["City", "Workstream", "Task", "Area", "Owner", "Vendors", "Status", "Progress", "Risk", "Due", "Docs"].map((heading) => <th key={heading} className="border-b border-[var(--color-border)] px-3 py-3 font-semibold">{heading}</th>)}</tr>
           </thead>
           <tbody>
-            {tasks.map((task) => {
-              const missing = missingFields(task);
-              return (
-                <tr key={task.id} className={`cursor-pointer border-b border-[var(--color-border)] transition hover:bg-[var(--color-bg)] ${dueRowClass(task)} ${highlightMissing && missing.length ? "border-l-4 border-l-[var(--color-important)]" : ""}`} onClick={() => onOpenTask(task)}>
-                  <td className="px-3 py-3 font-medium text-[var(--color-primary)]">{task.city}</td>
-                  <td className="px-3 py-3 text-[var(--color-text-muted)]">{task.workstream}</td>
-                  <td className="max-w-[320px] px-3 py-3 text-[var(--color-text)]">{taskDisplayName(task)}</td>
-                  <td className="px-3 py-3 text-[var(--color-text-muted)]">{task.zoneArea}</td>
-                  <td className="px-3 py-3 text-[var(--color-text-muted)]">{task.taskOwner}</td>
-                  <td className="px-3 py-3 text-[var(--color-text-muted)]">{vendorSummary(task) || "-"}</td>
-                  <td className="px-3 py-3"><StatusBadge status={task.status} /></td>
-                  <td className="px-3 py-3"><div className="min-w-28"><ProgressBar value={task.progress} compact /><span className="text-xs text-[var(--color-text-muted)]">{task.progress}%</span></div></td>
-                  <td className="px-3 py-3"><RiskBadge risk={task.riskLevel} /></td>
-                  <td className="px-3 py-3 text-[var(--color-text-muted)]">{task.dueDate}</td>
-                  <td className="px-3 py-3"><DocumentBadge status={task.documentStatus} /></td>
-                  <td className="px-3 py-3 text-[var(--color-important)]">{missing.length || ""}</td>
-                </tr>
-              );
-            })}
+            {tasks.map((task) => (
+              <tr key={task.id} className={`cursor-pointer border-b border-[var(--color-border)] transition hover:bg-[var(--color-bg)] ${dueRowClass(task)}`} onClick={() => onOpenTask(task)}>
+                <td className="px-3 py-3 font-medium text-[var(--color-primary)]"><div className={cellClass(task, "city")}>{task.city || "-"}</div></td>
+                <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "workstream")}>{task.workstream || "-"}</div></td>
+                <td className="max-w-[320px] px-3 py-3 text-[var(--color-text)]"><div className={cellClass(task, "taskName")}>{taskDisplayName(task) || "-"}</div></td>
+                <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "zoneArea")}>{task.zoneArea || "-"}</div></td>
+                <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "taskOwner")}>{task.taskOwner || "-"}</div></td>
+                <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "vendors")}>{vendorSummary(task) || "-"}</div></td>
+                <td className="px-3 py-3"><div className={cellClass(task, "status")}><StatusBadge status={task.status} /></div></td>
+                <td className="px-3 py-3"><div className={`${cellClass(task, "progress")} min-w-28`}><ProgressBar value={task.progress} compact /><span className="text-xs text-[var(--color-text-muted)]">{task.progress}%</span></div></td>
+                <td className="px-3 py-3"><div className={cellClass(task, "riskLevel")}><RiskBadge risk={task.riskLevel} /></div></td>
+                <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "dueDate")}>{task.dueDate || "-"}</div></td>
+                <td className="px-3 py-3"><div className={cellClass(task, "documentStatus")}><DocumentBadge status={task.documentStatus} /></div></td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
       <div className="space-y-3 p-2 sm:p-3 lg:hidden">
         {tasks.map((task) => (
-          <button key={task.id} className={`motion-card w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 text-left shadow-sm sm:p-4 ${dueRowClass(task)} ${highlightMissing && missingFields(task).length ? "border-l-4 border-l-[var(--color-important)]" : ""}`} onClick={() => onOpenTask(task)}>
+          <button key={task.id} className={`motion-card w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 text-left shadow-sm sm:p-4 ${dueRowClass(task)}`} onClick={() => onOpenTask(task)}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
-                <p className="break-words font-semibold text-[var(--color-text)]">{taskDisplayName(task)}</p>
-                <p className="mt-1 break-words text-sm text-[var(--color-text-muted)]">{task.city} / {task.zoneArea}</p>
+                <p className={`${cellClass(task, "taskName")} break-words font-semibold text-[var(--color-text)]`}>{taskDisplayName(task) || "-"}</p>
+                <div className="mt-2 grid gap-2 text-sm text-[var(--color-text-muted)] sm:grid-cols-2">
+                  <span className={cellClass(task, "city")}>City: {task.city || "-"}</span>
+                  <span className={cellClass(task, "zoneArea")}>Area: {task.zoneArea || "-"}</span>
+                  <span className={`${cellClass(task, "workstream")} sm:col-span-2`}>Workstream: {task.workstream || "-"}</span>
+                </div>
               </div>
-              <div className="w-fit"><StatusBadge status={task.status} /></div>
+              <div className={`${cellClass(task, "status")} w-fit`}><StatusBadge status={task.status} /></div>
             </div>
             <div className="mt-3 grid gap-2 text-sm text-[var(--color-text-muted)] sm:grid-cols-2">
-              <span className="break-words">Owner: {task.taskOwner || "Missing"}</span>
-              <span className="break-words">Due: {task.dueDate || "Missing"}</span>
-              <span>Risk: {task.riskLevel}</span>
-              <span>Missing: {missingFields(task).length}</span>
+              <span className={`${cellClass(task, "taskOwner")} break-words`}>Owner: {task.taskOwner || "-"}</span>
+              <span className={`${cellClass(task, "vendors")} break-words`}>Vendors: {vendorSummary(task) || "-"}</span>
+              <span className={`${cellClass(task, "dueDate")} break-words`}>Due: {task.dueDate || "-"}</span>
+              <span className={cellClass(task, "riskLevel")}>Risk: {task.riskLevel || "-"}</span>
+              <span className={cellClass(task, "documentStatus")}>Docs: {task.documentStatus || "-"}</span>
             </div>
-            <div className="mt-3"><ProgressBar value={task.progress} /></div>
+            <div className={`mt-3 ${cellClass(task, "progress")}`}><ProgressBar value={task.progress} /><span className="mt-1 block text-xs text-[var(--color-text-muted)]">{task.progress}%</span></div>
           </button>
         ))}
       </div>
@@ -1637,6 +1641,42 @@ function missingFields(task: TrackerTask) {
     ["Budget Status", Boolean(task.budgetStatus)]
   ];
   return checks.filter(([, ok]) => !ok).map(([label]) => label);
+}
+
+function isMissingTableField(task: TrackerTask, field: TableField) {
+  switch (field) {
+    case "city":
+      return isMissingValue(task.city);
+    case "workstream":
+      return isMissingValue(task.workstream);
+    case "taskName":
+      return isMissingValue(task.taskName);
+    case "zoneArea":
+      return isMissingValue(task.zoneArea);
+    case "taskOwner":
+      return isMissingValue(task.taskOwner);
+    case "vendors":
+      return !task.vendors?.some((vendor) => !isMissingValue(vendor.name) || !isMissingValue(vendor.contact));
+    case "status":
+      return isMissingValue(task.status);
+    case "progress":
+      return task.progress === null || task.progress === undefined || Number.isNaN(Number(task.progress)) || !PROGRESS_VALUES.some((value) => value === nearestProgress(task.progress));
+    case "riskLevel":
+      return isMissingValue(task.riskLevel);
+    case "dueDate":
+      return isMissingValue(task.dueDate);
+    case "documentStatus":
+      return task.documentStatus === "Not Attached" || isMissingValue(task.documentStatus) || (!task.documentLinkAttachmentReference && !task.attachments.length);
+    default:
+      return false;
+  }
+}
+
+function isMissingValue(value: unknown) {
+  if (Array.isArray(value)) return value.length === 0;
+  if (value === null || value === undefined) return true;
+  if (typeof value === "string") return !value.trim() || value.trim() === "-";
+  return false;
 }
 
 function sortTasks(rows: TrackerTask[], key: SortKey, asc: boolean) {
