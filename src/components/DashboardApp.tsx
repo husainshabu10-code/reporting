@@ -1083,6 +1083,7 @@ function ChartCard({
   const [bodyMounted, setBodyMounted] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showLegend, setShowLegend] = useState(true);
+  const [showDataLabels, setShowDataLabels] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
@@ -1098,6 +1099,7 @@ function ChartCard({
   const resetChart = () => {
     setChartKind(dataset.defaultKind);
     setShowLegend(true);
+    setShowDataLabels(false);
     setMenuOpen(false);
     setBodyMounted(true);
     setCollapsed(false);
@@ -1141,10 +1143,11 @@ function ChartCard({
             {menuOpen && (
               <div className="absolute right-0 top-9 z-30 w-48 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-1 shadow-2xl animate-fade-in">
                 <button className="export-menu-item" onClick={() => setShowLegend((value) => !value)}>{showLegend ? "Hide legend" : "Show legend"}</button>
+                <button className="export-menu-item" onClick={() => setShowDataLabels((value) => !value)}>{showDataLabels ? "Hide data labels" : "Show data labels"}</button>
                 <div className="border-t border-[var(--color-border)] py-1">
                   <p className="px-2 py-1 text-xs font-semibold uppercase text-[var(--color-text-muted)]">Export</p>
-                  <button className="export-menu-item" onClick={() => { downloadChartVisual(dataset, chartKind, "png"); setMenuOpen(false); }}>Export as PNG</button>
-                  <button className="export-menu-item" onClick={() => { downloadChartVisual(dataset, chartKind, "pdf"); setMenuOpen(false); }}>Export as PDF</button>
+                  <button className="export-menu-item" onClick={() => { downloadChartVisual(dataset, chartKind, "png", showDataLabels); setMenuOpen(false); }}>Export as PNG</button>
+                  <button className="export-menu-item" onClick={() => { downloadChartVisual(dataset, chartKind, "pdf", showDataLabels); setMenuOpen(false); }}>Export as PDF</button>
                 </div>
                 <button className="export-menu-item text-[var(--color-important)]" onClick={() => { setMenuOpen(false); onDeleteChart(dataset.id); }}>Delete card</button>
               </div>
@@ -1174,7 +1177,7 @@ function ChartCard({
               <button className="btn-compact justify-center" onClick={() => onShowData(dataset)}>View data</button>
               <button className="btn-compact justify-center" onClick={resetChart}>Reset</button>
             </div>
-            <ChartVisual dataset={dataset} chartKind={chartKind} showLegend={showLegend} />
+            <ChartVisual dataset={dataset} chartKind={chartKind} showLegend={showLegend} showDataLabels={showDataLabels} />
           </div>
         </div>
       )}
@@ -1185,7 +1188,7 @@ function ChartCard({
               <h2 className="section-title">{dataset.title}</h2>
               <button className="icon-btn" onClick={() => setFullscreen(false)} aria-label="Close expanded chart"><X size={18} /></button>
             </div>
-            <ChartVisual dataset={dataset} chartKind={chartKind} showLegend={showLegend} />
+            <ChartVisual dataset={dataset} chartKind={chartKind} showLegend={showLegend} showDataLabels={showDataLabels} />
           </div>
         </div>
       )}
@@ -1193,10 +1196,10 @@ function ChartCard({
   );
 }
 
-function ChartVisual({ dataset, chartKind, showLegend = true }: { dataset: ChartDataset; chartKind: ChartKind; showLegend?: boolean }) {
+function ChartVisual({ dataset, chartKind, showLegend = true, showDataLabels = false }: { dataset: ChartDataset; chartKind: ChartKind; showLegend?: boolean; showDataLabels?: boolean }) {
   if (dataset.rows.length === 0) return <p className="mt-4 text-sm text-[var(--color-text-muted)]">No chart data available.</p>;
-  if (chartKind === "Pie" || chartKind === "Donut") return <PieLikeChart dataset={dataset} chartKind={chartKind} showLegend={showLegend} />;
-  if (chartKind === "Line") return <LineChartVisual dataset={dataset} showLegend={showLegend} />;
+  if (chartKind === "Pie" || chartKind === "Donut") return <PieLikeChart dataset={dataset} chartKind={chartKind} showLegend={showLegend} showDataLabels={showDataLabels} />;
+  if (chartKind === "Line") return <LineChartVisual dataset={dataset} showLegend={showLegend} showDataLabels={showDataLabels} />;
 
   return (
     <div className="mt-4 space-y-3">
@@ -1204,6 +1207,7 @@ function ChartVisual({ dataset, chartKind, showLegend = true }: { dataset: Chart
         <div key={row.label} className="space-y-1" title={`${row.label}: ${row.value}${dataset.suffix || ""} (${row.percent}%)`}>
           <div className="flex items-center justify-between gap-3 text-sm">
             <span className="truncate text-[var(--color-text-muted)]">{row.label}</span>
+            {showDataLabels && <span className="flex-none text-xs font-semibold text-[var(--color-primary)]">{formatChartLabel(row, dataset.suffix)}</span>}
           </div>
           <ProgressBar value={row.percent} tone={row.status} />
         </div>
@@ -1212,7 +1216,7 @@ function ChartVisual({ dataset, chartKind, showLegend = true }: { dataset: Chart
   );
 }
 
-function LineChartVisual({ dataset, showLegend }: { dataset: ChartDataset; showLegend: boolean }) {
+function LineChartVisual({ dataset, showLegend, showDataLabels }: { dataset: ChartDataset; showLegend: boolean; showDataLabels: boolean }) {
   const width = 560;
   const height = 220;
   const padding = 28;
@@ -1229,17 +1233,24 @@ function LineChartVisual({ dataset, showLegend }: { dataset: ChartDataset; showL
         <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="var(--color-border)" strokeWidth="2" />
         <polyline points={points.map((point) => `${point.x},${point.y}`).join(" ")} fill="none" stroke="var(--color-secondary)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
         {points.map((point, index) => (
-          <circle key={`${point.row.label}-${index}`} cx={point.x} cy={point.y} r="5" fill={chartColor(point.row, index)}>
-            <title>{`${point.row.label}: ${point.row.value}${dataset.suffix || ""} (${point.row.percent}%)`}</title>
-          </circle>
+          <g key={`${point.row.label}-${index}`}>
+            <circle cx={point.x} cy={point.y} r="5" fill={chartColor(point.row, index)}>
+              <title>{`${point.row.label}: ${point.row.value}${dataset.suffix || ""} (${point.row.percent}%)`}</title>
+            </circle>
+            {showDataLabels && (
+              <text x={point.x} y={Math.max(12, point.y - 10)} textAnchor="middle" className="fill-[var(--color-primary)] text-[11px] font-semibold">
+                {formatChartLabel(point.row, dataset.suffix)}
+              </text>
+            )}
+          </g>
         ))}
       </svg>
-      {showLegend && <ChartLegend rows={dataset.rows} />}
+      {showLegend && <ChartLegend rows={dataset.rows} suffix={dataset.suffix} showDataLabels={showDataLabels} />}
     </div>
   );
 }
 
-function PieLikeChart({ dataset, chartKind, showLegend }: { dataset: ChartDataset; chartKind: "Pie" | "Donut"; showLegend: boolean }) {
+function PieLikeChart({ dataset, chartKind, showLegend, showDataLabels }: { dataset: ChartDataset; chartKind: "Pie" | "Donut"; showLegend: boolean; showDataLabels: boolean }) {
   const rows = dataset.rows.filter((row) => row.value > 0 || row.percent > 0);
   const gradient = conicGradient(rows.length ? rows : dataset.rows);
 
@@ -1250,13 +1261,14 @@ function PieLikeChart({ dataset, chartKind, showLegend }: { dataset: ChartDatase
           <div className="aspect-square w-20 rounded-full border border-[var(--color-border)] bg-[var(--color-card)] sm:w-24" aria-hidden="true" />
         )}
       </div>
-      {showLegend && <div className="min-w-0 space-y-2">
+      {(showLegend || showDataLabels) && <div className="min-w-0 space-y-2">
         {dataset.rows.map((row, index) => (
           <div key={row.label} className="flex items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm" title={`${row.label}: ${row.value}${dataset.suffix || ""} (${row.percent}%)`}>
             <span className="flex min-w-0 items-center gap-2">
-              <span className="h-3 w-3 flex-none rounded-full" style={{ background: chartColor(row, index) }} />
+              {showLegend && <span className="h-3 w-3 flex-none rounded-full" style={{ background: chartColor(row, index) }} />}
               <span className="truncate text-[var(--color-text-muted)]">{row.label}</span>
             </span>
+            {showDataLabels && <span className="flex-none text-xs font-semibold text-[var(--color-primary)]">{formatChartLabel(row, dataset.suffix)}</span>}
           </div>
         ))}
       </div>}
@@ -1264,13 +1276,13 @@ function PieLikeChart({ dataset, chartKind, showLegend }: { dataset: ChartDatase
   );
 }
 
-function ChartLegend({ rows }: { rows: ChartRow[] }) {
+function ChartLegend({ rows, suffix, showDataLabels = false }: { rows: ChartRow[]; suffix?: string; showDataLabels?: boolean }) {
   return (
     <div className="mt-3 flex flex-wrap gap-2">
       {rows.map((row, index) => (
         <span key={row.label} className="inline-flex items-center gap-2 rounded-full bg-[var(--color-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--color-text-muted)]" title={`${row.label}: ${row.value} (${row.percent}%)`}>
           <span className="h-2.5 w-2.5 rounded-full" style={{ background: chartColor(row, index) }} />
-          {row.label}
+          {row.label}{showDataLabels ? ` - ${formatChartLabel(row, suffix)}` : ""}
         </span>
       ))}
     </div>
@@ -1782,7 +1794,7 @@ function ProgressBar({ value, compact = false, tone }: { value: number; compact?
   return <div className={`overflow-hidden rounded-full bg-[var(--color-accent-light)] ${compact ? "h-2" : "h-2.5"}`}><div className={`h-full rounded-full ${color}`} style={{ width: `${clamp(value, 0, 100)}%` }} /></div>;
 }
 
-function chartSvg(dataset: ChartDataset, chartKind: ChartKind) {
+function chartSvg(dataset: ChartDataset, chartKind: ChartKind, showDataLabels = false) {
   const rows = dataset.rows;
   const width = 900;
   const chartRows = rows.length ? rows : [{ label: "No data", value: 1, percent: 100, status: "muted" as const }];
@@ -1790,18 +1802,25 @@ function chartSvg(dataset: ChartDataset, chartKind: ChartKind) {
   const bars = chartRows.map((row, index) => {
     const y = 86 + index * 34;
     const barWidth = Math.max(4, row.percent * 5.8);
-    return `<text x="40" y="${y + 14}" font-size="14" fill="#6B7280">${escapeHtml(row.label)}</text><rect x="270" y="${y}" width="${barWidth}" height="18" rx="9" fill="${cssColor(chartColor(row, index))}"><title>${escapeHtml(`${row.label}: ${row.value}${dataset.suffix || ""} (${row.percent}%)`)}</title></rect>`;
+    const labelX = Math.min(850, 285 + barWidth);
+    const valueLabel = showDataLabels ? `<text x="${labelX}" y="${y + 14}" font-size="12" font-weight="700" fill="#0B4F3A">${escapeHtml(formatChartLabel(row, dataset.suffix))}</text>` : "";
+    return `<text x="40" y="${y + 14}" font-size="14" fill="#6B7280">${escapeHtml(row.label)}</text><rect x="270" y="${y}" width="${barWidth}" height="18" rx="9" fill="${cssColor(chartColor(row, index))}"><title>${escapeHtml(`${row.label}: ${row.value}${dataset.suffix || ""} (${row.percent}%)`)}</title></rect>${valueLabel}`;
   }).join("");
-  const legend = chartRows.map((row, index) => `<circle cx="${40 + (index % 4) * 190}" cy="${height - 44 + Math.floor(index / 4) * 22}" r="6" fill="${cssColor(chartColor(row, index))}"/><text x="${52 + (index % 4) * 190}" y="${height - 39 + Math.floor(index / 4) * 22}" font-size="12" fill="#6B7280">${escapeHtml(row.label)}</text>`).join("");
+  const legend = chartRows.map((row, index) => `<circle cx="${40 + (index % 4) * 190}" cy="${height - 44 + Math.floor(index / 4) * 22}" r="6" fill="${cssColor(chartColor(row, index))}"/><text x="${52 + (index % 4) * 190}" y="${height - 39 + Math.floor(index / 4) * 22}" font-size="12" fill="#6B7280">${escapeHtml(showDataLabels ? `${row.label} - ${formatChartLabel(row, dataset.suffix)}` : row.label)}</text>`).join("");
   const pie = `${pieSlicesSvg(chartRows, 450, 250, 130)}${chartKind === "Donut" ? '<circle cx="450" cy="250" r="72" fill="#FFFFFF" stroke="#E8DDC5"/>' : ""}${legend}`;
   const linePoints = chartRows.map((row, index) => `${80 + (index / Math.max(1, chartRows.length - 1)) * 740},${410 - row.percent * 3}`).join(" ");
-  const line = `<polyline points="${linePoints}" fill="none" stroke="#2E7D5B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>${chartRows.map((row, index) => `<circle cx="${80 + (index / Math.max(1, chartRows.length - 1)) * 740}" cy="${410 - row.percent * 3}" r="7" fill="${cssColor(chartColor(row, index))}"/>`).join("")}${legend}`;
+  const line = `<polyline points="${linePoints}" fill="none" stroke="#2E7D5B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>${chartRows.map((row, index) => {
+    const x = 80 + (index / Math.max(1, chartRows.length - 1)) * 740;
+    const y = 410 - row.percent * 3;
+    const valueLabel = showDataLabels ? `<text x="${x}" y="${Math.max(46, y - 14)}" text-anchor="middle" font-size="11" font-weight="700" fill="#0B4F3A">${escapeHtml(formatChartLabel(row, dataset.suffix))}</text>` : "";
+    return `<g><circle cx="${x}" cy="${y}" r="7" fill="${cssColor(chartColor(row, index))}"><title>${escapeHtml(`${row.label}: ${row.value}${dataset.suffix || ""} (${row.percent}%)`)}</title></circle>${valueLabel}</g>`;
+  }).join("")}${legend}`;
   const body = chartKind === "Pie" || chartKind === "Donut" ? pie : chartKind === "Line" ? line : bars;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#FAF7EF"/><rect x="20" y="20" width="${width - 40}" height="${height - 40}" rx="16" fill="#FFFFFF" stroke="#E8DDC5"/><text x="40" y="58" font-family="Arial" font-size="24" font-weight="700" fill="#0B4F3A">${escapeHtml(dataset.title)}</text>${body}</svg>`;
 }
 
-function downloadChartVisual(dataset: ChartDataset, chartKind: ChartKind, format: "png" | "pdf") {
-  const svg = chartSvg(dataset, chartKind);
+function downloadChartVisual(dataset: ChartDataset, chartKind: ChartKind, format: "png" | "pdf", showDataLabels = false) {
+  const svg = chartSvg(dataset, chartKind, showDataLabels);
   if (format === "pdf") {
     const win = window.open("", "_blank");
     if (!win) return;
@@ -2440,6 +2459,10 @@ function chartColor(row: ChartRow, index: number) {
   if (row.status === "muted") return "#9CA3AF";
   const palette = ["var(--color-primary)", "var(--color-secondary)", "var(--color-accent)", "var(--color-important)", "#9CA3AF"];
   return palette[index % palette.length];
+}
+
+function formatChartLabel(row: ChartRow, suffix?: string) {
+  return `${row.value}${suffix || ""} (${row.percent}%)`;
 }
 
 function pieSlicesSvg(rows: ChartRow[], cx: number, cy: number, radius: number) {
