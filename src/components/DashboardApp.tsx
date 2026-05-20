@@ -888,6 +888,17 @@ function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData:
   const [chartKind, setChartKind] = useState<ChartKind>(dataset.defaultKind);
   const [collapsed, setCollapsed] = useState(false);
   const [bodyMounted, setBodyMounted] = useState(true);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!exportOpen) return;
+    const closeExport = (event: MouseEvent) => {
+      if (!exportRef.current?.contains(event.target as Node)) setExportOpen(false);
+    };
+    document.addEventListener("mousedown", closeExport);
+    return () => document.removeEventListener("mousedown", closeExport);
+  }, [exportOpen]);
 
   const resetChart = () => {
     setChartKind(dataset.defaultKind);
@@ -908,14 +919,27 @@ function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData:
     <article className="motion-card min-w-0 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft">
       <div className="flex min-w-0 items-start justify-between gap-3 p-3 sm:p-4">
         <h2 className="section-title break-words pt-2">{dataset.title}</h2>
-        <button
-          className="icon-btn flex-none"
-          onClick={toggleCollapsed}
-          aria-label={collapsed ? `Expand ${dataset.title}` : `Collapse ${dataset.title}`}
-          aria-expanded={!collapsed}
-        >
-          <ChevronDown className={`transition-transform duration-300 ${collapsed ? "-rotate-90" : "rotate-0"}`} size={18} />
-        </button>
+        <div className="flex flex-none items-start gap-2">
+          <div ref={exportRef} className="relative">
+            <button className="icon-btn" onClick={() => setExportOpen((value) => !value)} aria-label={`Export ${dataset.title}`} aria-expanded={exportOpen}>
+              <Download size={17} />
+            </button>
+            {exportOpen && (
+              <div className="absolute right-0 top-12 z-20 w-40 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-1 shadow-2xl animate-fade-in">
+                <button className="export-menu-item" onClick={() => { downloadChartVisual(dataset, chartKind, "png"); setExportOpen(false); }}>Export as PNG</button>
+                <button className="export-menu-item" onClick={() => { downloadChartVisual(dataset, chartKind, "pdf"); setExportOpen(false); }}>Export as PDF</button>
+              </div>
+            )}
+          </div>
+          <button
+            className="icon-btn"
+            onClick={toggleCollapsed}
+            aria-label={collapsed ? `Expand ${dataset.title}` : `Collapse ${dataset.title}`}
+            aria-expanded={!collapsed}
+          >
+            <ChevronDown className={`transition-transform duration-300 ${collapsed ? "-rotate-90" : "rotate-0"}`} size={18} />
+          </button>
+        </div>
       </div>
       {bodyMounted && (
         <div
@@ -934,8 +958,6 @@ function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData:
                 <option value="Progress">Progress bars</option>
               </select>
               <button className="btn-compact justify-center" onClick={() => onShowData(dataset)}>View data</button>
-              <button className="btn-compact justify-center" onClick={() => downloadChartVisual(dataset, chartKind, "png")}>PNG</button>
-              <button className="btn-compact justify-center" onClick={() => downloadChartVisual(dataset, chartKind, "pdf")}>PDF</button>
               <button className="btn-compact justify-center" onClick={resetChart}>Reset</button>
             </div>
             <ChartVisual dataset={dataset} chartKind={chartKind} />
