@@ -321,7 +321,7 @@ export default function DashboardApp() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[var(--color-bg)] text-[var(--color-text)]">
-      {sidebarOpen && <button className="fixed inset-0 z-30 bg-[#0B4F3A]/35 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar overlay" />}
+      {sidebarOpen && <button className="blur-overlay fixed inset-0 z-30 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar overlay" />}
 
       <aside className={`fixed inset-y-0 left-0 z-40 flex w-[min(18rem,86vw)] flex-col border-r border-[var(--color-border)] bg-[var(--color-primary)] text-white shadow-2xl transition-transform duration-300 ease-out lg:w-72 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex min-h-24 items-start justify-between gap-3 border-b border-white/15 p-5">
@@ -836,7 +836,7 @@ function FiltersPanel({ filters, setFilters, sourceTasks }: { filters: Filters; 
         <p className="text-sm text-[var(--color-text-muted)]">Open filters from the button and choose only what you need.</p>
       </div>
 
-      <div className={`fixed inset-0 z-20 cursor-default bg-transparent transition-opacity duration-200 ${open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`} onClick={() => setOpen(false)} aria-label="Close filter panel" />
+      <div className={`blur-overlay fixed inset-0 z-20 cursor-default transition-opacity duration-200 ${open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`} onClick={() => setOpen(false)} aria-label="Close filter panel" />
       <div className={`fixed inset-x-3 top-24 z-30 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-2xl transition-all duration-200 ease-out sm:absolute sm:left-0 sm:right-auto sm:top-12 sm:w-[min(72rem,calc(100vw-2rem))] sm:p-4 ${open ? "pointer-events-auto translate-y-0 scale-100 opacity-100" : "pointer-events-none -translate-y-2 scale-[0.98] opacity-0"}`}>
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
@@ -1153,7 +1153,7 @@ function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: Tracker
   };
 
   return (
-    <div className={`motion-overlay fixed inset-0 z-50 bg-[#0B4F3A]/35 lg:flex lg:justify-end ${closing ? "motion-overlay-exit" : ""}`}>
+    <div className={`motion-overlay blur-overlay fixed inset-0 z-50 lg:flex lg:justify-end ${closing ? "motion-overlay-exit" : ""}`}>
       <aside className={`motion-drawer flex h-full w-full flex-col bg-[var(--color-card)] shadow-2xl lg:w-[620px] ${closing ? "motion-drawer-exit" : ""}`}>
         <div className="flex items-start justify-between gap-3 border-b border-[var(--color-border)] p-3 sm:p-4">
           <div className="min-w-0">
@@ -1230,7 +1230,7 @@ function DataModal({ dataset, onClose }: { dataset: ChartDataset; onClose: () =>
   const { closing, close } = useAnimatedClose(onClose);
 
   return (
-    <div className={`motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-[#0B4F3A]/35 p-2 sm:p-4 ${closing ? "motion-overlay-exit" : ""}`}>
+    <div className={`motion-overlay blur-overlay fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 ${closing ? "motion-overlay-exit" : ""}`}>
       <div className={`motion-modal max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl ${closing ? "motion-modal-exit" : ""}`}>
         <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] p-3 sm:p-4">
           <h2 className="section-title min-w-0 break-words">{dataset.title} data</h2>
@@ -1275,7 +1275,7 @@ function ChartSettingsModal({
   const { closing, close } = useAnimatedClose(onClose);
 
   return (
-    <div className={`motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-[#0B4F3A]/35 p-2 sm:p-4 ${closing ? "motion-overlay-exit" : ""}`}>
+    <div className={`motion-overlay blur-overlay fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 ${closing ? "motion-overlay-exit" : ""}`}>
       <div className={`motion-modal max-h-[92vh] w-full max-w-xl overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl ${closing ? "motion-modal-exit" : ""}`}>
         <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] p-3 sm:p-4">
           <div>

@@ -390,6 +390,12 @@ table {
     animation: drawer-out 180ms ease-in both;
   }
 
+  .blur-overlay {
+    background: rgba(250, 247, 239, 0.34);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+
   @media (max-width: 480px) {
     .field,
     .btn-primary,
