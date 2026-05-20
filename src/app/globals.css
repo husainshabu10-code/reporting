@@ -434,6 +434,37 @@ table {
     position: relative;
   }
 
+  .chart-card-dragging {
+    opacity: 0.58;
+    transform: scale(0.985);
+    border-color: var(--color-accent);
+  }
+
+  .drag-handle {
+    min-height: 1.75rem;
+    height: 1.75rem;
+    width: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    border: 0;
+    background: transparent;
+    border-radius: 0.35rem;
+    color: var(--color-accent);
+    cursor: grab;
+    transition: background-color 180ms ease, color 180ms ease, transform 180ms ease;
+  }
+
+  .drag-handle:hover,
+  .drag-handle:focus-visible {
+    background: var(--color-accent-light);
+    color: var(--color-primary);
+    transform: translateY(-1px);
+  }
+
+  .drag-handle:active {
+    cursor: grabbing;
+  }
+
   .chart-hover-toolbar {
     opacity: 1;
     transform: translateY(0);

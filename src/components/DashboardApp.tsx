@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ChangeEvent, ReactNode } from "react";
+import type { ChangeEvent, DragEvent, ReactNode } from "react";
 import {
   Activity,
   BarChart3,
@@ -209,6 +209,7 @@ export default function DashboardApp() {
   const [chartData, setChartData] = useState<ChartDataset | null>(null);
   const [chartSettingsTab, setChartSettingsTab] = useState<TabId | null>(null);
   const [hiddenChartIds, setHiddenChartIds] = useState<Record<string, string[]>>({});
+  const [chartOrder, setChartOrder] = useState<Record<string, string[]>>({});
   const [customCharts, setCustomCharts] = useState<Record<string, CustomChartDefinition[]>>({});
   const [addChartTab, setAddChartTab] = useState<TabId | null>(null);
   const [compareCities, setCompareCities] = useState<string[]>(INITIAL_CITIES.slice(0, 3));
@@ -298,7 +299,7 @@ export default function DashboardApp() {
     [areaCharts, compareCharts, customChartsByTab, dashboardCharts, masterCharts, reportCharts]
   );
   const chartsForActiveTab = chartsForTab(activeTab, pageCharts);
-  const visibleChartsFor = (tab: TabId, charts: ChartDataset[]) => charts.filter((chart) => !(hiddenChartIds[tab] || []).includes(chart.id));
+  const visibleChartsFor = (tab: TabId, charts: ChartDataset[]) => orderCharts(charts.filter((chart) => !(hiddenChartIds[tab] || []).includes(chart.id)), chartOrder[tab] || []);
 
   const hideChart = (tab: TabId, chartId: string) => {
     if (!window.confirm("Delete this chart card from the current page view? You can add it again from Add Chart.")) return;
@@ -307,6 +308,12 @@ export default function DashboardApp() {
 
   const restoreChart = (tab: TabId, chartId: string) => {
     setHiddenChartIds((current) => ({ ...current, [tab]: (current[tab] || []).filter((id) => id !== chartId) }));
+  };
+
+  const reorderChart = (tab: TabId, sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    const availableIds = chartsForTab(tab, pageCharts).map((chart) => chart.id);
+    setChartOrder((current) => ({ ...current, [tab]: moveChartId(sourceId, targetId, current[tab] || availableIds, availableIds) }));
   };
 
   const addCustomChart = (tab: TabId, definition: CustomChartDefinition) => {
@@ -498,6 +505,7 @@ export default function DashboardApp() {
             charts={visibleChartsFor("Dashboard", pageCharts.Dashboard || [])}
             onShowData={setChartData}
             onDeleteChart={(chartId) => hideChart("Dashboard", chartId)}
+            onReorderChart={(sourceId, targetId) => reorderChart("Dashboard", sourceId, targetId)}
           />
         )}
 
@@ -510,6 +518,7 @@ export default function DashboardApp() {
             tasks={tasks.filter((task) => compareCities.includes(task.city))}
             onShowData={setChartData}
             onDeleteChart={(chartId) => hideChart("Compare", chartId)}
+            onReorderChart={(sourceId, targetId) => reorderChart("Compare", sourceId, targetId)}
           />
         )}
 
@@ -532,6 +541,7 @@ export default function DashboardApp() {
             setHighlightMissing={setHighlightMissing}
             onShowData={setChartData}
             onDeleteChart={(chartId) => hideChart("Master List", chartId)}
+            onReorderChart={(sourceId, targetId) => reorderChart("Master List", sourceId, targetId)}
             onOpenTask={setSelectedTask}
           />
         )}
@@ -541,7 +551,7 @@ export default function DashboardApp() {
         )}
 
         {activeTab === "Area" && (
-          <AreaPage cities={cities} selectedCity={areaCity} setSelectedCity={setAreaCity} areaRows={areaRows} charts={visibleChartsFor("Area", pageCharts.Area || [])} onShowData={setChartData} onDeleteChart={(chartId) => hideChart("Area", chartId)} />
+          <AreaPage cities={cities} selectedCity={areaCity} setSelectedCity={setAreaCity} areaRows={areaRows} charts={visibleChartsFor("Area", pageCharts.Area || [])} onShowData={setChartData} onDeleteChart={(chartId) => hideChart("Area", chartId)} onReorderChart={(sourceId, targetId) => reorderChart("Area", sourceId, targetId)} />
         )}
 
         {activeTab === "Activity" && <ActivityPage activity={activity} />}
@@ -559,6 +569,7 @@ export default function DashboardApp() {
             setExcelReportFormat={setExcelReportFormat}
             onShowData={setChartData}
             onDeleteChart={(chartId) => hideChart("Report", chartId)}
+            onReorderChart={(sourceId, targetId) => reorderChart("Report", sourceId, targetId)}
             onExportPdf={exportPdf}
             onExportExcel={() => exportExcelReport(reportTasks)}
           />
@@ -609,7 +620,8 @@ function DashboardPage({
   sourceTasks,
   charts,
   onShowData,
-  onDeleteChart
+  onDeleteChart,
+  onReorderChart
 }: {
   filters: Filters;
   setFilters: (filters: Filters) => void;
@@ -617,13 +629,14 @@ function DashboardPage({
   charts: ChartDataset[];
   onShowData: (dataset: ChartDataset) => void;
   onDeleteChart: (chartId: string) => void;
+  onReorderChart: (sourceId: string, targetId: string) => void;
 }) {
   return (
     <section className="animate-fade-in space-y-5">
       <Panel>
         <FiltersPanel filters={filters} setFilters={setFilters} sourceTasks={sourceTasks} />
       </Panel>
-      <ChartGrid charts={charts} onShowData={onShowData} onDeleteChart={onDeleteChart} />
+      <ChartGrid charts={charts} onShowData={onShowData} onDeleteChart={onDeleteChart} onReorderChart={onReorderChart} />
     </section>
   );
 }
@@ -635,7 +648,8 @@ function ComparePage({
   charts,
   tasks,
   onShowData,
-  onDeleteChart
+  onDeleteChart,
+  onReorderChart
 }: {
   cities: string[];
   selectedCities: string[];
@@ -644,6 +658,7 @@ function ComparePage({
   tasks: TrackerTask[];
   onShowData: (dataset: ChartDataset) => void;
   onDeleteChart: (chartId: string) => void;
+  onReorderChart: (sourceId: string, targetId: string) => void;
 }) {
   const toggleCity = (city: string) => {
     setSelectedCities(selectedCities.includes(city) ? selectedCities.filter((item) => item !== city) : [...selectedCities, city]);
@@ -662,7 +677,7 @@ function ComparePage({
           </div>
         </div>
       </Panel>
-      <ChartGrid charts={charts} onShowData={onShowData} onDeleteChart={onDeleteChart} />
+      <ChartGrid charts={charts} onShowData={onShowData} onDeleteChart={onDeleteChart} onReorderChart={onReorderChart} />
       <TaskTable tasks={tasks.slice(0, 40)} onOpenTask={() => undefined} highlightMissing={false} />
     </section>
   );
@@ -686,6 +701,7 @@ function MasterListPage({
   setHighlightMissing,
   onShowData,
   onDeleteChart,
+  onReorderChart,
   onOpenTask
 }: {
   filters: Filters;
@@ -705,6 +721,7 @@ function MasterListPage({
   setHighlightMissing: (value: boolean) => void;
   onShowData: (dataset: ChartDataset) => void;
   onDeleteChart: (chartId: string) => void;
+  onReorderChart: (sourceId: string, targetId: string) => void;
   onOpenTask: (task: TrackerTask) => void;
 }) {
   return (
@@ -712,7 +729,7 @@ function MasterListPage({
       <Panel>
         <FiltersPanel filters={filters} setFilters={setFilters} sourceTasks={sourceTasks} />
       </Panel>
-      <ChartGrid charts={charts} onShowData={onShowData} onDeleteChart={onDeleteChart} />
+      <ChartGrid charts={charts} onShowData={onShowData} onDeleteChart={onDeleteChart} onReorderChart={onReorderChart} />
       <Panel>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <SelectField label="Group by" value={groupBy} options={["none", ...MASTER_FIELDS]} onChange={(value) => setGroupBy(value as SortKey | "none")} />
@@ -789,7 +806,8 @@ function AreaPage({
   areaRows,
   charts,
   onShowData,
-  onDeleteChart
+  onDeleteChart,
+  onReorderChart
 }: {
   cities: string[];
   selectedCity: string;
@@ -798,11 +816,12 @@ function AreaPage({
   charts: ChartDataset[];
   onShowData: (dataset: ChartDataset) => void;
   onDeleteChart: (chartId: string) => void;
+  onReorderChart: (sourceId: string, targetId: string) => void;
 }) {
   return (
     <section className="animate-fade-in space-y-5">
       <Panel><SelectField label="Select city" value={selectedCity} options={cities} onChange={setSelectedCity} /></Panel>
-      <ChartGrid charts={charts} onShowData={onShowData} onDeleteChart={onDeleteChart} />
+      <ChartGrid charts={charts} onShowData={onShowData} onDeleteChart={onDeleteChart} onReorderChart={onReorderChart} />
       <Panel>
         <Table rows={areaRows.map((row) => ({
           Area: row.area,
@@ -852,6 +871,7 @@ function ReportPage({
   setExcelReportFormat,
   onShowData,
   onDeleteChart,
+  onReorderChart,
   onExportPdf,
   onExportExcel
 }: {
@@ -866,6 +886,7 @@ function ReportPage({
   setExcelReportFormat: (format: ExcelReportFormat) => void;
   onShowData: (dataset: ChartDataset) => void;
   onDeleteChart: (chartId: string) => void;
+  onReorderChart: (sourceId: string, targetId: string) => void;
   onExportPdf: (rows: TrackerTask[]) => void;
   onExportExcel: () => void;
 }) {
@@ -880,7 +901,7 @@ function ReportPage({
           <button className="btn-secondary justify-center" onClick={onExportExcel}><FileSpreadsheet size={16} /> Export Excel</button>
         </div>
       </Panel>
-      {reportFormat !== "Tables only" && <ChartGrid charts={charts} onShowData={onShowData} onDeleteChart={onDeleteChart} />}
+      {reportFormat !== "Tables only" && <ChartGrid charts={charts} onShowData={onShowData} onDeleteChart={onDeleteChart} onReorderChart={onReorderChart} />}
       {reportFormat !== "Charts only" && <TaskTable tasks={reportTasks} onOpenTask={() => undefined} highlightMissing={false} />}
     </section>
   );
@@ -998,15 +1019,65 @@ function FiltersPanel({ filters, setFilters, sourceTasks }: { filters: Filters; 
   );
 }
 
-function ChartGrid({ charts, onShowData, onDeleteChart }: { charts: ChartDataset[]; onShowData: (dataset: ChartDataset) => void; onDeleteChart: (chartId: string) => void }) {
+function ChartGrid({
+  charts,
+  onShowData,
+  onDeleteChart,
+  onReorderChart
+}: {
+  charts: ChartDataset[];
+  onShowData: (dataset: ChartDataset) => void;
+  onDeleteChart: (chartId: string) => void;
+  onReorderChart: (sourceId: string, targetId: string) => void;
+}) {
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const startDrag = (event: DragEvent<HTMLButtonElement>, chartId: string) => {
+    setDraggingId(chartId);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", chartId);
+  };
+  const dropOnChart = (event: DragEvent<HTMLElement>, targetId: string) => {
+    event.preventDefault();
+    const sourceId = draggingId || event.dataTransfer.getData("text/plain");
+    if (sourceId && sourceId !== targetId) onReorderChart(sourceId, targetId);
+    setDraggingId(null);
+  };
+
   return (
     <section className="chart-masonry min-w-0">
-      {charts.map((chart) => <ChartCard key={chart.id} dataset={chart} onShowData={onShowData} onDeleteChart={onDeleteChart} />)}
+      {charts.map((chart) => (
+        <ChartCard
+          key={chart.id}
+          dataset={chart}
+          isDragging={draggingId === chart.id}
+          onDragStart={(event) => startDrag(event, chart.id)}
+          onDragEnd={() => setDraggingId(null)}
+          onDropChart={(event) => dropOnChart(event, chart.id)}
+          onShowData={onShowData}
+          onDeleteChart={onDeleteChart}
+        />
+      ))}
     </section>
   );
 }
 
-function ChartCard({ dataset, onShowData, onDeleteChart }: { dataset: ChartDataset; onShowData: (dataset: ChartDataset) => void; onDeleteChart: (chartId: string) => void }) {
+function ChartCard({
+  dataset,
+  isDragging,
+  onDragStart,
+  onDragEnd,
+  onDropChart,
+  onShowData,
+  onDeleteChart
+}: {
+  dataset: ChartDataset;
+  isDragging: boolean;
+  onDragStart: (event: DragEvent<HTMLButtonElement>) => void;
+  onDragEnd: () => void;
+  onDropChart: (event: DragEvent<HTMLElement>) => void;
+  onShowData: (dataset: ChartDataset) => void;
+  onDeleteChart: (chartId: string) => void;
+}) {
   const [chartKind, setChartKind] = useState<ChartKind>(dataset.defaultKind);
   const [collapsed, setCollapsed] = useState(false);
   const [bodyMounted, setBodyMounted] = useState(true);
@@ -1042,10 +1113,19 @@ function ChartCard({ dataset, onShowData, onDeleteChart }: { dataset: ChartDatas
   };
 
   return (
-    <article className="chart-card group motion-card min-w-0 overflow-visible rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft">
+    <article
+      className={`chart-card group motion-card min-w-0 overflow-visible rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft ${isDragging ? "chart-card-dragging" : ""}`}
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+      }}
+      onDrop={onDropChart}
+    >
       <div className="relative min-w-0 p-3 pr-28 sm:p-4 sm:pr-36 lg:pr-64">
         <div className="flex min-w-0 items-center gap-2">
-          <GripVertical className="hidden flex-none text-[var(--color-border)] sm:block" size={16} />
+          <button className="drag-handle hidden flex-none sm:inline-flex" draggable onDragStart={onDragStart} onDragEnd={onDragEnd} aria-label={`Move ${dataset.title}`} title="Drag to reorder chart">
+            <GripVertical size={16} />
+          </button>
           <h2 className="section-title break-words">{dataset.title}</h2>
         </div>
         <div className="chart-hover-toolbar absolute right-3 top-3 flex flex-none items-start gap-1 sm:right-4 sm:top-4">
@@ -1993,6 +2073,25 @@ function compactCharts(charts: ChartDataset[]) {
 
 function chartsForTab(tab: TabId, charts: Partial<Record<TabId, ChartDataset[]>>) {
   return charts[tab] || [];
+}
+
+function orderCharts(charts: ChartDataset[], order: string[]) {
+  if (!order.length) return charts;
+  const byId = new Map(charts.map((chart) => [chart.id, chart]));
+  const ordered = order.map((id) => byId.get(id)).filter(Boolean) as ChartDataset[];
+  const unseen = charts.filter((chart) => !order.includes(chart.id));
+  return [...ordered, ...unseen];
+}
+
+function moveChartId(sourceId: string, targetId: string, currentOrder: string[], availableIds: string[]) {
+  const merged = [...currentOrder, ...availableIds.filter((id) => !currentOrder.includes(id))].filter((id) => availableIds.includes(id));
+  const sourceIndex = merged.indexOf(sourceId);
+  const targetIndex = merged.indexOf(targetId);
+  if (sourceIndex < 0 || targetIndex < 0) return merged;
+  const next = [...merged];
+  const [moved] = next.splice(sourceIndex, 1);
+  next.splice(targetIndex, 0, moved);
+  return next;
 }
 
 function progressRow(label: string, rows: TrackerTask[]): ChartRow {
