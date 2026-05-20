@@ -6,7 +6,6 @@ import {
   Activity,
   BarChart3,
   CalendarClock,
-  ChevronDown,
   Download,
   FileSpreadsheet,
   FileText,
@@ -46,6 +45,7 @@ import type { AttachmentReference, TrackerTask, VendorEntry } from "@/lib/ashara
 
 type TabId = "Dashboard" | "Compare" | "Master List" | "Contacts" | "Area" | "Activity" | "Report" | "Timeline";
 type ReportFormat = "Charts only" | "Tables only" | "Both charts and tables";
+type ExcelReportFormat = "Table only" | "Table with chart summaries";
 type SortKey = "city" | "workstream" | "taskName" | "zoneArea" | "taskOwner" | "status" | "progress" | "dueDate" | "riskLevel";
 
 type Filters = {
@@ -93,11 +93,14 @@ type ChartRow = {
 };
 
 type ChartDataset = {
+  id: string;
   title: string;
   rows: ChartRow[];
+  sourceRows: Array<Record<string, string | number>>;
+  defaultKind: ChartKind;
   suffix?: string;
 };
-type ChartKind = "Bar" | "Pie" | "Donut";
+type ChartKind = "Bar" | "Line" | "Pie" | "Donut" | "Progress";
 
 const STORAGE_TASKS_KEY = "ashara-it-readiness-tasks";
 const STORAGE_CITIES_KEY = "ashara-it-readiness-cities";
@@ -148,6 +151,8 @@ export default function DashboardApp() {
   const [cityDraft, setCityDraft] = useState("");
   const [highlightMissing, setHighlightMissing] = useState(true);
   const [chartData, setChartData] = useState<ChartDataset | null>(null);
+  const [chartSettingsTab, setChartSettingsTab] = useState<TabId | null>(null);
+  const [hiddenChartIds, setHiddenChartIds] = useState<Record<string, string[]>>({});
   const [compareCities, setCompareCities] = useState<string[]>(INITIAL_CITIES.slice(0, 3));
   const [areaCity, setAreaCity] = useState(INITIAL_CITIES[0]);
   const [masterGroup, setMasterGroup] = useState<SortKey | "none">("city");
@@ -156,6 +161,7 @@ export default function DashboardApp() {
   const [sortAsc, setSortAsc] = useState(true);
   const [contactDraft, setContactDraft] = useState<Contact>(() => blankContact(INITIAL_CITIES[0]));
   const [reportFormat, setReportFormat] = useState<ReportFormat>("Both charts and tables");
+  const [excelReportFormat, setExcelReportFormat] = useState<ExcelReportFormat>("Table only");
   const [hydrated, setHydrated] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -187,12 +193,26 @@ export default function DashboardApp() {
   const filteredTasks = useMemo(() => applyFilters(tasks, filters), [filters, tasks]);
   const reportTasks = useMemo(() => applyFilters(tasks, reportFilters), [reportFilters, tasks]);
   const cityStats = useMemo(() => getCityStats(tasks, cities), [cities, tasks]);
-  const dashboardCharts = useMemo(() => buildDashboardCharts(filteredTasks, cityStats), [cityStats, filteredTasks]);
+  const filteredCityStats = useMemo(() => getCityStats(filteredTasks, cities), [cities, filteredTasks]);
+  const dashboardCharts = useMemo(() => buildDashboardCharts(filteredTasks, filteredCityStats), [filteredCityStats, filteredTasks]);
   const compareCharts = useMemo(() => buildCompareCharts(tasks, compareCities), [compareCities, tasks]);
+  const masterCharts = useMemo(() => buildTaskCharts(filteredTasks, "master"), [filteredTasks]);
   const areaRows = useMemo(() => getAreaRows(tasks.filter((task) => task.city === areaCity)), [areaCity, tasks]);
-  const areaCharts = useMemo(() => buildAreaCharts(areaRows), [areaRows]);
+  const areaCharts = useMemo(() => buildAreaCharts(areaRows, tasks.filter((task) => task.city === areaCity)), [areaRows, areaCity, tasks]);
   const reportCharts = useMemo(() => buildDashboardCharts(reportTasks, getCityStats(reportTasks, cities)), [cities, reportTasks]);
   const sortedMasterTasks = useMemo(() => sortTasks(filteredTasks, sortKey, sortAsc), [filteredTasks, sortAsc, sortKey]);
+  const pageCharts = useMemo(
+    () => ({
+      Dashboard: dashboardCharts,
+      Compare: compareCharts,
+      "Master List": masterCharts,
+      Area: areaCharts,
+      Report: reportCharts
+    }),
+    [areaCharts, compareCharts, dashboardCharts, masterCharts, reportCharts]
+  );
+  const chartsForActiveTab = chartsForTab(activeTab, pageCharts);
+  const visibleChartsFor = (tab: TabId, charts: ChartDataset[]) => charts.filter((chart) => !(hiddenChartIds[tab] || []).includes(chart.id));
 
   const logActivity = (action: string, item: string, details: string) => {
     setActivity((current) => [createActivity(action, item, details), ...current].slice(0, 250));
@@ -282,9 +302,9 @@ export default function DashboardApp() {
     logActivity("Report exported", label, `${rows.length} task row(s) exported as CSV.`);
   };
 
-  const exportExcel = (rows: TrackerTask[], label: string) => {
-    downloadExcel(tasksToRows(rows), `ashara-it-${label}.xls`);
-    logActivity("Report exported", label, `${rows.length} task row(s) exported as Excel.`);
+  const exportExcelReport = (rows: TrackerTask[]) => {
+    downloadExcelReport(rows, reportCharts, excelReportFormat, "ashara-it-report.xls");
+    logActivity("Report exported", "Excel report", `${rows.length} task row(s), ${excelReportFormat}.`);
   };
 
   const exportPdf = (rows: TrackerTask[]) => {
@@ -343,6 +363,9 @@ export default function DashboardApp() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
+              {chartsForActiveTab.length > 0 && (
+                <button className="btn-secondary" onClick={() => setChartSettingsTab(activeTab)}><BarChart3 size={16} /> Chart Settings</button>
+              )}
               <button className="btn-primary" onClick={() => setSelectedTask(createBlankTask(cities[0] ?? "Nairobi"))}><Plus size={16} /> Add Task</button>
               <button className="btn-secondary" onClick={() => exportTaskCsv(filteredTasks, "visible-tasks")}><Download size={16} /> Export CSV</button>
               <button className="btn-secondary" onClick={() => importInputRef.current?.click()}><Upload size={16} /> Import CSV</button>
@@ -360,7 +383,7 @@ export default function DashboardApp() {
             filters={filters}
             setFilters={setFilters}
             sourceTasks={tasks}
-            charts={dashboardCharts}
+            charts={visibleChartsFor("Dashboard", dashboardCharts)}
             onShowData={setChartData}
           />
         )}
@@ -370,7 +393,7 @@ export default function DashboardApp() {
             cities={cities}
             selectedCities={compareCities}
             setSelectedCities={setCompareCities}
-            charts={compareCharts}
+            charts={visibleChartsFor("Compare", compareCharts)}
             tasks={tasks.filter((task) => compareCities.includes(task.city))}
             onShowData={setChartData}
           />
@@ -382,6 +405,7 @@ export default function DashboardApp() {
             setFilters={setFilters}
             sourceTasks={tasks}
             tasks={sortedMasterTasks}
+            charts={visibleChartsFor("Master List", masterCharts)}
             groupBy={masterGroup}
             setGroupBy={setMasterGroup}
             subgroupBy={masterSubgroup}
@@ -392,6 +416,7 @@ export default function DashboardApp() {
             setSortAsc={setSortAsc}
             highlightMissing={highlightMissing}
             setHighlightMissing={setHighlightMissing}
+            onShowData={setChartData}
             onOpenTask={setSelectedTask}
           />
         )}
@@ -401,7 +426,7 @@ export default function DashboardApp() {
         )}
 
         {activeTab === "Area" && (
-          <AreaPage cities={cities} selectedCity={areaCity} setSelectedCity={setAreaCity} areaRows={areaRows} charts={areaCharts} onShowData={setChartData} />
+          <AreaPage cities={cities} selectedCity={areaCity} setSelectedCity={setAreaCity} areaRows={areaRows} charts={visibleChartsFor("Area", areaCharts)} onShowData={setChartData} />
         )}
 
         {activeTab === "Activity" && <ActivityPage activity={activity} />}
@@ -412,12 +437,14 @@ export default function DashboardApp() {
             setFilters={setReportFilters}
             sourceTasks={tasks}
             reportTasks={reportTasks}
-            charts={reportCharts}
+            charts={visibleChartsFor("Report", reportCharts)}
             reportFormat={reportFormat}
             setReportFormat={setReportFormat}
+            excelReportFormat={excelReportFormat}
+            setExcelReportFormat={setExcelReportFormat}
             onShowData={setChartData}
             onExportPdf={exportPdf}
-            onExportExcel={() => exportExcel(reportTasks, "report")}
+            onExportExcel={() => exportExcelReport(reportTasks)}
           />
         )}
 
@@ -436,6 +463,15 @@ export default function DashboardApp() {
         <TaskEditor task={selectedTask} cities={cities} onSave={upsertTask} onClose={() => setSelectedTask(null)} onDelete={deleteTask} />
       )}
       {chartData && <DataModal dataset={chartData} onClose={() => setChartData(null)} />}
+      {chartSettingsTab && (
+        <ChartSettingsModal
+          tab={chartSettingsTab}
+          charts={chartsForTab(chartSettingsTab, pageCharts)}
+          hiddenIds={hiddenChartIds[chartSettingsTab] || []}
+          onChange={(nextHidden) => setHiddenChartIds((current) => ({ ...current, [chartSettingsTab]: nextHidden }))}
+          onClose={() => setChartSettingsTab(null)}
+        />
+      )}
     </main>
   );
 }
@@ -506,6 +542,7 @@ function MasterListPage({
   setFilters,
   sourceTasks,
   tasks,
+  charts,
   groupBy,
   setGroupBy,
   subgroupBy,
@@ -516,12 +553,14 @@ function MasterListPage({
   setSortAsc,
   highlightMissing,
   setHighlightMissing,
+  onShowData,
   onOpenTask
 }: {
   filters: Filters;
   setFilters: (filters: Filters) => void;
   sourceTasks: TrackerTask[];
   tasks: TrackerTask[];
+  charts: ChartDataset[];
   groupBy: SortKey | "none";
   setGroupBy: (value: SortKey | "none") => void;
   subgroupBy: SortKey | "none";
@@ -532,6 +571,7 @@ function MasterListPage({
   setSortAsc: (value: boolean) => void;
   highlightMissing: boolean;
   setHighlightMissing: (value: boolean) => void;
+  onShowData: (dataset: ChartDataset) => void;
   onOpenTask: (task: TrackerTask) => void;
 }) {
   return (
@@ -539,6 +579,7 @@ function MasterListPage({
       <Panel>
         <FiltersPanel filters={filters} setFilters={setFilters} sourceTasks={sourceTasks} />
       </Panel>
+      <ChartGrid charts={charts} onShowData={onShowData} />
       <Panel>
         <div className="grid gap-3 md:grid-cols-5">
           <SelectField label="Group by" value={groupBy} options={["none", ...MASTER_FIELDS]} onChange={(value) => setGroupBy(value as SortKey | "none")} />
@@ -672,6 +713,8 @@ function ReportPage({
   charts,
   reportFormat,
   setReportFormat,
+  excelReportFormat,
+  setExcelReportFormat,
   onShowData,
   onExportPdf,
   onExportExcel
@@ -683,6 +726,8 @@ function ReportPage({
   charts: ChartDataset[];
   reportFormat: ReportFormat;
   setReportFormat: (format: ReportFormat) => void;
+  excelReportFormat: ExcelReportFormat;
+  setExcelReportFormat: (format: ExcelReportFormat) => void;
   onShowData: (dataset: ChartDataset) => void;
   onExportPdf: (rows: TrackerTask[]) => void;
   onExportExcel: () => void;
@@ -691,8 +736,9 @@ function ReportPage({
     <section className="animate-fade-in space-y-5">
       <Panel>
         <FiltersPanel filters={filters} setFilters={setFilters} sourceTasks={sourceTasks} />
-        <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
+        <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_auto_auto] lg:items-end">
           <SelectField label="Report format" value={reportFormat} options={["Charts only", "Tables only", "Both charts and tables"]} onChange={(value) => setReportFormat(value as ReportFormat)} />
+          <SelectField label="Excel export" value={excelReportFormat} options={["Table only", "Table with chart summaries"]} onChange={(value) => setExcelReportFormat(value as ExcelReportFormat)} />
           <button className="btn-primary justify-center" onClick={() => onExportPdf(reportTasks)}><FileText size={16} /> Export PDF</button>
           <button className="btn-secondary justify-center" onClick={onExportExcel}><FileSpreadsheet size={16} /> Export Excel</button>
         </div>
@@ -821,28 +867,40 @@ function FiltersPanel({ filters, setFilters, sourceTasks }: { filters: Filters; 
 function ChartGrid({ charts, onShowData }: { charts: ChartDataset[]; onShowData: (dataset: ChartDataset) => void }) {
   return (
     <section className="grid gap-5 xl:grid-cols-3">
-      {charts.map((chart) => <ChartCard key={chart.title} dataset={chart} onShowData={onShowData} />)}
+      {charts.map((chart) => <ChartCard key={chart.id} dataset={chart} onShowData={onShowData} />)}
     </section>
   );
 }
 
 function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData: (dataset: ChartDataset) => void }) {
-  const [chartKind, setChartKind] = useState<ChartKind>("Bar");
+  const [chartKind, setChartKind] = useState<ChartKind>(dataset.defaultKind);
+  const [collapsed, setCollapsed] = useState(false);
+
+  const resetChart = () => {
+    setChartKind(dataset.defaultKind);
+    setCollapsed(false);
+  };
 
   return (
     <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-soft">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <h2 className="section-title">{dataset.title}</h2>
         <div className="flex flex-wrap gap-2">
-          {(["Bar", "Pie", "Donut"] as ChartKind[]).map((kind) => (
-            <button key={kind} className={`chart-toggle ${chartKind === kind ? "chart-toggle-active" : ""}`} onClick={() => setChartKind(kind)}>
-              {kind}
-            </button>
-          ))}
-          <button className="btn-compact" onClick={() => onShowData(dataset)}>Data</button>
+          <select className="chart-select" value={chartKind} onChange={(event) => setChartKind(event.target.value as ChartKind)}>
+            <option value="Bar">Bar chart</option>
+            <option value="Line">Line chart</option>
+            <option value="Pie">Pie chart</option>
+            <option value="Donut">Donut chart</option>
+            <option value="Progress">Progress bars</option>
+          </select>
+          <button className="btn-compact" onClick={() => onShowData(dataset)}>View data</button>
+          <button className="btn-compact" onClick={() => downloadChartVisual(dataset, chartKind, "png")}>PNG</button>
+          <button className="btn-compact" onClick={() => downloadChartVisual(dataset, chartKind, "pdf")}>PDF</button>
+          <button className="btn-compact" onClick={resetChart}>Reset</button>
+          <button className="btn-compact" onClick={() => setCollapsed((value) => !value)}>{collapsed ? "Expand" : "Collapse"}</button>
         </div>
       </div>
-      <ChartVisual dataset={dataset} chartKind={chartKind} />
+      {!collapsed && <ChartVisual dataset={dataset} chartKind={chartKind} />}
     </article>
   );
 }
@@ -850,14 +908,14 @@ function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData:
 function ChartVisual({ dataset, chartKind }: { dataset: ChartDataset; chartKind: ChartKind }) {
   if (dataset.rows.length === 0) return <p className="mt-4 text-sm text-[var(--color-text-muted)]">No chart data available.</p>;
   if (chartKind === "Pie" || chartKind === "Donut") return <PieLikeChart dataset={dataset} chartKind={chartKind} />;
+  if (chartKind === "Line") return <LineChartVisual dataset={dataset} />;
 
   return (
     <div className="mt-4 space-y-3">
       {dataset.rows.map((row) => (
-        <div key={row.label} className="space-y-1">
+        <div key={row.label} className="space-y-1" title={`${row.label}: ${row.value}${dataset.suffix || ""} (${row.percent}%)`}>
           <div className="flex items-center justify-between gap-3 text-sm">
             <span className="truncate text-[var(--color-text-muted)]">{row.label}</span>
-            <span className="font-semibold text-[var(--color-primary)]">{row.value}{dataset.suffix}</span>
           </div>
           <ProgressBar value={row.percent} tone={row.status} />
         </div>
@@ -866,32 +924,67 @@ function ChartVisual({ dataset, chartKind }: { dataset: ChartDataset; chartKind:
   );
 }
 
+function LineChartVisual({ dataset }: { dataset: ChartDataset }) {
+  const width = 560;
+  const height = 220;
+  const padding = 28;
+  const maxValue = Math.max(1, ...dataset.rows.map((row) => row.value));
+  const points = dataset.rows.map((row, index) => {
+    const x = dataset.rows.length === 1 ? width / 2 : padding + (index / (dataset.rows.length - 1)) * (width - padding * 2);
+    const y = height - padding - (row.value / maxValue) * (height - padding * 2);
+    return { x, y, row };
+  });
+
+  return (
+    <div className="mt-4 overflow-x-auto">
+      <svg className="min-w-[520px]" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={dataset.title}>
+        <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="var(--color-border)" strokeWidth="2" />
+        <polyline points={points.map((point) => `${point.x},${point.y}`).join(" ")} fill="none" stroke="var(--color-secondary)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((point, index) => (
+          <circle key={`${point.row.label}-${index}`} cx={point.x} cy={point.y} r="5" fill={chartColor(point.row, index)}>
+            <title>{`${point.row.label}: ${point.row.value}${dataset.suffix || ""} (${point.row.percent}%)`}</title>
+          </circle>
+        ))}
+      </svg>
+      <ChartLegend rows={dataset.rows} />
+    </div>
+  );
+}
+
 function PieLikeChart({ dataset, chartKind }: { dataset: ChartDataset; chartKind: "Pie" | "Donut" }) {
   const rows = dataset.rows.filter((row) => row.value > 0 || row.percent > 0);
   const gradient = conicGradient(rows.length ? rows : dataset.rows);
-  const total = dataset.rows.reduce((sum, row) => sum + row.value, 0);
 
   return (
     <div className="mt-4 grid gap-4 md:grid-cols-[180px_1fr] md:items-center">
       <div className="mx-auto flex h-44 w-44 items-center justify-center rounded-full border border-[var(--color-border)] shadow-inner" style={{ background: gradient }}>
         {chartKind === "Donut" && (
-          <div className="flex h-24 w-24 flex-col items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-card)] text-center">
-            <span className="text-xs font-semibold uppercase text-[var(--color-text-muted)]">Total</span>
-            <span className="text-xl font-semibold text-[var(--color-primary)]">{total}</span>
-          </div>
+          <div className="h-24 w-24 rounded-full border border-[var(--color-border)] bg-[var(--color-card)]" aria-hidden="true" />
         )}
       </div>
       <div className="space-y-2">
         {dataset.rows.map((row, index) => (
-          <div key={row.label} className="flex items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm">
+          <div key={row.label} className="flex items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm" title={`${row.label}: ${row.value}${dataset.suffix || ""} (${row.percent}%)`}>
             <span className="flex min-w-0 items-center gap-2">
               <span className="h-3 w-3 flex-none rounded-full" style={{ background: chartColor(row, index) }} />
               <span className="truncate text-[var(--color-text-muted)]">{row.label}</span>
             </span>
-            <span className="font-semibold text-[var(--color-primary)]">{row.value}{dataset.suffix}</span>
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function ChartLegend({ rows }: { rows: ChartRow[] }) {
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      {rows.map((row, index) => (
+        <span key={row.label} className="inline-flex items-center gap-2 rounded-full bg-[var(--color-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--color-text-muted)]" title={`${row.label}: ${row.value} (${row.percent}%)`}>
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: chartColor(row, index) }} />
+          {row.label}
+        </span>
+      ))}
     </div>
   );
 }
@@ -1089,6 +1182,9 @@ function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: Tracker
 }
 
 function DataModal({ dataset, onClose }: { dataset: ChartDataset; onClose: () => void }) {
+  const summaryRows = dataset.rows.map((row) => ({ Label: row.label, Value: row.value, Percent: `${row.percent}%`, Status: row.status || "" }));
+  const sourceRows = dataset.sourceRows;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B4F3A]/35 p-4">
       <div className="max-h-[86vh] w-full max-w-3xl overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl">
@@ -1097,7 +1193,59 @@ function DataModal({ dataset, onClose }: { dataset: ChartDataset; onClose: () =>
           <button className="icon-btn" onClick={onClose}><X size={18} /></button>
         </div>
         <div className="max-h-[70vh] overflow-auto p-4">
-          <Table rows={dataset.rows.map((row) => ({ Label: row.label, Value: row.value, Percent: `${row.percent}%`, Status: row.status || "" }))} />
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button className="btn-compact" onClick={() => downloadCsv(sourceRows.length ? sourceRows : summaryRows, `${slug(dataset.title)}-source.csv`)}>CSV</button>
+            <button className="btn-compact" onClick={() => downloadExcel(sourceRows.length ? sourceRows : summaryRows, `${slug(dataset.title)}-source.xls`)}>Excel</button>
+            <button className="btn-compact" onClick={() => openTablePdf(dataset.title, sourceRows.length ? sourceRows : summaryRows)}>PDF</button>
+          </div>
+          <h3 className="mb-2 text-sm font-semibold text-[var(--color-primary)]">Chart summary</h3>
+          <Table rows={summaryRows} />
+          {sourceRows.length > 0 && (
+            <>
+              <h3 className="mb-2 mt-4 text-sm font-semibold text-[var(--color-primary)]">Filtered source tasks</h3>
+              <Table rows={sourceRows} />
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChartSettingsModal({
+  tab,
+  charts,
+  hiddenIds,
+  onChange,
+  onClose
+}: {
+  tab: TabId;
+  charts: ChartDataset[];
+  hiddenIds: string[];
+  onChange: (hiddenIds: string[]) => void;
+  onClose: () => void;
+}) {
+  const toggleChart = (chartId: string) => {
+    onChange(hiddenIds.includes(chartId) ? hiddenIds.filter((id) => id !== chartId) : [...hiddenIds, chartId]);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B4F3A]/35 p-4">
+      <div className="w-full max-w-xl rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[var(--color-border)] p-4">
+          <div>
+            <h2 className="section-title">Chart settings</h2>
+            <p className="text-sm text-[var(--color-text-muted)]">{tab}</p>
+          </div>
+          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
+        </div>
+        <div className="space-y-3 p-4">
+          {charts.map((chart) => (
+            <label key={chart.id} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3 text-sm font-semibold text-[var(--color-primary)]">
+              <span>{chart.title}</span>
+              <input type="checkbox" checked={!hiddenIds.includes(chart.id)} onChange={() => toggleChart(chart.id)} />
+            </label>
+          ))}
         </div>
       </div>
     </div>
@@ -1167,6 +1315,52 @@ function Table({ rows }: { rows: Array<Record<string, string | number>> }) {
 function ProgressBar({ value, compact = false, tone }: { value: number; compact?: boolean; tone?: ChartRow["status"] }) {
   const color = tone === "critical" ? "bg-[var(--color-important)]" : tone === "warning" ? "bg-[var(--color-accent)]" : tone === "muted" ? "bg-[#9CA3AF]" : "bg-[var(--color-secondary)]";
   return <div className={`overflow-hidden rounded-full bg-[var(--color-accent-light)] ${compact ? "h-2" : "h-2.5"}`}><div className={`h-full rounded-full ${color}`} style={{ width: `${clamp(value, 0, 100)}%` }} /></div>;
+}
+
+function chartSvg(dataset: ChartDataset, chartKind: ChartKind) {
+  const rows = dataset.rows;
+  const width = 900;
+  const chartRows = rows.length ? rows : [{ label: "No data", value: 1, percent: 100, status: "muted" as const }];
+  const height = chartKind === "Bar" || chartKind === "Progress" ? Math.max(520, 130 + chartRows.length * 36) : 520;
+  const bars = chartRows.map((row, index) => {
+    const y = 86 + index * 34;
+    const barWidth = Math.max(4, row.percent * 5.8);
+    return `<text x="40" y="${y + 14}" font-size="14" fill="#6B7280">${escapeHtml(row.label)}</text><rect x="270" y="${y}" width="${barWidth}" height="18" rx="9" fill="${cssColor(chartColor(row, index))}"><title>${escapeHtml(`${row.label}: ${row.value}${dataset.suffix || ""} (${row.percent}%)`)}</title></rect>`;
+  }).join("");
+  const legend = chartRows.map((row, index) => `<circle cx="${40 + (index % 4) * 190}" cy="${height - 44 + Math.floor(index / 4) * 22}" r="6" fill="${cssColor(chartColor(row, index))}"/><text x="${52 + (index % 4) * 190}" y="${height - 39 + Math.floor(index / 4) * 22}" font-size="12" fill="#6B7280">${escapeHtml(row.label)}</text>`).join("");
+  const pie = `${pieSlicesSvg(chartRows, 450, 250, 130)}${chartKind === "Donut" ? '<circle cx="450" cy="250" r="72" fill="#FFFFFF" stroke="#E8DDC5"/>' : ""}${legend}`;
+  const linePoints = chartRows.map((row, index) => `${80 + (index / Math.max(1, chartRows.length - 1)) * 740},${410 - row.percent * 3}`).join(" ");
+  const line = `<polyline points="${linePoints}" fill="none" stroke="#2E7D5B" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>${chartRows.map((row, index) => `<circle cx="${80 + (index / Math.max(1, chartRows.length - 1)) * 740}" cy="${410 - row.percent * 3}" r="7" fill="${cssColor(chartColor(row, index))}"/>`).join("")}${legend}`;
+  const body = chartKind === "Pie" || chartKind === "Donut" ? pie : chartKind === "Line" ? line : bars;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#FAF7EF"/><rect x="20" y="20" width="${width - 40}" height="${height - 40}" rx="16" fill="#FFFFFF" stroke="#E8DDC5"/><text x="40" y="58" font-family="Arial" font-size="24" font-weight="700" fill="#0B4F3A">${escapeHtml(dataset.title)}</text>${body}</svg>`;
+}
+
+function downloadChartVisual(dataset: ChartDataset, chartKind: ChartKind, format: "png" | "pdf") {
+  const svg = chartSvg(dataset, chartKind);
+  if (format === "pdf") {
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`<!doctype html><html><head><title>${escapeHtml(dataset.title)}</title><style>@page{size:A4 portrait;margin:18mm}body{background:#FAF7EF;font-family:Arial,sans-serif}svg{max-width:100%;height:auto}</style></head><body>${svg}<script>window.print()</script></body></html>`);
+    win.document.close();
+    return;
+  }
+  const image = new Image();
+  const svgUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+  image.onload = () => {
+    const canvas = document.createElement("canvas");
+    const svgHeight = Number(svg.match(/height="(\d+)"/)?.[1] || 520);
+    canvas.width = 900;
+    canvas.height = svgHeight;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    context.drawImage(image, 0, 0);
+    URL.revokeObjectURL(svgUrl);
+    const link = document.createElement("a");
+    link.href = canvas.toDataURL("image/png");
+    link.download = `${slug(dataset.title)}.png`;
+    link.click();
+  };
+  image.src = svgUrl;
 }
 
 function StatusBadge({ status }: { status: TrackerTask["status"] }) {
@@ -1270,27 +1464,25 @@ function buildDashboardCharts(rows: TrackerTask[], cityStats: ReturnType<typeof 
   const completed = rows.filter(isClosed).length;
   const pending = rows.filter((task) => !isClosed(task) && task.status !== "Blocked").length;
   const delayed = rows.filter((task) => task.status === "Blocked" || isOverdue(task)).length;
-  return [
-    { title: "Overall progress", suffix: "%", rows: [{ label: "Average readiness", value: Math.round(rows.reduce((sum, task) => sum + task.progress, 0) / total), percent: Math.round(rows.reduce((sum, task) => sum + task.progress, 0) / total), status: "good" }] },
-    { title: "City-wise progress", suffix: "%", rows: cityStats.map((city) => ({ label: city.city, value: city.completion, percent: city.completion, status: city.health === "Critical" ? "critical" : city.health === "Good" ? "good" : "warning" })) },
-    { title: "Workstream-wise progress", suffix: "%", rows: WORKSTREAMS.map((workstream) => averageRow(workstream.name, rows.filter((task) => task.workstream === workstream.name))) },
-    { title: "Status distribution", rows: distribution(rows, "status") },
-    { title: "Task completion", rows: [{ label: "Completed", value: completed, percent: Math.round((completed / total) * 100), status: "good" }, { label: "Pending", value: pending, percent: Math.round((pending / total) * 100), status: "warning" }, { label: "Delayed", value: delayed, percent: Math.round((delayed / total) * 100), status: "critical" }] },
-    { title: "Due date health", rows: dueHealthRows(rows) }
-  ];
+  return compactCharts([
+    makeChart("overall-progress", "Overall progress", [{ label: "Average of task progress percentages", value: Math.round(rows.reduce((sum, task) => sum + task.progress, 0) / total), percent: Math.round(rows.reduce((sum, task) => sum + task.progress, 0) / total), status: "good" }], rows, "Progress", "%"),
+    makeChart("completed-vs-total", "Completed tasks vs total tasks", [{ label: "Completed", value: completed, percent: Math.round((completed / total) * 100), status: "good" }, { label: "Remaining", value: Math.max(0, rows.length - completed), percent: Math.round(((rows.length - completed) / total) * 100), status: "warning" }], rows, "Donut"),
+    makeChart("city-wise-progress", "City-wise progress", cityStats.map((city) => ({ label: city.city, value: city.completion, percent: city.completion, status: city.health === "Critical" ? "critical" : city.health === "Good" ? "good" : "warning" })), rows, "Bar", "%"),
+    ...buildTaskCharts(rows, "dashboard"),
+    makeChart("task-completion", "Task completion", [{ label: "Completed", value: completed, percent: Math.round((completed / total) * 100), status: "good" }, { label: "Pending", value: pending, percent: Math.round((pending / total) * 100), status: "warning" }, { label: "Delayed", value: delayed, percent: Math.round((delayed / total) * 100), status: "critical" }], rows, "Donut")
+  ]);
 }
 
 function buildCompareCharts(rows: TrackerTask[], cities: string[]): ChartDataset[] {
   const selected = rows.filter((task) => cities.includes(task.city));
   const stats = getCityStats(selected, cities);
-  return [
-    { title: "Overall progress by city", suffix: "%", rows: stats.map((city) => ({ label: city.city, value: city.completion, percent: city.completion, status: city.health === "Critical" ? "critical" : city.health === "Good" ? "good" : "warning" })) },
-    { title: "Task completion by city", rows: stats.map((city) => ({ label: city.city, value: city.completed, percent: city.total ? Math.round((city.completed / city.total) * 100) : 0, status: "good" })) },
-    { title: "Delayed items by city", rows: stats.map((city) => ({ label: city.city, value: city.delayed, percent: city.total ? Math.round((city.delayed / city.total) * 100) : 0, status: city.delayed ? "critical" : "good" })) },
-    { title: "Status distribution", rows: distribution(selected, "status") },
-    { title: "Due date performance", rows: dueHealthRows(selected) },
-    { title: "Workstream progress", suffix: "%", rows: WORKSTREAMS.map((workstream) => averageRow(workstream.name, selected.filter((task) => task.workstream === workstream.name))) }
-  ];
+  return compactCharts([
+    makeChart("compare-overall-progress", "Overall progress by city", stats.map((city) => ({ label: city.city, value: city.completion, percent: city.completion, status: city.health === "Critical" ? "critical" : city.health === "Good" ? "good" : "warning" })), selected, "Bar", "%"),
+    makeChart("compare-task-completion", "Task completion by city", stats.map((city) => ({ label: city.city, value: city.completed, percent: city.total ? Math.round((city.completed / city.total) * 100) : 0, status: "good" })), selected, "Bar"),
+    makeChart("compare-delayed-items", "Delayed items by city", stats.map((city) => ({ label: city.city, value: city.delayed, percent: city.total ? Math.round((city.delayed / city.total) * 100) : 0, status: city.delayed ? "critical" : "good" })), selected, "Bar"),
+    makeChart("compare-status-distribution", "Status distribution", distribution(selected, "status"), selected, "Donut"),
+    makeChart("compare-workstream-progress", "Workstream-wise progress", WORKSTREAMS.map((workstream) => averageRow(workstream.name, selected.filter((task) => task.workstream === workstream.name))), selected, "Bar", "%")
+  ]);
 }
 
 function getAreaRows(rows: TrackerTask[]) {
@@ -1310,12 +1502,24 @@ function getAreaRows(rows: TrackerTask[]) {
   });
 }
 
-function buildAreaCharts(rows: ReturnType<typeof getAreaRows>): ChartDataset[] {
-  return [
-    { title: "Area-wise progress", suffix: "%", rows: rows.map((row) => ({ label: row.area, value: row.progress, percent: row.progress, status: row.health === "Critical" ? "critical" : row.health === "Good" ? "good" : "warning" })) },
-    { title: "Area tasks", rows: rows.map((row) => ({ label: row.area, value: row.tasks, percent: Math.min(100, row.tasks * 8), status: "muted" })) },
-    { title: "Area due date health", rows: rows.map((row) => ({ label: row.area, value: row.overdue + row.dueSoon, percent: Math.min(100, (row.overdue + row.dueSoon) * 15), status: row.overdue ? "critical" : row.dueSoon ? "warning" : "good" })) }
-  ];
+function buildAreaCharts(rows: ReturnType<typeof getAreaRows>, sourceTasks: TrackerTask[]): ChartDataset[] {
+  return compactCharts([
+    makeChart("area-wise-completion", "Area-wise completion", rows.map((row) => ({ label: row.area, value: row.progress, percent: row.progress, status: row.health === "Critical" ? "critical" : row.health === "Good" ? "good" : "warning" })), sourceTasks, "Bar", "%"),
+    makeChart("area-wise-tasks", "Area-wise tasks", rows.map((row) => ({ label: row.area, value: row.tasks, percent: Math.min(100, row.tasks * 8), status: "muted" })), sourceTasks, "Bar"),
+    makeChart("area-workstream-coverage", "Area-wise workstream coverage", rows.map((row) => ({ label: row.area, value: row.workstreams, percent: Math.min(100, row.workstreams * 8), status: row.workstreams ? "good" : "muted" })), sourceTasks, "Bar")
+  ]);
+}
+
+function buildTaskCharts(rows: TrackerTask[], prefix: string): ChartDataset[] {
+  return compactCharts([
+    makeChart(`${prefix}-status-distribution`, "Status distribution", distribution(rows, "status"), rows, "Donut"),
+    makeChart(`${prefix}-workstream-wise-tasks`, "Workstream-wise tasks", distribution(rows, "workstream"), rows, "Bar"),
+    makeChart(`${prefix}-workstream-wise-progress`, "Workstream-wise progress", WORKSTREAMS.map((workstream) => averageRow(workstream.name, rows.filter((task) => task.workstream === workstream.name))), rows, "Bar", "%"),
+    makeChart(`${prefix}-area-wise-completion`, "Area-wise completion", ZONES.map((area) => averageRow(area, rows.filter((task) => task.zoneArea === area))), rows, "Bar", "%"),
+    makeChart(`${prefix}-priority-distribution`, "Priority distribution", distribution(rows, "priority"), rows, "Donut"),
+    makeChart(`${prefix}-risk-distribution`, "Risk distribution", distribution(rows, "riskLevel"), rows, "Donut"),
+    makeChart(`${prefix}-document-status`, "Document status distribution", distribution(rows, "documentStatus"), rows, "Donut")
+  ]);
 }
 
 function distribution<T extends keyof TrackerTask>(rows: TrackerTask[], key: T): ChartRow[] {
@@ -1328,21 +1532,28 @@ function distribution<T extends keyof TrackerTask>(rows: TrackerTask[], key: T):
   return Object.entries(counts).map(([label, value]) => ({ label, value, percent: Math.round((value / total) * 100), status: chartStatus(label) }));
 }
 
+function makeChart(id: string, title: string, rows: ChartRow[], sourceTasks: TrackerTask[], defaultKind: ChartKind, suffix?: string): ChartDataset {
+  return {
+    id,
+    title,
+    rows,
+    sourceRows: tasksToRows(sourceTasks),
+    defaultKind,
+    suffix
+  };
+}
+
+function compactCharts(charts: ChartDataset[]) {
+  return charts.filter((chart) => chart.sourceRows.length > 0 && chart.rows.length > 0);
+}
+
+function chartsForTab(tab: TabId, charts: Partial<Record<TabId, ChartDataset[]>>) {
+  return charts[tab] || [];
+}
+
 function averageRow(label: string, rows: TrackerTask[]): ChartRow {
   const value = rows.length ? Math.round(rows.reduce((sum, task) => sum + task.progress, 0) / rows.length) : 0;
   return { label, value, percent: value, status: value >= 80 ? "good" : value >= 40 ? "warning" : "critical" };
-}
-
-function dueHealthRows(rows: TrackerTask[]): ChartRow[] {
-  const total = Math.max(rows.length, 1);
-  const overdue = rows.filter(isOverdue).length;
-  const soon = rows.filter(isDueSoon).length;
-  const healthy = rows.filter((task) => !isOverdue(task) && !isDueSoon(task)).length;
-  return [
-    { label: "Healthy", value: healthy, percent: Math.round((healthy / total) * 100), status: "good" },
-    { label: "Due within 3 days", value: soon, percent: Math.round((soon / total) * 100), status: "warning" },
-    { label: "Overdue", value: overdue, percent: Math.round((overdue / total) * 100), status: "critical" }
-  ];
 }
 
 function missingFields(task: TrackerTask) {
@@ -1496,14 +1707,38 @@ function downloadExcel(rows: Array<Record<string, string | number>>, filename: s
   downloadBlob(html, filename, "application/vnd.ms-excel");
 }
 
+function downloadExcelReport(rows: TrackerTask[], charts: ChartDataset[], format: ExcelReportFormat, filename: string) {
+  const tableRows = tasksToRows(rows);
+  const keys = Object.keys(tableRows[0] || {});
+  const chartTables = format === "Table with chart summaries"
+    ? charts.map((chart) => {
+      const chartRows: Array<Record<string, string | number>> = chart.rows.map((row) => ({ Label: row.label, Value: row.value, Percent: `${row.percent}%`, Status: row.status || "" }));
+      const chartKeys = Object.keys(chartRows[0] || {});
+      return `<h2>${escapeHtml(chart.title)}</h2><table><thead><tr>${chartKeys.map((key) => `<th>${escapeHtml(key)}</th>`).join("")}</tr></thead><tbody>${chartRows.map((row) => `<tr>${chartKeys.map((key) => `<td>${escapeHtml(String(row[key] ?? ""))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    }).join("")
+    : "";
+  const taskTable = `<h2>Task table</h2><table><thead><tr>${keys.map((key) => `<th>${escapeHtml(key)}</th>`).join("")}</tr></thead><tbody>${tableRows.map((row) => `<tr>${keys.map((key) => `<td>${escapeHtml(String(row[key] ?? ""))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+  const html = `<html><head><meta charset="utf-8" /><style>body{font-family:Arial,sans-serif;color:#1F2933}h1,h2{color:#0B4F3A}table{border-collapse:collapse;margin-bottom:18px}th{background:#F3E7C3;color:#0B4F3A}td,th{border:1px solid #E8DDC5;padding:6px;vertical-align:top}</style></head><body><h1>Asharah Mubarak IT / Event Preparation Report</h1>${chartTables}${taskTable}</body></html>`;
+  downloadBlob(html, filename, "application/vnd.ms-excel");
+}
+
 function openPdfReport(rows: TrackerTask[], charts: ChartDataset[], format: ReportFormat) {
   const tableRows = tasksToRows(rows).slice(0, 200);
-  const chartHtml = charts.map((chart) => `<section class="card"><h2>${escapeHtml(chart.title)}</h2>${chart.rows.map((row) => `<div class="bar"><span>${escapeHtml(row.label)}</span><strong>${row.value}${chart.suffix || ""}</strong><i style="width:${row.percent}%"></i></div>`).join("")}</section>`).join("");
+  const chartHtml = charts.map((chart) => `<section class="card">${chartSvg(chart, chart.defaultKind)}</section>`).join("");
   const keys = Object.keys(tableRows[0] || {});
   const tableHtml = `<section class="card"><h2>Task table</h2><table><thead><tr>${keys.map((key) => `<th>${escapeHtml(key)}</th>`).join("")}</tr></thead><tbody>${tableRows.map((row) => `<tr>${keys.map((key) => `<td>${escapeHtml(String(row[key] ?? ""))}</td>`).join("")}</tr>`).join("")}</tbody></table></section>`;
   const win = window.open("", "_blank");
   if (!win) return;
   win.document.write(`<!doctype html><html><head><title>Asharah IT Report</title><style>@page{size:A4 portrait;margin:18mm}body{font-family:Arial,sans-serif;background:#FAF7EF;color:#1F2933}h1,h2{color:#0B4F3A}.card{background:#fff;border:1px solid #E8DDC5;border-radius:8px;padding:14px;margin:0 0 14px}.bar{position:relative;margin:10px 0;padding-bottom:8px;border-bottom:1px solid #E8DDC5}.bar span{display:inline-block;width:70%}.bar strong{float:right;color:#0B4F3A}.bar i{display:block;height:7px;background:#2E7D5B;border-radius:99px;margin-top:6px}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#F3E7C3;color:#0B4F3A}td,th{border:1px solid #E8DDC5;padding:5px;vertical-align:top}</style></head><body><h1>Asharah Mubarak IT / Event Preparation Report</h1><p>${new Date().toLocaleString()}</p>${format !== "Tables only" ? chartHtml : ""}${format !== "Charts only" ? tableHtml : ""}<script>window.print()</script></body></html>`);
+  win.document.close();
+}
+
+function openTablePdf(title: string, rows: Array<Record<string, string | number>>) {
+  const keys = Object.keys(rows[0] || {});
+  const tableHtml = `<table><thead><tr>${keys.map((key) => `<th>${escapeHtml(key)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${keys.map((key) => `<td>${escapeHtml(String(row[key] ?? ""))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.write(`<!doctype html><html><head><title>${escapeHtml(title)}</title><style>@page{size:A4 portrait;margin:18mm}body{font-family:Arial,sans-serif;background:#FAF7EF;color:#1F2933}h1{color:#0B4F3A}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#F3E7C3;color:#0B4F3A}td,th{border:1px solid #E8DDC5;padding:5px;vertical-align:top}</style></head><body><h1>${escapeHtml(title)}</h1>${tableHtml}<script>window.print()</script></body></html>`);
   win.document.close();
 }
 
@@ -1583,6 +1818,42 @@ function chartColor(row: ChartRow, index: number) {
   return palette[index % palette.length];
 }
 
+function pieSlicesSvg(rows: ChartRow[], cx: number, cy: number, radius: number) {
+  const total = rows.reduce((sum, row) => sum + Math.max(0, row.value || row.percent), 0);
+  if (!rows.length || total <= 0) return `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="#9CA3AF"/>`;
+  if (rows.length === 1) return `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="${cssColor(chartColor(rows[0], 0))}"><title>${escapeHtml(`${rows[0].label}: ${rows[0].value} (${rows[0].percent}%)`)}</title></circle>`;
+  let startAngle = -90;
+  return rows.map((row, index) => {
+    const sliceValue = Math.max(0, row.value || row.percent);
+    const endAngle = startAngle + (sliceValue / total) * 360;
+    const path = describePieSlice(cx, cy, radius, startAngle, endAngle);
+    startAngle = endAngle;
+    return `<path d="${path}" fill="${cssColor(chartColor(row, index))}"><title>${escapeHtml(`${row.label}: ${row.value} (${row.percent}%)`)}</title></path>`;
+  }).join("");
+}
+
+function describePieSlice(cx: number, cy: number, radius: number, startAngle: number, endAngle: number) {
+  const start = polarPoint(cx, cy, radius, endAngle);
+  const end = polarPoint(cx, cy, radius, startAngle);
+  const largeArc = endAngle - startAngle <= 180 ? "0" : "1";
+  return `M ${cx} ${cy} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 0 ${end.x} ${end.y} Z`;
+}
+
+function polarPoint(cx: number, cy: number, radius: number, angle: number) {
+  const radians = (angle * Math.PI) / 180;
+  return { x: cx + radius * Math.cos(radians), y: cy + radius * Math.sin(radians) };
+}
+
+function cssColor(value: string) {
+  const colors: Record<string, string> = {
+    "var(--color-primary)": "#0B4F3A",
+    "var(--color-secondary)": "#2E7D5B",
+    "var(--color-accent)": "#C9A227",
+    "var(--color-important)": "#7A1F2B"
+  };
+  return colors[value] || value;
+}
+
 function conicGradient(rows: ChartRow[]) {
   const total = rows.reduce((sum, row) => sum + Math.max(0, row.value || row.percent), 0);
   if (!rows.length || total <= 0) return "conic-gradient(#9CA3AF 0deg 360deg)";
@@ -1623,6 +1894,10 @@ function clamp(value: number, min: number, max: number) {
 
 function escapeCsv(value: string) {
   return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+function slug(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "chart";
 }
 
 function escapeHtml(value: string) {
