@@ -6,6 +6,7 @@ import {
   Activity,
   BarChart3,
   CalendarClock,
+  ChevronDown,
   Download,
   FileSpreadsheet,
   FileText,
@@ -895,24 +896,35 @@ function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData:
 
   return (
     <article className="min-w-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-soft sm:p-4">
-      <div className="flex min-w-0 flex-col gap-3">
-        <h2 className="section-title break-words">{dataset.title}</h2>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          <select className="chart-select" value={chartKind} onChange={(event) => setChartKind(event.target.value as ChartKind)}>
-            <option value="Bar">Bar chart</option>
-            <option value="Line">Line chart</option>
-            <option value="Pie">Pie chart</option>
-            <option value="Donut">Donut chart</option>
-            <option value="Progress">Progress bars</option>
-          </select>
-          <button className="btn-compact justify-center" onClick={() => onShowData(dataset)}>View data</button>
-          <button className="btn-compact justify-center" onClick={() => downloadChartVisual(dataset, chartKind, "png")}>PNG</button>
-          <button className="btn-compact justify-center" onClick={() => downloadChartVisual(dataset, chartKind, "pdf")}>PDF</button>
-          <button className="btn-compact justify-center" onClick={resetChart}>Reset</button>
-          <button className="btn-compact justify-center" onClick={() => setCollapsed((value) => !value)}>{collapsed ? "Expand" : "Collapse"}</button>
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <h2 className="section-title break-words pt-2">{dataset.title}</h2>
+        <button
+          className="icon-btn flex-none"
+          onClick={() => setCollapsed((value) => !value)}
+          aria-label={collapsed ? `Expand ${dataset.title}` : `Collapse ${dataset.title}`}
+          aria-expanded={!collapsed}
+        >
+          <ChevronDown className={`transition-transform duration-300 ${collapsed ? "-rotate-90" : "rotate-0"}`} size={18} />
+        </button>
+      </div>
+      <div className={`grid transition-all duration-300 ease-in-out ${collapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"}`}>
+        <div className="min-h-0 overflow-hidden">
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            <select className="chart-select" value={chartKind} onChange={(event) => setChartKind(event.target.value as ChartKind)}>
+              <option value="Bar">Bar chart</option>
+              <option value="Line">Line chart</option>
+              <option value="Pie">Pie chart</option>
+              <option value="Donut">Donut chart</option>
+              <option value="Progress">Progress bars</option>
+            </select>
+            <button className="btn-compact justify-center" onClick={() => onShowData(dataset)}>View data</button>
+            <button className="btn-compact justify-center" onClick={() => downloadChartVisual(dataset, chartKind, "png")}>PNG</button>
+            <button className="btn-compact justify-center" onClick={() => downloadChartVisual(dataset, chartKind, "pdf")}>PDF</button>
+            <button className="btn-compact justify-center" onClick={resetChart}>Reset</button>
+          </div>
+          <ChartVisual dataset={dataset} chartKind={chartKind} />
         </div>
       </div>
-      {!collapsed && <ChartVisual dataset={dataset} chartKind={chartKind} />}
     </article>
   );
 }
