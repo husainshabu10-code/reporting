@@ -1582,29 +1582,19 @@ function averageRow(label: string, rows: TrackerTask[]): ChartRow {
 
 function missingFields(task: TrackerTask) {
   const checks: Array<[string, boolean]> = [
+    ["Task name", Boolean(task.taskName)],
     ["City", Boolean(task.city)],
     ["Area", Boolean(task.zoneArea)],
-    ["Workstream", Boolean(task.workstream)],
-    ["Task name", Boolean(task.taskName)],
-    ["Ownership type", Boolean(task.ownershipType)],
-    ["Task owner", Boolean(task.taskOwner)],
-    ["Supporting person", Boolean(task.supportingPerson)],
+    ["Ownership Type", Boolean(task.ownershipType)],
+    ["Task Owner / POC", Boolean(task.taskOwner)],
+    ["Supporting Person", Boolean(task.supportingPerson)],
     ["Priority", Boolean(task.priority)],
-    ["Event criticality", Boolean(task.eventCriticality)],
+    ["Event Criticality", Boolean(task.eventCriticality)],
     ["Status", Boolean(task.status)],
-    ["Due date", Boolean(task.dueDate)],
-    ["Target readiness date", Boolean(task.targetReadinessDate)],
-    ["Dependency", Boolean(task.dependency)],
-    ["Vendor", task.vendors.some((vendor) => vendor.name && vendor.contact)],
-    ["Budget status", Boolean(task.budgetStatus)],
-    ["Document status", Boolean(task.documentStatus)],
-    ["Risk level", Boolean(task.riskLevel)],
-    ["Last update date", Boolean(task.lastUpdateDate)],
-    ["Next follow-up date", Boolean(task.nextFollowUpDate)],
-    ["Remarks", Boolean(task.remarksLatestUpdate)],
-    ["Document link or attachment", Boolean(task.documentLinkAttachmentReference || task.attachments.length)]
+    ["Progress %", task.progress !== null && task.progress !== undefined && PROGRESS_VALUES.includes(nearestProgress(task.progress))],
+    ["Due Date", Boolean(task.dueDate)],
+    ["Budget Status", Boolean(task.budgetStatus)]
   ];
-  if (task.status === "Blocked") checks.push(["Blocker reason", Boolean(task.blockerReason)]);
   return checks.filter(([, ok]) => !ok).map(([label]) => label);
 }
 
