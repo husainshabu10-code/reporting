@@ -13,6 +13,7 @@ import {
   Filter,
   Layers3,
   Menu,
+  Minus,
   Plus,
   RefreshCcw,
   Search,
@@ -1125,6 +1126,10 @@ function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: Tracker
   };
 
   const addVendor = () => setDraft({ ...draft, vendors: [...draft.vendors, { name: "", contact: "" }] });
+  const removeVendor = (index: number) => {
+    const vendors = draft.vendors.filter((_, vendorIndex) => vendorIndex !== index);
+    setDraft({ ...draft, vendors, vendorName: vendors[0]?.name || "", vendorContact: vendors[0]?.contact || "" });
+  };
 
   const addAttachments = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -1175,14 +1180,21 @@ function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: Tracker
           </div>
           <div className="rounded-lg border border-[var(--color-border)] p-3">
             <div className="mb-3 flex items-center justify-between"><span className="field-label">Vendors</span><button className="icon-btn" onClick={addVendor} aria-label="Add vendor"><Plus size={16} /></button></div>
-            <div className="space-y-2">
-              {draft.vendors.map((vendor, index) => (
-                <div key={index} className="grid gap-2 sm:grid-cols-2">
-                  <input className="field" value={vendor.name} onChange={(event) => updateVendor(index, "name", event.target.value)} placeholder="Vendor name" />
-                  <input className="field" value={vendor.contact} onChange={(event) => updateVendor(index, "contact", event.target.value)} placeholder="Vendor contact" />
-                </div>
-              ))}
-            </div>
+            {draft.vendors.length === 0 ? (
+              <p className="text-sm text-[var(--color-text-muted)]">No vendor added.</p>
+            ) : (
+              <div className="space-y-2">
+                {draft.vendors.map((vendor, index) => (
+                  <div key={index} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                    <input className="field" value={vendor.name} onChange={(event) => updateVendor(index, "name", event.target.value)} placeholder="Vendor name" />
+                    <input className="field" value={vendor.contact} onChange={(event) => updateVendor(index, "contact", event.target.value)} placeholder="Vendor contact" />
+                    <button className="icon-btn justify-self-start text-[var(--color-important)] hover:bg-[#7A1F2B]/10" onClick={() => removeVendor(index)} aria-label={`Remove vendor ${index + 1}`}>
+                      <Minus size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <TextAreaField label="Blocker Reason" value={draft.blockerReason} onChange={(value) => updateField("blockerReason", value)} />
           <TextAreaField label="Remarks / Latest Update" value={draft.remarksLatestUpdate} onChange={(value) => updateField("remarksLatestUpdate", value)} />
@@ -1417,15 +1429,17 @@ function normalizeTasks(rows: TrackerTask[]) {
 }
 
 function normalizeTask(task: TrackerTask): TrackerTask {
-  const vendors = task.vendors?.length ? task.vendors : [{ name: task.vendorName || "", contact: task.vendorContact || "" }];
+  const vendors = (task.vendors?.length ? task.vendors : [{ name: task.vendorName || "", contact: task.vendorContact || "" }])
+    .map((vendor) => ({ name: vendor.name || "", contact: vendor.contact || "" }))
+    .filter((vendor) => vendor.name.trim() || vendor.contact.trim());
   const roundedProgress = nearestProgress(task.progress);
   return {
     ...task,
     taskName: toSentenceCase(stripRepeatedTaskWords(task.taskName, task)),
     progress: roundedProgress,
     vendors,
-    vendorName: vendors[0]?.name || task.vendorName || "",
-    vendorContact: vendors[0]?.contact || task.vendorContact || "",
+    vendorName: vendors[0]?.name || "",
+    vendorContact: vendors[0]?.contact || "",
     attachments: task.attachments || []
   };
 }
@@ -1675,6 +1689,8 @@ function rowToTask(row: Record<string, string>): TrackerTask | null {
   const status = optionOrDefault(get("Status"), STATUSES, "Not Started");
   const progress = nearestProgress(Number(get("Progress %") || STATUS_PROGRESS[status]));
   const vendors = get("Vendors").split(";").map((name) => ({ name: name.trim(), contact: "" })).filter((vendor) => vendor.name);
+  const fallbackVendor = { name: get("Vendor Name"), contact: get("Vendor Contact") };
+  const importedVendors = vendors.length ? vendors : (fallbackVendor.name || fallbackVendor.contact ? [fallbackVendor] : []);
   return normalizeTask({
     id: get("Task ID") || makeTaskId(city, workstream, taskName),
     city,
@@ -1691,9 +1707,9 @@ function rowToTask(row: Record<string, string>): TrackerTask | null {
     dueDate: get("Due Date"),
     targetReadinessDate: get("Target Readiness Date"),
     dependency: get("Dependency"),
-    vendorName: vendors[0]?.name || get("Vendor Name"),
-    vendorContact: get("Vendor Contact"),
-    vendors: vendors.length ? vendors : [{ name: get("Vendor Name"), contact: get("Vendor Contact") }],
+    vendorName: importedVendors[0]?.name || "",
+    vendorContact: importedVendors[0]?.contact || "",
+    vendors: importedVendors,
     budgetStatus: optionOrDefault(get("Budget Status"), BUDGET_STATUSES, "Not Required"),
     documentStatus: optionOrDefault(get("Document Status"), DOCUMENT_STATUSES, "Not Attached"),
     riskLevel: optionOrDefault(get("Risk Level"), RISK_LEVELS, "Medium"),

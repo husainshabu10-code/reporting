@@ -355,7 +355,7 @@ export function createDefaultTask(city: string, workstream: string, taskName: st
     dependency: "",
     vendorName: "",
     vendorContact: "",
-    vendors: [{ name: "", contact: "" }],
+    vendors: [],
     budgetStatus: "Not Required",
     documentStatus: "Not Attached",
     riskLevel: "Medium",
