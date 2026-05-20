@@ -11,12 +11,16 @@ import {
   FileSpreadsheet,
   FileText,
   Filter,
+  GripVertical,
   Layers3,
+  Maximize2,
   Menu,
   Minus,
+  MoreVertical,
   Plus,
   RefreshCcw,
   Search,
+  Settings,
   Upload,
   Users,
   X
@@ -33,6 +37,7 @@ import {
   RISK_LEVELS,
   STATUSES,
   STATUS_PROGRESS,
+  TASK_WEIGHTS,
   WORKSTREAMS,
   ZONES,
   createBlankTask,
@@ -48,8 +53,8 @@ import type { AttachmentReference, TrackerTask, VendorEntry } from "@/lib/ashara
 type TabId = "Dashboard" | "Compare" | "Master List" | "Contacts" | "Area" | "Activity" | "Report" | "Timeline";
 type ReportFormat = "Charts only" | "Tables only" | "Both charts and tables";
 type ExcelReportFormat = "Table only" | "Table with chart summaries";
-type SortKey = "city" | "workstream" | "taskName" | "zoneArea" | "taskOwner" | "status" | "progress" | "dueDate" | "riskLevel";
-type TableField = "city" | "workstream" | "taskName" | "zoneArea" | "taskOwner" | "vendors" | "status" | "progress" | "riskLevel" | "dueDate" | "documentStatus";
+type SortKey = "city" | "workstream" | "taskName" | "zoneArea" | "taskOwner" | "status" | "progress" | "dueDate" | "riskLevel" | "taskWeight";
+type TableField = "city" | "workstream" | "taskName" | "zoneArea" | "taskOwner" | "vendors" | "status" | "progress" | "riskLevel" | "dueDate" | "documentStatus" | "taskWeight";
 
 type Filters = {
   city: string;
@@ -61,6 +66,7 @@ type Filters = {
   progress: string;
   priority: string;
   riskLevel: string;
+  taskWeight: string;
   documentStatus: string;
   dueFrom: string;
   dueTo: string;
@@ -102,8 +108,21 @@ type ChartDataset = {
   sourceRows: Array<Record<string, string | number>>;
   defaultKind: ChartKind;
   suffix?: string;
+  sourceColumns?: string[];
 };
 type ChartKind = "Bar" | "Line" | "Pie" | "Donut" | "Progress";
+type CustomMetric = "Count" | "Average progress" | "Weighted progress" | "Completed tasks";
+type CustomField = "city" | "zoneArea" | "workstream" | "status" | "progress" | "taskWeight" | "priority" | "riskLevel" | "taskOwner" | "eventCriticality";
+type CustomChartDefinition = {
+  id: string;
+  title: string;
+  chartKind: ChartKind;
+  groupBy: CustomField;
+  subgroupBy: CustomField | "none";
+  metric: CustomMetric;
+  sourceColumns: string[];
+  filters: Filters;
+};
 
 const STORAGE_TASKS_KEY = "ashara-it-readiness-tasks";
 const STORAGE_CITIES_KEY = "ashara-it-readiness-cities";
@@ -136,11 +155,27 @@ const EMPTY_FILTERS: Filters = {
   progress: "All",
   priority: "All",
   riskLevel: "All",
+  taskWeight: "All",
   documentStatus: "All",
   dueFrom: "",
   dueTo: "",
   search: ""
 };
+
+const CUSTOM_FIELDS: Array<{ key: CustomField; label: string }> = [
+  { key: "city", label: "City" },
+  { key: "zoneArea", label: "Area" },
+  { key: "workstream", label: "Workstream" },
+  { key: "status", label: "Status" },
+  { key: "progress", label: "Progress" },
+  { key: "taskWeight", label: "Task weight" },
+  { key: "priority", label: "Priority" },
+  { key: "riskLevel", label: "Risk" },
+  { key: "taskOwner", label: "Task Owner / POC" },
+  { key: "eventCriticality", label: "Event Criticality" }
+];
+const CUSTOM_METRICS: CustomMetric[] = ["Count", "Average progress", "Weighted progress", "Completed tasks"];
+const DEFAULT_CUSTOM_COLUMNS = ["City", "Area", "Workstream", "Task Name", "Status", "Progress %", "Task Weight"];
 
 export default function DashboardApp() {
   const [tasks, setTasks] = useState<TrackerTask[]>(() => normalizeTasks(generateDefaultTasksForCities(INITIAL_CITIES)));
@@ -159,6 +194,8 @@ export default function DashboardApp() {
   const [chartData, setChartData] = useState<ChartDataset | null>(null);
   const [chartSettingsTab, setChartSettingsTab] = useState<TabId | null>(null);
   const [hiddenChartIds, setHiddenChartIds] = useState<Record<string, string[]>>({});
+  const [customCharts, setCustomCharts] = useState<Record<string, CustomChartDefinition[]>>({});
+  const [addChartTab, setAddChartTab] = useState<TabId | null>(null);
   const [compareCities, setCompareCities] = useState<string[]>(INITIAL_CITIES.slice(0, 3));
   const [areaCity, setAreaCity] = useState(INITIAL_CITIES[0]);
   const [masterGroup, setMasterGroup] = useState<SortKey | "none">("city");
@@ -221,18 +258,47 @@ export default function DashboardApp() {
   const areaCharts = useMemo(() => buildAreaCharts(areaRows, tasks.filter((task) => task.city === areaCity)), [areaRows, areaCity, tasks]);
   const reportCharts = useMemo(() => buildDashboardCharts(reportTasks, getCityStats(reportTasks, cities)), [cities, reportTasks]);
   const sortedMasterTasks = useMemo(() => sortTasks(filteredTasks, sortKey, sortAsc), [filteredTasks, sortAsc, sortKey]);
+  const chartRowsByTab = useMemo(
+    () => ({
+      Dashboard: filteredTasks,
+      Compare: tasks.filter((task) => compareCities.includes(task.city)),
+      "Master List": filteredTasks,
+      Area: tasks.filter((task) => task.city === areaCity),
+      Report: reportTasks
+    }),
+    [areaCity, compareCities, filteredTasks, reportTasks, tasks]
+  );
+  const customChartsByTab = useMemo(
+    () => Object.fromEntries(Object.entries(customCharts).map(([tab, definitions]) => [tab, definitions.map((definition) => buildCustomChart(definition, chartRowsByTab[tab as keyof typeof chartRowsByTab] || []))])) as Partial<Record<TabId, ChartDataset[]>>,
+    [chartRowsByTab, customCharts]
+  );
   const pageCharts = useMemo(
     () => ({
-      Dashboard: dashboardCharts,
-      Compare: compareCharts,
-      "Master List": masterCharts,
-      Area: areaCharts,
-      Report: reportCharts
+      Dashboard: [...dashboardCharts, ...(customChartsByTab.Dashboard || [])],
+      Compare: [...compareCharts, ...(customChartsByTab.Compare || [])],
+      "Master List": [...masterCharts, ...(customChartsByTab["Master List"] || [])],
+      Area: [...areaCharts, ...(customChartsByTab.Area || [])],
+      Report: [...reportCharts, ...(customChartsByTab.Report || [])]
     }),
-    [areaCharts, compareCharts, dashboardCharts, masterCharts, reportCharts]
+    [areaCharts, compareCharts, customChartsByTab, dashboardCharts, masterCharts, reportCharts]
   );
   const chartsForActiveTab = chartsForTab(activeTab, pageCharts);
   const visibleChartsFor = (tab: TabId, charts: ChartDataset[]) => charts.filter((chart) => !(hiddenChartIds[tab] || []).includes(chart.id));
+
+  const hideChart = (tab: TabId, chartId: string) => {
+    if (!window.confirm("Delete this chart card from the current page view? You can add it again from Add Chart.")) return;
+    setHiddenChartIds((current) => ({ ...current, [tab]: unique([...(current[tab] || []), chartId]) }));
+  };
+
+  const restoreChart = (tab: TabId, chartId: string) => {
+    setHiddenChartIds((current) => ({ ...current, [tab]: (current[tab] || []).filter((id) => id !== chartId) }));
+  };
+
+  const addCustomChart = (tab: TabId, definition: CustomChartDefinition) => {
+    setCustomCharts((current) => ({ ...current, [tab]: [...(current[tab] || []), definition] }));
+    setAddChartTab(null);
+    logActivity("Chart created", definition.title, `${tab} custom chart added.`);
+  };
 
   const logActivity = (action: string, item: string, details: string) => {
     setActivity((current) => [createActivity(action, item, details), ...current].slice(0, 250));
@@ -386,6 +452,9 @@ export default function DashboardApp() {
               {chartsForActiveTab.length > 0 && (
                 <button className="btn-secondary justify-center max-[380px]:col-span-2" onClick={() => setChartSettingsTab(activeTab)}><BarChart3 size={16} /> Chart Settings</button>
               )}
+              {chartsForActiveTab.length > 0 && (
+                <button className="btn-secondary justify-center max-[380px]:col-span-2" onClick={() => setAddChartTab(activeTab)}><Plus size={16} /> Add Chart</button>
+              )}
               <button className="btn-primary justify-center" onClick={() => setSelectedTask(createBlankTask(cities[0] ?? "Nairobi"))}><Plus size={16} /> Add Task</button>
               <button className="btn-secondary justify-center" onClick={() => exportTaskCsv(filteredTasks, "visible-tasks")}><Download size={16} /> Export CSV</button>
               <button className="btn-secondary justify-center" onClick={() => importInputRef.current?.click()}><Upload size={16} /> Import CSV</button>
@@ -411,8 +480,9 @@ export default function DashboardApp() {
             filters={filters}
             setFilters={setFilters}
             sourceTasks={tasks}
-            charts={visibleChartsFor("Dashboard", dashboardCharts)}
+            charts={visibleChartsFor("Dashboard", pageCharts.Dashboard || [])}
             onShowData={setChartData}
+            onDeleteChart={(chartId) => hideChart("Dashboard", chartId)}
           />
         )}
 
@@ -421,9 +491,10 @@ export default function DashboardApp() {
             cities={cities}
             selectedCities={compareCities}
             setSelectedCities={setCompareCities}
-            charts={visibleChartsFor("Compare", compareCharts)}
+            charts={visibleChartsFor("Compare", pageCharts.Compare || [])}
             tasks={tasks.filter((task) => compareCities.includes(task.city))}
             onShowData={setChartData}
+            onDeleteChart={(chartId) => hideChart("Compare", chartId)}
           />
         )}
 
@@ -433,7 +504,7 @@ export default function DashboardApp() {
             setFilters={setFilters}
             sourceTasks={tasks}
             tasks={sortedMasterTasks}
-            charts={visibleChartsFor("Master List", masterCharts)}
+            charts={visibleChartsFor("Master List", pageCharts["Master List"] || [])}
             groupBy={masterGroup}
             setGroupBy={setMasterGroup}
             subgroupBy={masterSubgroup}
@@ -445,6 +516,7 @@ export default function DashboardApp() {
             highlightMissing={highlightMissing}
             setHighlightMissing={setHighlightMissing}
             onShowData={setChartData}
+            onDeleteChart={(chartId) => hideChart("Master List", chartId)}
             onOpenTask={setSelectedTask}
           />
         )}
@@ -454,7 +526,7 @@ export default function DashboardApp() {
         )}
 
         {activeTab === "Area" && (
-          <AreaPage cities={cities} selectedCity={areaCity} setSelectedCity={setAreaCity} areaRows={areaRows} charts={visibleChartsFor("Area", areaCharts)} onShowData={setChartData} />
+          <AreaPage cities={cities} selectedCity={areaCity} setSelectedCity={setAreaCity} areaRows={areaRows} charts={visibleChartsFor("Area", pageCharts.Area || [])} onShowData={setChartData} onDeleteChart={(chartId) => hideChart("Area", chartId)} />
         )}
 
         {activeTab === "Activity" && <ActivityPage activity={activity} />}
@@ -465,12 +537,13 @@ export default function DashboardApp() {
             setFilters={setReportFilters}
             sourceTasks={tasks}
             reportTasks={reportTasks}
-            charts={visibleChartsFor("Report", reportCharts)}
+            charts={visibleChartsFor("Report", pageCharts.Report || [])}
             reportFormat={reportFormat}
             setReportFormat={setReportFormat}
             excelReportFormat={excelReportFormat}
             setExcelReportFormat={setExcelReportFormat}
             onShowData={setChartData}
+            onDeleteChart={(chartId) => hideChart("Report", chartId)}
             onExportPdf={exportPdf}
             onExportExcel={() => exportExcelReport(reportTasks)}
           />
@@ -500,6 +573,17 @@ export default function DashboardApp() {
           onClose={() => setChartSettingsTab(null)}
         />
       )}
+      {addChartTab && (
+        <AddChartModal
+          tab={addChartTab}
+          charts={chartsForTab(addChartTab, pageCharts)}
+          hiddenIds={hiddenChartIds[addChartTab] || []}
+          sourceTasks={chartRowsByTab[addChartTab as keyof typeof chartRowsByTab] || []}
+          onRestore={(chartId) => restoreChart(addChartTab, chartId)}
+          onAddCustom={(definition) => addCustomChart(addChartTab, definition)}
+          onClose={() => setAddChartTab(null)}
+        />
+      )}
     </main>
   );
 }
@@ -509,20 +593,22 @@ function DashboardPage({
   setFilters,
   sourceTasks,
   charts,
-  onShowData
+  onShowData,
+  onDeleteChart
 }: {
   filters: Filters;
   setFilters: (filters: Filters) => void;
   sourceTasks: TrackerTask[];
   charts: ChartDataset[];
   onShowData: (dataset: ChartDataset) => void;
+  onDeleteChart: (chartId: string) => void;
 }) {
   return (
     <section className="animate-fade-in space-y-5">
       <Panel>
         <FiltersPanel filters={filters} setFilters={setFilters} sourceTasks={sourceTasks} />
       </Panel>
-      <ChartGrid charts={charts} onShowData={onShowData} />
+      <ChartGrid charts={charts} onShowData={onShowData} onDeleteChart={onDeleteChart} />
     </section>
   );
 }
@@ -533,7 +619,8 @@ function ComparePage({
   setSelectedCities,
   charts,
   tasks,
-  onShowData
+  onShowData,
+  onDeleteChart
 }: {
   cities: string[];
   selectedCities: string[];
@@ -541,6 +628,7 @@ function ComparePage({
   charts: ChartDataset[];
   tasks: TrackerTask[];
   onShowData: (dataset: ChartDataset) => void;
+  onDeleteChart: (chartId: string) => void;
 }) {
   const toggleCity = (city: string) => {
     setSelectedCities(selectedCities.includes(city) ? selectedCities.filter((item) => item !== city) : [...selectedCities, city]);
@@ -559,7 +647,7 @@ function ComparePage({
           </div>
         </div>
       </Panel>
-      <ChartGrid charts={charts} onShowData={onShowData} />
+      <ChartGrid charts={charts} onShowData={onShowData} onDeleteChart={onDeleteChart} />
       <TaskTable tasks={tasks.slice(0, 40)} onOpenTask={() => undefined} highlightMissing={false} />
     </section>
   );
@@ -582,6 +670,7 @@ function MasterListPage({
   highlightMissing,
   setHighlightMissing,
   onShowData,
+  onDeleteChart,
   onOpenTask
 }: {
   filters: Filters;
@@ -600,6 +689,7 @@ function MasterListPage({
   highlightMissing: boolean;
   setHighlightMissing: (value: boolean) => void;
   onShowData: (dataset: ChartDataset) => void;
+  onDeleteChart: (chartId: string) => void;
   onOpenTask: (task: TrackerTask) => void;
 }) {
   return (
@@ -607,7 +697,7 @@ function MasterListPage({
       <Panel>
         <FiltersPanel filters={filters} setFilters={setFilters} sourceTasks={sourceTasks} />
       </Panel>
-      <ChartGrid charts={charts} onShowData={onShowData} />
+      <ChartGrid charts={charts} onShowData={onShowData} onDeleteChart={onDeleteChart} />
       <Panel>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <SelectField label="Group by" value={groupBy} options={["none", ...MASTER_FIELDS]} onChange={(value) => setGroupBy(value as SortKey | "none")} />
@@ -683,7 +773,8 @@ function AreaPage({
   setSelectedCity,
   areaRows,
   charts,
-  onShowData
+  onShowData,
+  onDeleteChart
 }: {
   cities: string[];
   selectedCity: string;
@@ -691,11 +782,12 @@ function AreaPage({
   areaRows: ReturnType<typeof getAreaRows>;
   charts: ChartDataset[];
   onShowData: (dataset: ChartDataset) => void;
+  onDeleteChart: (chartId: string) => void;
 }) {
   return (
     <section className="animate-fade-in space-y-5">
       <Panel><SelectField label="Select city" value={selectedCity} options={cities} onChange={setSelectedCity} /></Panel>
-      <ChartGrid charts={charts} onShowData={onShowData} />
+      <ChartGrid charts={charts} onShowData={onShowData} onDeleteChart={onDeleteChart} />
       <Panel>
         <Table rows={areaRows.map((row) => ({
           Area: row.area,
@@ -703,6 +795,7 @@ function AreaPage({
           Workstreams: row.workstreams,
           Status: row.health,
           "Progress %": row.progress,
+          "Weighted Progress %": row.weighted,
           "Due Soon": row.dueSoon,
           Overdue: row.overdue
         }))} />
@@ -744,6 +837,7 @@ function ReportPage({
   excelReportFormat,
   setExcelReportFormat,
   onShowData,
+  onDeleteChart,
   onExportPdf,
   onExportExcel
 }: {
@@ -757,6 +851,7 @@ function ReportPage({
   excelReportFormat: ExcelReportFormat;
   setExcelReportFormat: (format: ExcelReportFormat) => void;
   onShowData: (dataset: ChartDataset) => void;
+  onDeleteChart: (chartId: string) => void;
   onExportPdf: (rows: TrackerTask[]) => void;
   onExportExcel: () => void;
 }) {
@@ -771,7 +866,7 @@ function ReportPage({
           <button className="btn-secondary justify-center" onClick={onExportExcel}><FileSpreadsheet size={16} /> Export Excel</button>
         </div>
       </Panel>
-      {reportFormat !== "Tables only" && <ChartGrid charts={charts} onShowData={onShowData} />}
+      {reportFormat !== "Tables only" && <ChartGrid charts={charts} onShowData={onShowData} onDeleteChart={onDeleteChart} />}
       {reportFormat !== "Charts only" && <TaskTable tasks={reportTasks} onOpenTask={() => undefined} highlightMissing={false} />}
     </section>
   );
@@ -791,7 +886,7 @@ function TimelinePage({ cityStats, tasks, onOpenTask }: { cityStats: ReturnType<
             <div key={city.city} className="grid gap-3 md:grid-cols-[11rem_1fr_8rem] md:items-center">
               <div>
                 <p className="font-semibold text-[var(--color-primary)]">{index + 1}. {city.city}</p>
-                <p className="text-sm text-[var(--color-text-muted)]">{city.health}</p>
+                <p className="text-sm text-[var(--color-text-muted)]">{city.health} / weighted {city.weightedCompletion}%</p>
               </div>
               <ProgressBar value={city.completion} />
               <span className="text-sm font-semibold text-[var(--color-primary)]">{city.completion}% ready</span>
@@ -875,6 +970,7 @@ function FiltersPanel({ filters, setFilters, sourceTasks }: { filters: Filters; 
               <SelectField label="Progress" value={filters.progress} options={PROGRESS_VALUES.map(String)} includeAll onChange={(value) => update("progress", value)} />
               <SelectField label="Priority" value={filters.priority} options={PRIORITIES} includeAll onChange={(value) => update("priority", value)} />
               <SelectField label="Risk" value={filters.riskLevel} options={RISK_LEVELS} includeAll onChange={(value) => update("riskLevel", value)} />
+              <SelectField label="Task weight" value={filters.taskWeight} options={TASK_WEIGHTS} includeAll onChange={(value) => update("taskWeight", value)} />
               <SelectField label="Document" value={filters.documentStatus} options={DOCUMENT_STATUSES} includeAll onChange={(value) => update("documentStatus", value)} />
               <InputField label="Due from" type="date" value={filters.dueFrom} onChange={(value) => update("dueFrom", value)} />
               <InputField label="Due to" type="date" value={filters.dueTo} onChange={(value) => update("dueTo", value)} />
@@ -888,32 +984,36 @@ function FiltersPanel({ filters, setFilters, sourceTasks }: { filters: Filters; 
   );
 }
 
-function ChartGrid({ charts, onShowData }: { charts: ChartDataset[]; onShowData: (dataset: ChartDataset) => void }) {
+function ChartGrid({ charts, onShowData, onDeleteChart }: { charts: ChartDataset[]; onShowData: (dataset: ChartDataset) => void; onDeleteChart: (chartId: string) => void }) {
   return (
     <section className="chart-masonry min-w-0">
-      {charts.map((chart) => <ChartCard key={chart.id} dataset={chart} onShowData={onShowData} />)}
+      {charts.map((chart) => <ChartCard key={chart.id} dataset={chart} onShowData={onShowData} onDeleteChart={onDeleteChart} />)}
     </section>
   );
 }
 
-function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData: (dataset: ChartDataset) => void }) {
+function ChartCard({ dataset, onShowData, onDeleteChart }: { dataset: ChartDataset; onShowData: (dataset: ChartDataset) => void; onDeleteChart: (chartId: string) => void }) {
   const [chartKind, setChartKind] = useState<ChartKind>(dataset.defaultKind);
   const [collapsed, setCollapsed] = useState(false);
   const [bodyMounted, setBodyMounted] = useState(true);
-  const [exportOpen, setExportOpen] = useState(false);
-  const exportRef = useRef<HTMLDivElement | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showLegend, setShowLegend] = useState(true);
+  const [fullscreen, setFullscreen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!exportOpen) return;
-    const closeExport = (event: MouseEvent) => {
-      if (!exportRef.current?.contains(event.target as Node)) setExportOpen(false);
+    if (!menuOpen) return;
+    const closeMenu = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
     };
-    document.addEventListener("mousedown", closeExport);
-    return () => document.removeEventListener("mousedown", closeExport);
-  }, [exportOpen]);
+    document.addEventListener("mousedown", closeMenu);
+    return () => document.removeEventListener("mousedown", closeMenu);
+  }, [menuOpen]);
 
   const resetChart = () => {
     setChartKind(dataset.defaultKind);
+    setShowLegend(true);
+    setMenuOpen(false);
     setBodyMounted(true);
     setCollapsed(false);
   };
@@ -928,28 +1028,36 @@ function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData:
   };
 
   return (
-    <article className="motion-card min-w-0 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft">
-      <div className="flex min-w-0 items-start justify-between gap-3 p-3 sm:p-4">
-        <h2 className="section-title break-words pt-2">{dataset.title}</h2>
-        <div className="flex flex-none items-start gap-2">
-          <div ref={exportRef} className="relative">
-            <button className="icon-btn" onClick={() => setExportOpen((value) => !value)} aria-label={`Export ${dataset.title}`} aria-expanded={exportOpen}>
-              <Download size={17} />
+    <article className="chart-card group motion-card min-w-0 overflow-visible rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft">
+      <div className="relative min-w-0 p-3 pr-28 sm:p-4 sm:pr-36 lg:pr-64">
+        <div className="flex min-w-0 items-center gap-2">
+          <GripVertical className="hidden flex-none text-[var(--color-border)] sm:block" size={16} />
+          <h2 className="section-title break-words">{dataset.title}</h2>
+        </div>
+        <div className="chart-hover-toolbar absolute right-3 top-3 flex flex-none items-start gap-1 sm:right-4 sm:top-4">
+          <span className="hidden rounded-full bg-[var(--color-bg)] px-2 py-1 text-xs font-semibold text-[var(--color-text-muted)] xl:inline-flex">Refreshed now</span>
+          <button className="mini-icon-btn" onClick={resetChart} aria-label="Refresh chart" title="Refresh"><RefreshCcw size={15} /></button>
+          <button className="mini-icon-btn" onClick={() => setFullscreen(true)} aria-label="Expand chart" title="Expand"><Maximize2 size={15} /></button>
+          <button className="mini-icon-btn" onClick={() => onShowData(dataset)} aria-label="Filter source data" title="View data"><Filter size={15} /></button>
+          <button className="mini-icon-btn" onClick={resetChart} aria-label="Chart settings" title="Reset settings"><Settings size={15} /></button>
+          <div ref={menuRef} className="relative">
+            <button className="mini-icon-btn" onClick={() => setMenuOpen((value) => !value)} aria-label="More chart options" aria-expanded={menuOpen} title="More options">
+              <MoreVertical size={15} />
             </button>
-            {exportOpen && (
-              <div className="absolute right-0 top-12 z-20 w-40 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-1 shadow-2xl animate-fade-in">
-                <button className="export-menu-item" onClick={() => { downloadChartVisual(dataset, chartKind, "png"); setExportOpen(false); }}>Export as PNG</button>
-                <button className="export-menu-item" onClick={() => { downloadChartVisual(dataset, chartKind, "pdf"); setExportOpen(false); }}>Export as PDF</button>
+            {menuOpen && (
+              <div className="absolute right-0 top-9 z-30 w-48 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-1 shadow-2xl animate-fade-in">
+                <button className="export-menu-item" onClick={() => setShowLegend((value) => !value)}>{showLegend ? "Hide legend" : "Show legend"}</button>
+                <div className="border-t border-[var(--color-border)] py-1">
+                  <p className="px-2 py-1 text-xs font-semibold uppercase text-[var(--color-text-muted)]">Export</p>
+                  <button className="export-menu-item" onClick={() => { downloadChartVisual(dataset, chartKind, "png"); setMenuOpen(false); }}>Export as PNG</button>
+                  <button className="export-menu-item" onClick={() => { downloadChartVisual(dataset, chartKind, "pdf"); setMenuOpen(false); }}>Export as PDF</button>
+                </div>
+                <button className="export-menu-item text-[var(--color-important)]" onClick={() => { setMenuOpen(false); onDeleteChart(dataset.id); }}>Delete card</button>
               </div>
             )}
           </div>
-          <button
-            className="icon-btn"
-            onClick={toggleCollapsed}
-            aria-label={collapsed ? `Expand ${dataset.title}` : `Collapse ${dataset.title}`}
-            aria-expanded={!collapsed}
-          >
-            <ChevronDown className={`transition-transform duration-300 ${collapsed ? "-rotate-90" : "rotate-0"}`} size={18} />
+          <button className="mini-icon-btn" onClick={toggleCollapsed} aria-label={collapsed ? `Expand ${dataset.title}` : `Collapse ${dataset.title}`} aria-expanded={!collapsed} title={collapsed ? "Expand" : "Collapse"}>
+            <ChevronDown className={`transition-transform duration-300 ${collapsed ? "-rotate-90" : "rotate-0"}`} size={17} />
           </button>
         </div>
       </div>
@@ -972,7 +1080,18 @@ function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData:
               <button className="btn-compact justify-center" onClick={() => onShowData(dataset)}>View data</button>
               <button className="btn-compact justify-center" onClick={resetChart}>Reset</button>
             </div>
-            <ChartVisual dataset={dataset} chartKind={chartKind} />
+            <ChartVisual dataset={dataset} chartKind={chartKind} showLegend={showLegend} />
+          </div>
+        </div>
+      )}
+      {fullscreen && (
+        <div className="motion-overlay blur-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
+          <div className="motion-modal max-h-[92vh] w-full max-w-6xl overflow-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="section-title">{dataset.title}</h2>
+              <button className="icon-btn" onClick={() => setFullscreen(false)} aria-label="Close expanded chart"><X size={18} /></button>
+            </div>
+            <ChartVisual dataset={dataset} chartKind={chartKind} showLegend={showLegend} />
           </div>
         </div>
       )}
@@ -980,10 +1099,10 @@ function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData:
   );
 }
 
-function ChartVisual({ dataset, chartKind }: { dataset: ChartDataset; chartKind: ChartKind }) {
+function ChartVisual({ dataset, chartKind, showLegend = true }: { dataset: ChartDataset; chartKind: ChartKind; showLegend?: boolean }) {
   if (dataset.rows.length === 0) return <p className="mt-4 text-sm text-[var(--color-text-muted)]">No chart data available.</p>;
-  if (chartKind === "Pie" || chartKind === "Donut") return <PieLikeChart dataset={dataset} chartKind={chartKind} />;
-  if (chartKind === "Line") return <LineChartVisual dataset={dataset} />;
+  if (chartKind === "Pie" || chartKind === "Donut") return <PieLikeChart dataset={dataset} chartKind={chartKind} showLegend={showLegend} />;
+  if (chartKind === "Line") return <LineChartVisual dataset={dataset} showLegend={showLegend} />;
 
   return (
     <div className="mt-4 space-y-3">
@@ -999,7 +1118,7 @@ function ChartVisual({ dataset, chartKind }: { dataset: ChartDataset; chartKind:
   );
 }
 
-function LineChartVisual({ dataset }: { dataset: ChartDataset }) {
+function LineChartVisual({ dataset, showLegend }: { dataset: ChartDataset; showLegend: boolean }) {
   const width = 560;
   const height = 220;
   const padding = 28;
@@ -1021,12 +1140,12 @@ function LineChartVisual({ dataset }: { dataset: ChartDataset }) {
           </circle>
         ))}
       </svg>
-      <ChartLegend rows={dataset.rows} />
+      {showLegend && <ChartLegend rows={dataset.rows} />}
     </div>
   );
 }
 
-function PieLikeChart({ dataset, chartKind }: { dataset: ChartDataset; chartKind: "Pie" | "Donut" }) {
+function PieLikeChart({ dataset, chartKind, showLegend }: { dataset: ChartDataset; chartKind: "Pie" | "Donut"; showLegend: boolean }) {
   const rows = dataset.rows.filter((row) => row.value > 0 || row.percent > 0);
   const gradient = conicGradient(rows.length ? rows : dataset.rows);
 
@@ -1037,7 +1156,7 @@ function PieLikeChart({ dataset, chartKind }: { dataset: ChartDataset; chartKind
           <div className="aspect-square w-20 rounded-full border border-[var(--color-border)] bg-[var(--color-card)] sm:w-24" aria-hidden="true" />
         )}
       </div>
-      <div className="min-w-0 space-y-2">
+      {showLegend && <div className="min-w-0 space-y-2">
         {dataset.rows.map((row, index) => (
           <div key={row.label} className="flex items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm" title={`${row.label}: ${row.value}${dataset.suffix || ""} (${row.percent}%)`}>
             <span className="flex min-w-0 items-center gap-2">
@@ -1046,7 +1165,7 @@ function PieLikeChart({ dataset, chartKind }: { dataset: ChartDataset; chartKind
             </span>
           </div>
         ))}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -1092,6 +1211,7 @@ function GroupedTaskTable({ tasks, groupBy, subgroupBy, onOpenTask, highlightMis
 
 function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { tasks: TrackerTask[]; onOpenTask: (task: TrackerTask) => void; highlightMissing: boolean; compact?: boolean }) {
   const cellClass = (task: TrackerTask, field: TableField) => `cell-box ${highlightMissing && isMissingTableField(task, field) ? "missing-cell-box" : ""}`;
+  const headings = ["City", "Workstream", "Task", "Area", "Owner", "Vendors", "Status", "Progress", "Risk", "Due", "Docs", "Task weight"];
 
   return (
     <section className={`${compact ? "" : "motion-card rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft"}`}>
@@ -1104,16 +1224,30 @@ function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { t
         </div>
       )}
       <div className="hidden overflow-x-auto lg:block">
-        <table className="w-full min-w-[1240px] border-collapse text-left text-sm">
+        <table className="task-table w-full min-w-[1480px] table-fixed border-collapse text-left text-sm">
+          <colgroup>
+            <col className="w-[8rem]" />
+            <col className="w-[15rem]" />
+            <col className="w-[21rem]" />
+            <col className="w-[9rem]" />
+            <col className="w-[10rem]" />
+            <col className="w-[12rem]" />
+            <col className="w-[9.5rem]" />
+            <col className="w-[9rem]" />
+            <col className="w-[7rem]" />
+            <col className="w-[8rem]" />
+            <col className="w-[9rem]" />
+            <col className="w-[8.5rem]" />
+          </colgroup>
           <thead className="bg-[var(--color-accent-light)] text-xs uppercase text-[var(--color-primary)]">
-            <tr>{["City", "Workstream", "Task", "Area", "Owner", "Vendors", "Status", "Progress", "Risk", "Due", "Docs"].map((heading) => <th key={heading} className="border-b border-[var(--color-border)] px-3 py-3 font-semibold">{heading}</th>)}</tr>
+            <tr>{headings.map((heading) => <th key={heading} className="border-b border-[var(--color-border)] px-3 py-3 font-semibold">{heading}</th>)}</tr>
           </thead>
           <tbody>
             {tasks.map((task) => (
               <tr key={task.id} className={`cursor-pointer border-b border-[var(--color-border)] transition hover:bg-[var(--color-bg)] ${dueRowClass(task)}`} onClick={() => onOpenTask(task)}>
                 <td className="px-3 py-3 font-medium text-[var(--color-primary)]"><div className={cellClass(task, "city")}>{task.city || "-"}</div></td>
                 <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "workstream")}>{task.workstream || "-"}</div></td>
-                <td className="max-w-[320px] px-3 py-3 text-[var(--color-text)]"><div className={cellClass(task, "taskName")}>{taskDisplayName(task) || "-"}</div></td>
+                <td className="px-3 py-3 text-[var(--color-text)]"><div className={cellClass(task, "taskName")}>{taskDisplayName(task) || "-"}</div></td>
                 <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "zoneArea")}>{task.zoneArea || "-"}</div></td>
                 <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "taskOwner")}>{task.taskOwner || "-"}</div></td>
                 <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "vendors")}>{vendorSummary(task) || "-"}</div></td>
@@ -1122,6 +1256,7 @@ function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { t
                 <td className="px-3 py-3"><div className={cellClass(task, "riskLevel")}><RiskBadge risk={task.riskLevel} /></div></td>
                 <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "dueDate")}>{task.dueDate || "-"}</div></td>
                 <td className="px-3 py-3"><div className={cellClass(task, "documentStatus")}><DocumentBadge status={task.documentStatus} /></div></td>
+                <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "taskWeight")}>{task.taskWeight || "-"}</div></td>
               </tr>
             ))}
           </tbody>
@@ -1147,6 +1282,7 @@ function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { t
               <span className={`${cellClass(task, "dueDate")} break-words`}>Due: {task.dueDate || "-"}</span>
               <span className={cellClass(task, "riskLevel")}>Risk: {task.riskLevel || "-"}</span>
               <span className={cellClass(task, "documentStatus")}>Docs: {task.documentStatus || "-"}</span>
+              <span className={cellClass(task, "taskWeight")}>Task weight: {task.taskWeight || "-"}</span>
             </div>
             <div className={`mt-3 ${cellClass(task, "progress")}`}><ProgressBar value={task.progress} /><span className="mt-1 block text-xs text-[var(--color-text-muted)]">{task.progress}%</span></div>
           </button>
@@ -1238,6 +1374,7 @@ function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: Tracker
             <SelectField label="Budget Status" value={draft.budgetStatus} options={BUDGET_STATUSES} onChange={(value) => updateField("budgetStatus", value as TrackerTask["budgetStatus"])} />
             <SelectField label="Document Status" value={draft.documentStatus} options={DOCUMENT_STATUSES} onChange={(value) => updateField("documentStatus", value as TrackerTask["documentStatus"])} />
             <SelectField label="Risk Level" value={draft.riskLevel} options={RISK_LEVELS} onChange={(value) => updateField("riskLevel", value as TrackerTask["riskLevel"])} />
+            <SelectField label="Task weight" value={draft.taskWeight} options={TASK_WEIGHTS} onChange={(value) => updateField("taskWeight", value as TrackerTask["taskWeight"])} />
             <InputField label="Last Update Date" type="date" value={draft.lastUpdateDate} onChange={(value) => updateField("lastUpdateDate", value)} />
             <InputField label="Next Follow-up Date" type="date" value={draft.nextFollowUpDate} onChange={(value) => updateField("nextFollowUpDate", value)} />
           </div>
@@ -1353,6 +1490,138 @@ function ChartSettingsModal({
   );
 }
 
+function AddChartModal({
+  tab,
+  charts,
+  hiddenIds,
+  sourceTasks,
+  onRestore,
+  onAddCustom,
+  onClose
+}: {
+  tab: TabId;
+  charts: ChartDataset[];
+  hiddenIds: string[];
+  sourceTasks: TrackerTask[];
+  onRestore: (chartId: string) => void;
+  onAddCustom: (definition: CustomChartDefinition) => void;
+  onClose: () => void;
+}) {
+  const { closing, close } = useAnimatedClose(onClose);
+  const [mode, setMode] = useState<"Recommended Charts" | "All Charts" | "Custom Chart">("Recommended Charts");
+  const [draft, setDraft] = useState<CustomChartDefinition>(() => ({
+    id: `custom-chart-${Date.now()}`,
+    title: "Custom task chart",
+    chartKind: "Bar",
+    groupBy: "city",
+    subgroupBy: "none",
+    metric: "Count",
+    sourceColumns: DEFAULT_CUSTOM_COLUMNS,
+    filters: EMPTY_FILTERS
+  }));
+  const recommended = charts.filter((chart) => ["city-wise-progress", "weighted-progress", "overall-progress", "completed-vs-total", "status-distribution", "workstream-wise-progress", "area-wise-completion"].some((id) => chart.id.includes(id)));
+  const recommendedCharts = recommended.length ? recommended : charts.slice(0, 6);
+  const visibleSource = useMemo(() => applyFilters(sourceTasks, draft.filters), [draft.filters, sourceTasks]);
+  const preview = useMemo(() => buildCustomChart(draft, sourceTasks), [draft, sourceTasks]);
+  const isValid = preview.rows.length > 0 && preview.sourceRows.length > 0 && Boolean(draft.title.trim());
+  const addExisting = (chartId: string) => {
+    onRestore(chartId);
+    close();
+  };
+  const toggleColumn = (column: string) => {
+    const next = draft.sourceColumns.includes(column) ? draft.sourceColumns.filter((item) => item !== column) : [...draft.sourceColumns, column];
+    setDraft({ ...draft, sourceColumns: next.length ? next : DEFAULT_CUSTOM_COLUMNS });
+  };
+  const updateFilter = (key: keyof Filters, value: string) => setDraft({ ...draft, filters: { ...draft.filters, [key]: value } });
+
+  return (
+    <div className={`motion-overlay blur-overlay fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 ${closing ? "motion-overlay-exit" : ""}`}>
+      <div className={`motion-modal max-h-[94vh] w-full max-w-6xl overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl ${closing ? "motion-modal-exit" : ""}`}>
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--color-border)] p-3 sm:p-4">
+          <div>
+            <h2 className="section-title">Add chart</h2>
+            <p className="text-sm text-[var(--color-text-muted)]">{tab} / real task data only</p>
+          </div>
+          <button className="icon-btn" onClick={close}><X size={18} /></button>
+        </div>
+        <div className="max-h-[78vh] overflow-auto p-3 sm:p-4">
+          <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+            {(["Recommended Charts", "All Charts", "Custom Chart"] as const).map((item) => (
+              <button key={item} className={`tab-choice flex-none ${mode === item ? "tab-choice-active" : ""}`} onClick={() => setMode(item)}>{item}</button>
+            ))}
+          </div>
+
+          {mode !== "Custom Chart" && (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {(mode === "Recommended Charts" ? recommendedCharts : charts).map((chart) => {
+                const deleted = hiddenIds.includes(chart.id);
+                return (
+                  <article key={chart.id} className="motion-card rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-[var(--color-primary)]">{chart.title}</p>
+                        <p className="mt-1 text-sm text-[var(--color-text-muted)]">{chart.rows.length} grouped value(s)</p>
+                      </div>
+                      <BarChart3 className="text-[var(--color-accent)]" size={20} />
+                    </div>
+                    <div className="mt-3 h-14 space-y-1">
+                      {chart.rows.slice(0, 3).map((row) => <ProgressBar key={row.label} value={row.percent} compact tone={row.status} />)}
+                    </div>
+                    <button className="btn-compact mt-3 w-full" disabled={!deleted} onClick={() => addExisting(chart.id)}>{deleted ? "Add" : "Already visible"}</button>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+
+          {mode === "Custom Chart" && (
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,0.9fr)]">
+              <Panel>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <InputField label="Chart title" value={draft.title} onChange={(value) => setDraft({ ...draft, title: value })} />
+                  <SelectField label="Chart type" value={draft.chartKind} options={["Bar", "Line", "Pie", "Donut", "Progress"]} onChange={(value) => setDraft({ ...draft, chartKind: value as ChartKind })} />
+                  <SelectField label="Main data field / group by" value={draft.groupBy} options={CUSTOM_FIELDS.map((field) => field.key)} onChange={(value) => setDraft({ ...draft, groupBy: value as CustomField })} />
+                  <SelectField label="Optional subgroup" value={draft.subgroupBy} options={["none", ...CUSTOM_FIELDS.map((field) => field.key)]} onChange={(value) => setDraft({ ...draft, subgroupBy: value as CustomField | "none" })} />
+                  <SelectField label="Value / metric" value={draft.metric} options={CUSTOM_METRICS} onChange={(value) => setDraft({ ...draft, metric: value as CustomMetric })} />
+                  <SelectField label="City filter" value={draft.filters.city} options={unique(sourceTasks.map((task) => task.city))} includeAll onChange={(value) => updateFilter("city", value)} />
+                  <SelectField label="Workstream filter" value={draft.filters.workstream} options={unique(sourceTasks.map((task) => task.workstream))} includeAll onChange={(value) => updateFilter("workstream", value)} />
+                  <SelectField label="Status filter" value={draft.filters.status} options={STATUSES} includeAll onChange={(value) => updateFilter("status", value)} />
+                  <SelectField label="Area filter" value={draft.filters.area} options={ZONES} includeAll onChange={(value) => updateFilter("area", value)} />
+                  <SelectField label="Task weight filter" value={draft.filters.taskWeight} options={TASK_WEIGHTS} includeAll onChange={(value) => updateFilter("taskWeight", value)} />
+                </div>
+                <div className="mt-4">
+                  <p className="field-label mb-2">Source table fields</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {Object.keys(tasksToRows(sourceTasks.slice(0, 1))[0] || tasksToRows(generateDefaultTasksForCities(INITIAL_CITIES).slice(0, 1))[0]).map((column) => (
+                      <label key={column} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-2 text-sm font-semibold text-[var(--color-primary)]">
+                        <input type="checkbox" checked={draft.sourceColumns.includes(column)} onChange={() => toggleColumn(column)} />
+                        {column}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                {!isValid && <p className="mt-3 rounded-lg border border-[var(--color-important)] bg-[#7A1F2B]/10 p-3 text-sm text-[var(--color-important)]">Choose a title and fields that produce at least one chart row from the current task data.</p>}
+                <div className="mt-4 flex justify-end">
+                  <button className="btn-primary" disabled={!isValid} onClick={() => onAddCustom({ ...draft, id: `custom-chart-${Date.now()}` })}><Plus size={16} /> Add Custom Chart</button>
+                </div>
+              </Panel>
+              <Panel>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="section-title">Live preview</h3>
+                    <p className="text-sm text-[var(--color-text-muted)]">{visibleSource.length} filtered task row(s)</p>
+                  </div>
+                </div>
+                <ChartVisual dataset={preview} chartKind={draft.chartKind} showLegend />
+              </Panel>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Panel({ children }: { children: ReactNode }) {
   return <section className="motion-card min-w-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-soft sm:p-4">{children}</section>;
 }
@@ -1362,6 +1631,7 @@ function SelectField({ label, value, options, onChange, includeAll = false }: { 
     <label className="space-y-1">
       <span className="field-label">{label}</span>
       <select className="field" value={value} onChange={(event) => onChange(event.target.value)}>
+        {value === "" && <option value="">Select...</option>}
         {includeAll && <option value="All">All</option>}
         {options.map((option) => <option key={option} value={option}>{option}</option>)}
       </select>
@@ -1487,7 +1757,7 @@ function DocumentBadge({ status }: { status: TrackerTask["documentStatus"] }) {
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{status || "-"}</span>;
 }
 
-const MASTER_FIELDS: SortKey[] = ["city", "workstream", "taskName", "zoneArea", "taskOwner", "status", "progress", "dueDate", "riskLevel"];
+const MASTER_FIELDS: SortKey[] = ["city", "workstream", "taskName", "zoneArea", "taskOwner", "status", "progress", "dueDate", "riskLevel", "taskWeight"];
 
 function normalizeTasks(rows: TrackerTask[]) {
   return rows.map(normalizeTask);
@@ -1502,6 +1772,7 @@ function normalizeTask(task: TrackerTask): TrackerTask {
     ...task,
     taskName: toSentenceCase(stripRepeatedTaskWords(task.taskName, task)),
     progress: roundedProgress,
+    taskWeight: task.taskWeight || "",
     vendors,
     vendorName: vendors[0]?.name || "",
     vendorContact: vendors[0]?.contact || "",
@@ -1536,6 +1807,7 @@ function applyFilters(rows: TrackerTask[], filters: Filters) {
       (filters.progress === "All" || task.progress === Number(filters.progress)) &&
       (filters.priority === "All" || task.priority === filters.priority) &&
       (filters.riskLevel === "All" || task.riskLevel === filters.riskLevel) &&
+      (filters.taskWeight === "All" || task.taskWeight === filters.taskWeight) &&
       (filters.documentStatus === "All" || task.documentStatus === filters.documentStatus) &&
       vendorMatch &&
       pocMatch &&
@@ -1549,7 +1821,8 @@ function getCityStats(rows: TrackerTask[], cities: string[]) {
   return cities.map((city) => {
     const cityRows = rows.filter((task) => task.city === city);
     const total = cityRows.length || 1;
-    const completion = Math.round(cityRows.reduce((sum, task) => sum + task.progress, 0) / total);
+    const completion = averageProgress(cityRows);
+    const weightedCompletion = weightedProgress(cityRows);
     const delayed = cityRows.filter((task) => task.status === "Blocked" || isOverdue(task)).length;
     return {
       city,
@@ -1557,6 +1830,7 @@ function getCityStats(rows: TrackerTask[], cities: string[]) {
       completed: cityRows.filter(isClosed).length,
       delayed,
       completion,
+      weightedCompletion,
       health: delayed > 0 || completion < 40 ? "Critical" : completion < 75 ? "Attention Needed" : "Good"
     };
   });
@@ -1568,9 +1842,10 @@ function buildDashboardCharts(rows: TrackerTask[], cityStats: ReturnType<typeof 
   const pending = rows.filter((task) => !isClosed(task) && task.status !== "Blocked").length;
   const delayed = rows.filter((task) => task.status === "Blocked" || isOverdue(task)).length;
   return compactCharts([
-    makeChart("overall-progress", "Overall progress", [{ label: "Average of task progress percentages", value: Math.round(rows.reduce((sum, task) => sum + task.progress, 0) / total), percent: Math.round(rows.reduce((sum, task) => sum + task.progress, 0) / total), status: "good" }], rows, "Progress", "%"),
+    makeChart("overall-progress", "Overall progress", [{ label: "Average of task progress percentages", value: averageProgress(rows), percent: averageProgress(rows), status: "good" }, { label: "Weighted progress", value: weightedProgress(rows), percent: weightedProgress(rows), status: "good" }], rows, "Progress", "%"),
     makeChart("completed-vs-total", "Completed tasks vs total tasks", [{ label: "Completed", value: completed, percent: Math.round((completed / total) * 100), status: "good" }, { label: "Remaining", value: Math.max(0, rows.length - completed), percent: Math.round(((rows.length - completed) / total) * 100), status: "warning" }], rows, "Donut"),
     makeChart("city-wise-progress", "City-wise progress", cityStats.map((city) => ({ label: city.city, value: city.completion, percent: city.completion, status: city.health === "Critical" ? "critical" : city.health === "Good" ? "good" : "warning" })), rows, "Bar", "%"),
+    makeChart("weighted-progress-by-city", "Weighted progress by city", cityStats.map((city) => ({ label: city.city, value: city.weightedCompletion, percent: city.weightedCompletion, status: city.weightedCompletion >= 80 ? "good" : city.weightedCompletion >= 40 ? "warning" : "critical" })), rows, "Bar", "%"),
     ...buildTaskCharts(rows, "dashboard"),
     makeChart("task-completion", "Task completion", [{ label: "Completed", value: completed, percent: Math.round((completed / total) * 100), status: "good" }, { label: "Pending", value: pending, percent: Math.round((pending / total) * 100), status: "warning" }, { label: "Delayed", value: delayed, percent: Math.round((delayed / total) * 100), status: "critical" }], rows, "Donut")
   ]);
@@ -1581,6 +1856,7 @@ function buildCompareCharts(rows: TrackerTask[], cities: string[]): ChartDataset
   const stats = getCityStats(selected, cities);
   return compactCharts([
     makeChart("compare-overall-progress", "Overall progress by city", stats.map((city) => ({ label: city.city, value: city.completion, percent: city.completion, status: city.health === "Critical" ? "critical" : city.health === "Good" ? "good" : "warning" })), selected, "Bar", "%"),
+    makeChart("compare-weighted-progress", "Weighted progress by city", stats.map((city) => ({ label: city.city, value: city.weightedCompletion, percent: city.weightedCompletion, status: city.weightedCompletion >= 80 ? "good" : city.weightedCompletion >= 40 ? "warning" : "critical" })), selected, "Bar", "%"),
     makeChart("compare-task-completion", "Task completion by city", stats.map((city) => ({ label: city.city, value: city.completed, percent: city.total ? Math.round((city.completed / city.total) * 100) : 0, status: "good" })), selected, "Bar"),
     makeChart("compare-delayed-items", "Delayed items by city", stats.map((city) => ({ label: city.city, value: city.delayed, percent: city.total ? Math.round((city.delayed / city.total) * 100) : 0, status: city.delayed ? "critical" : "good" })), selected, "Bar"),
     makeChart("compare-status-distribution", "Status distribution", distribution(selected, "status"), selected, "Donut"),
@@ -1591,13 +1867,15 @@ function buildCompareCharts(rows: TrackerTask[], cities: string[]): ChartDataset
 function getAreaRows(rows: TrackerTask[]) {
   return ZONES.map((area) => {
     const areaTasks = rows.filter((task) => task.zoneArea === area);
-    const progress = areaTasks.length ? Math.round(areaTasks.reduce((sum, task) => sum + task.progress, 0) / areaTasks.length) : 0;
+    const progress = averageProgress(areaTasks);
+    const weighted = weightedProgress(areaTasks);
     const overdue = areaTasks.filter(isOverdue).length;
     return {
       area,
       tasks: areaTasks.length,
       workstreams: new Set(areaTasks.map((task) => task.workstream)).size,
       progress,
+      weighted,
       dueSoon: areaTasks.filter(isDueSoon).length,
       overdue,
       health: overdue > 0 || progress < 40 ? "Critical" : progress < 75 ? "Attention Needed" : "Good"
@@ -1608,6 +1886,7 @@ function getAreaRows(rows: TrackerTask[]) {
 function buildAreaCharts(rows: ReturnType<typeof getAreaRows>, sourceTasks: TrackerTask[]): ChartDataset[] {
   return compactCharts([
     makeChart("area-wise-completion", "Area-wise completion", rows.map((row) => ({ label: row.area, value: row.progress, percent: row.progress, status: row.health === "Critical" ? "critical" : row.health === "Good" ? "good" : "warning" })), sourceTasks, "Bar", "%"),
+    makeChart("weighted-progress-by-area", "Weighted progress by area", rows.map((row) => ({ label: row.area, value: row.weighted, percent: row.weighted, status: row.weighted >= 80 ? "good" : row.weighted >= 40 ? "warning" : "critical" })), sourceTasks, "Bar", "%"),
     makeChart("area-wise-tasks", "Area-wise tasks", rows.map((row) => ({ label: row.area, value: row.tasks, percent: Math.min(100, row.tasks * 8), status: "muted" })), sourceTasks, "Bar"),
     makeChart("area-workstream-coverage", "Area-wise workstream coverage", rows.map((row) => ({ label: row.area, value: row.workstreams, percent: Math.min(100, row.workstreams * 8), status: row.workstreams ? "good" : "muted" })), sourceTasks, "Bar")
   ]);
@@ -1618,10 +1897,13 @@ function buildTaskCharts(rows: TrackerTask[], prefix: string): ChartDataset[] {
     makeChart(`${prefix}-status-distribution`, "Status distribution", distribution(rows, "status"), rows, "Donut"),
     makeChart(`${prefix}-workstream-wise-tasks`, "Workstream-wise tasks", distribution(rows, "workstream"), rows, "Bar"),
     makeChart(`${prefix}-workstream-wise-progress`, "Workstream-wise progress", WORKSTREAMS.map((workstream) => averageRow(workstream.name, rows.filter((task) => task.workstream === workstream.name))), rows, "Bar", "%"),
+    makeChart(`${prefix}-weighted-progress-by-workstream`, "Weighted progress by workstream", WORKSTREAMS.map((workstream) => weightedRow(workstream.name, rows.filter((task) => task.workstream === workstream.name))), rows, "Bar", "%"),
     makeChart(`${prefix}-area-wise-completion`, "Area-wise completion", ZONES.map((area) => averageRow(area, rows.filter((task) => task.zoneArea === area))), rows, "Bar", "%"),
+    makeChart(`${prefix}-weighted-progress-by-area`, "Weighted progress by area", ZONES.map((area) => weightedRow(area, rows.filter((task) => task.zoneArea === area))), rows, "Bar", "%"),
     makeChart(`${prefix}-priority-distribution`, "Priority distribution", distribution(rows, "priority"), rows, "Donut"),
     makeChart(`${prefix}-risk-distribution`, "Risk distribution", distribution(rows, "riskLevel"), rows, "Donut"),
-    makeChart(`${prefix}-document-status`, "Document status distribution", distribution(rows, "documentStatus"), rows, "Donut")
+    makeChart(`${prefix}-document-status`, "Document status distribution", distribution(rows, "documentStatus"), rows, "Donut"),
+    makeChart(`${prefix}-task-weight-distribution`, "Task weight distribution", distribution(rows, "taskWeight"), rows, "Donut")
   ]);
 }
 
@@ -1646,6 +1928,61 @@ function makeChart(id: string, title: string, rows: ChartRow[], sourceTasks: Tra
   };
 }
 
+function buildCustomChart(definition: CustomChartDefinition, sourceTasks: TrackerTask[]): ChartDataset {
+  const filtered = applyFilters(sourceTasks, definition.filters);
+  const groups = groupTasksByCustomField(filtered, definition.groupBy, definition.subgroupBy);
+  const rows = Object.entries(groups).map(([label, groupRows]) => metricRow(label, groupRows, definition.metric, filtered.length));
+  const suffix = definition.metric.includes("progress") ? "%" : undefined;
+  return {
+    id: definition.id,
+    title: definition.title || "Custom task chart",
+    rows,
+    sourceRows: selectSourceColumns(filtered, definition.sourceColumns),
+    sourceColumns: definition.sourceColumns,
+    defaultKind: definition.chartKind,
+    suffix
+  };
+}
+
+function groupTasksByCustomField(rows: TrackerTask[], groupBy: CustomField, subgroupBy: CustomField | "none") {
+  return rows.reduce<Record<string, TrackerTask[]>>((acc, task) => {
+    const primary = customFieldValue(task, groupBy);
+    const secondary = subgroupBy === "none" ? "" : ` / ${customFieldValue(task, subgroupBy)}`;
+    const label = `${primary}${secondary}` || "Blank";
+    acc[label] = acc[label] || [];
+    acc[label].push(task);
+    return acc;
+  }, {});
+}
+
+function metricRow(label: string, rows: TrackerTask[], metric: CustomMetric, totalRows: number): ChartRow {
+  const total = Math.max(totalRows, 1);
+  if (metric === "Average progress") return averageRow(label, rows);
+  if (metric === "Weighted progress") return weightedRow(label, rows);
+  if (metric === "Completed tasks") {
+    const completed = rows.filter(isClosed).length;
+    return { label, value: completed, percent: Math.round((completed / Math.max(rows.length, 1)) * 100), status: completed === rows.length && rows.length ? "good" : completed ? "warning" : "muted" };
+  }
+  return { label, value: rows.length, percent: Math.round((rows.length / total) * 100), status: chartStatus(label) };
+}
+
+function customFieldValue(task: TrackerTask, field: CustomField) {
+  if (field === "zoneArea") return task.zoneArea || "Blank";
+  if (field === "taskWeight") return task.taskWeight || "Blank";
+  if (field === "eventCriticality") return task.eventCriticality || "Blank";
+  return String(task[field] || "Blank");
+}
+
+function selectSourceColumns(tasks: TrackerTask[], columns: string[]) {
+  return tasksToRows(tasks).map((row) => {
+    const selected: Record<string, string | number> = {};
+    columns.forEach((column) => {
+      selected[column] = row[column] ?? "";
+    });
+    return selected;
+  });
+}
+
 function compactCharts(charts: ChartDataset[]) {
   return charts.filter((chart) => chart.sourceRows.length > 0 && chart.rows.length > 0);
 }
@@ -1655,8 +1992,34 @@ function chartsForTab(tab: TabId, charts: Partial<Record<TabId, ChartDataset[]>>
 }
 
 function averageRow(label: string, rows: TrackerTask[]): ChartRow {
-  const value = rows.length ? Math.round(rows.reduce((sum, task) => sum + task.progress, 0) / rows.length) : 0;
+  const value = averageProgress(rows);
   return { label, value, percent: value, status: value >= 80 ? "good" : value >= 40 ? "warning" : "critical" };
+}
+
+function weightedRow(label: string, rows: TrackerTask[]): ChartRow {
+  const value = weightedProgress(rows);
+  return { label, value, percent: value, status: value >= 80 ? "good" : value >= 40 ? "warning" : "critical" };
+}
+
+function averageProgress(rows: TrackerTask[]) {
+  return rows.length ? Math.round(rows.reduce((sum, task) => sum + task.progress, 0) / rows.length) : 0;
+}
+
+function weightedProgress(rows: TrackerTask[]) {
+  const weighted = rows
+    .map((task) => ({ progress: task.progress, weight: taskWeightValue(task.taskWeight) }))
+    .filter((item) => item.weight > 0);
+  const totalWeight = weighted.reduce((sum, item) => sum + item.weight, 0);
+  if (!totalWeight) return 0;
+  return Math.round(weighted.reduce((sum, item) => sum + item.progress * item.weight, 0) / totalWeight);
+}
+
+function taskWeightValue(weight: TrackerTask["taskWeight"]) {
+  if (weight === "Very high") return 4;
+  if (weight === "High") return 3;
+  if (weight === "Medium") return 2;
+  if (weight === "Low") return 1;
+  return 0;
 }
 
 function missingFields(task: TrackerTask) {
@@ -1672,7 +2035,8 @@ function missingFields(task: TrackerTask) {
     ["Status", Boolean(task.status)],
     ["Progress %", task.progress !== null && task.progress !== undefined && PROGRESS_VALUES.some((value) => value === nearestProgress(task.progress))],
     ["Due Date", Boolean(task.dueDate)],
-    ["Budget Status", Boolean(task.budgetStatus)]
+    ["Budget Status", Boolean(task.budgetStatus)],
+    ["Task weight", Boolean(task.taskWeight)]
   ];
   return checks.filter(([, ok]) => !ok).map(([label]) => label);
 }
@@ -1701,6 +2065,8 @@ function isMissingTableField(task: TrackerTask, field: TableField) {
       return isMissingValue(task.dueDate);
     case "documentStatus":
       return task.documentStatus === "Not Attached" || isMissingValue(task.documentStatus) || (!task.documentLinkAttachmentReference && !task.attachments.length);
+    case "taskWeight":
+      return isMissingValue(task.taskWeight);
     default:
       return false;
   }
@@ -1772,6 +2138,7 @@ function tasksToRows(rows: TrackerTask[]): Array<Record<string, string | number>
     "Budget Status": task.budgetStatus,
     "Document Status": task.documentStatus,
     "Risk Level": task.riskLevel,
+    "Task Weight": task.taskWeight,
     "Blocker Reason": task.blockerReason,
     "Last Update Date": task.lastUpdateDate,
     "Next Follow-up Date": task.nextFollowUpDate,
@@ -1814,6 +2181,7 @@ function rowToTask(row: Record<string, string>): TrackerTask | null {
     budgetStatus: optionOrDefault(get("Budget Status"), BUDGET_STATUSES, "Not Required"),
     documentStatus: optionOrDefault(get("Document Status"), DOCUMENT_STATUSES, "Not Attached"),
     riskLevel: optionOrDefault(get("Risk Level"), RISK_LEVELS, "Medium"),
+    taskWeight: optionOrDefault(get("Task Weight"), TASK_WEIGHTS, ""),
     blockerReason: get("Blocker Reason"),
     lastUpdateDate: get("Last Update Date"),
     nextFollowUpDate: get("Next Follow-up Date"),
@@ -2011,7 +2379,7 @@ function labelForField(field: SortKey | "none") {
   return field === "none" ? "None" : field.replace(/([A-Z])/g, " $1").replace(/^./, (char) => char.toUpperCase());
 }
 
-function optionOrDefault<T extends string>(value: string, options: readonly T[], fallback: T): T {
+function optionOrDefault<T extends string, F extends string>(value: string, options: readonly T[], fallback: F): T | F {
   return options.includes(value as T) ? (value as T) : fallback;
 }
 

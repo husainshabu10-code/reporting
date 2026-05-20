@@ -31,6 +31,7 @@ export const BUDGET_STATUSES = ["Not Required", "Quote Pending", "Quote Received
 export const DOCUMENT_STATUSES = ["Not Attached", "Draft Attached", "Final Attached", "Needs Revision"] as const;
 export const RISK_LEVELS = ["High", "Medium", "Low"] as const;
 export const PROGRESS_VALUES = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
+export const TASK_WEIGHTS = ["Very high", "High", "Medium", "Low"] as const;
 
 export type Zone = (typeof ZONES)[number];
 export type OwnershipType = (typeof OWNERSHIP_TYPES)[number] | "";
@@ -41,6 +42,7 @@ export type BudgetStatus = (typeof BUDGET_STATUSES)[number] | "";
 export type DocumentStatus = (typeof DOCUMENT_STATUSES)[number] | "";
 export type RiskLevel = (typeof RISK_LEVELS)[number] | "";
 export type ProgressValue = (typeof PROGRESS_VALUES)[number];
+export type TaskWeight = (typeof TASK_WEIGHTS)[number] | "";
 
 export type Workstream = {
   name: string;
@@ -80,6 +82,7 @@ export type TrackerTask = {
   budgetStatus: BudgetStatus;
   documentStatus: DocumentStatus;
   riskLevel: RiskLevel;
+  taskWeight: TaskWeight;
   blockerReason: string;
   lastUpdateDate: string;
   nextFollowUpDate: string;
@@ -225,6 +228,7 @@ export const CSV_HEADERS: Array<{ key: keyof TrackerTask; label: string }> = [
   { key: "budgetStatus", label: "Budget Status" },
   { key: "documentStatus", label: "Document Status" },
   { key: "riskLevel", label: "Risk Level" },
+  { key: "taskWeight", label: "Task Weight" },
   { key: "blockerReason", label: "Blocker Reason" },
   { key: "lastUpdateDate", label: "Last Update Date" },
   { key: "nextFollowUpDate", label: "Next Follow-up Date" },
@@ -241,6 +245,7 @@ export function inferArea(taskName: string, workstreamName = ""): Zone {
   if (value.includes("checkpoint") || value.includes("scanner") || value.includes("scanning") || value.includes("e-pass")) return "Checkpoints";
   if (value.includes("relay") || value.includes("av ")) return "Relay Area";
   if (value.includes("public wi-fi") || value.includes("captive portal")) return "Public Wi-Fi Area";
+  if (value.includes("cctv") || value.includes("surveillance") || value.includes("security")) return "CCTV / Security";
   if (value.includes("construction") || value.includes("cabling") || value.includes("cable") || value.includes("fiber")) return "Construction";
   if (value.includes("masjid") || value.includes("main venue") || value.includes("waaz")) return "Masjid";
   if (value.includes("office") || value.includes("printer") || value.includes("department")) return "Central Offices";
@@ -283,6 +288,7 @@ export function createDefaultTask(city: string, workstream: string, taskName: st
     budgetStatus: "",
     documentStatus: "",
     riskLevel: "",
+    taskWeight: "",
     blockerReason: "",
     lastUpdateDate: "",
     nextFollowUpDate: "",
