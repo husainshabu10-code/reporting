@@ -895,8 +895,8 @@ function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData:
   };
 
   return (
-    <article className="min-w-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-soft sm:p-4">
-      <div className="flex min-w-0 items-start justify-between gap-3">
+    <article className="min-w-0 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft">
+      <div className="flex min-w-0 items-start justify-between gap-3 p-3 sm:p-4">
         <h2 className="section-title break-words pt-2">{dataset.title}</h2>
         <button
           className="icon-btn flex-none"
@@ -907,9 +907,9 @@ function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData:
           <ChevronDown className={`transition-transform duration-300 ${collapsed ? "-rotate-90" : "rotate-0"}`} size={18} />
         </button>
       </div>
-      <div className={`grid transition-all duration-300 ease-in-out ${collapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"}`}>
+      <div className={`grid overflow-hidden transition-all duration-300 ease-in-out ${collapsed ? "grid-rows-[0fr] px-3 pb-0 opacity-0 sm:px-4" : "grid-rows-[1fr] px-3 pb-3 opacity-100 sm:px-4 sm:pb-4"}`}>
         <div className="min-h-0 overflow-hidden">
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
             <select className="chart-select" value={chartKind} onChange={(event) => setChartKind(event.target.value as ChartKind)}>
               <option value="Bar">Bar chart</option>
               <option value="Line">Line chart</option>
