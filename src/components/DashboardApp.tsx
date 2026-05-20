@@ -111,6 +111,7 @@ const STORAGE_ACTIVITY_KEY = "ashara-it-readiness-activity";
 const CURRENT_USER = "Admin";
 const ATTACHMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx"];
 const CLOSED_STATUSES = new Set(["Completed", "Tested", "Not Required"]);
+const MOTION_MS = 180;
 const TABS: Array<{ id: TabId; icon: LucideIcon }> = [
   { id: "Dashboard", icon: BarChart3 },
   { id: "Compare", icon: Layers3 },
@@ -322,7 +323,7 @@ export default function DashboardApp() {
     <main className="min-h-screen overflow-x-hidden bg-[var(--color-bg)] text-[var(--color-text)]">
       {sidebarOpen && <button className="fixed inset-0 z-30 bg-[#0B4F3A]/35 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar overlay" />}
 
-      <aside className={`fixed inset-y-0 left-0 z-40 flex w-[min(18rem,86vw)] flex-col border-r border-[var(--color-border)] bg-[var(--color-primary)] text-white shadow-2xl transition-transform duration-200 lg:w-72 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`fixed inset-y-0 left-0 z-40 flex w-[min(18rem,86vw)] flex-col border-r border-[var(--color-border)] bg-[var(--color-primary)] text-white shadow-2xl transition-transform duration-300 ease-out lg:w-72 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex min-h-24 items-start justify-between gap-3 border-b border-white/15 p-5">
           <div>
             <p className="text-xs font-semibold uppercase text-[var(--color-accent-light)]">Asharah Mubarak</p>
@@ -338,7 +339,7 @@ export default function DashboardApp() {
             return (
               <button
                 key={tab.id}
-                className={`flex w-full min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition ${
+                className={`flex w-full min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-all duration-200 ${
                   activeTab === tab.id ? "bg-[var(--color-accent)] text-[var(--color-primary)] shadow-sm" : "text-white/90 hover:bg-white/10 hover:text-white"
                 }`}
                 onClick={() => {
@@ -356,7 +357,7 @@ export default function DashboardApp() {
         </div>
       </aside>
 
-      <section className={`min-h-screen transition-[padding] duration-200 ${sidebarOpen ? "lg:pl-72" : ""}`}>
+      <section className={`min-h-screen transition-[padding] duration-300 ease-out ${sidebarOpen ? "lg:pl-72" : ""}`}>
         <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-[var(--color-card)]/95 shadow-sm backdrop-blur">
           <div className="mx-auto flex max-w-[1800px] flex-col gap-3 px-3 py-3 sm:px-6 sm:py-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-center gap-3">
@@ -644,7 +645,7 @@ function ContactsPage({
             <h3 className="section-title">{city}</h3>
             <div className="mt-3 space-y-3">
               {rows.map((contact) => (
-                <button key={contact.id} className="w-full rounded-lg border border-[var(--color-border)] p-3 text-left transition hover:bg-[var(--color-bg)]" onClick={() => setContactDraft(contact)}>
+                <button key={contact.id} className="motion-card w-full rounded-lg border border-[var(--color-border)] p-3 text-left transition hover:bg-[var(--color-bg)]" onClick={() => setContactDraft(contact)}>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <p className="font-semibold text-[var(--color-primary)]">{contact.name || "Unnamed POC"}</p>
@@ -701,7 +702,7 @@ function ActivityPage({ activity }: { activity: ActivityEntry[] }) {
   return (
     <section className="animate-fade-in space-y-4">
       {activity.map((item) => (
-        <article key={item.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-soft">
+        <article key={item.id} className="motion-card rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-soft">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="font-semibold text-[var(--color-primary)]">{item.action}</p>
@@ -789,7 +790,7 @@ function TimelinePage({ cityStats, tasks, onOpenTask }: { cityStats: ReturnType<
         <h2 className="section-title">Upcoming and delayed items</h2>
         <div className="mt-4 space-y-3">
           {upcoming.map((task) => (
-            <button key={task.id} className={`w-full rounded-lg border border-[var(--color-border)] p-3 text-left transition hover:bg-[var(--color-bg)] ${isOverdue(task) ? "bg-[#7A1F2B]/10" : ""}`} onClick={() => onOpenTask(task)}>
+            <button key={task.id} className={`motion-card w-full rounded-lg border border-[var(--color-border)] p-3 text-left transition hover:bg-[var(--color-bg)] ${isOverdue(task) ? "bg-[#7A1F2B]/10" : ""}`} onClick={() => onOpenTask(task)}>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="font-semibold text-[var(--color-text)]">{task.taskName}</p>
@@ -835,10 +836,8 @@ function FiltersPanel({ filters, setFilters, sourceTasks }: { filters: Filters; 
         <p className="text-sm text-[var(--color-text-muted)]">Open filters from the button and choose only what you need.</p>
       </div>
 
-      {open && (
-        <>
-          <button className="fixed inset-0 z-20 cursor-default bg-transparent" onClick={() => setOpen(false)} aria-label="Close filter panel" />
-          <div className="fixed inset-x-3 top-24 z-30 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-2xl animate-fade-in sm:absolute sm:left-0 sm:right-auto sm:top-12 sm:w-[min(72rem,calc(100vw-2rem))] sm:p-4">
+      <div className={`fixed inset-0 z-20 cursor-default bg-transparent transition-opacity duration-200 ${open ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`} onClick={() => setOpen(false)} aria-label="Close filter panel" />
+      <div className={`fixed inset-x-3 top-24 z-30 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-2xl transition-all duration-200 ease-out sm:absolute sm:left-0 sm:right-auto sm:top-12 sm:w-[min(72rem,calc(100vw-2rem))] sm:p-4 ${open ? "pointer-events-auto translate-y-0 scale-100 opacity-100" : "pointer-events-none -translate-y-2 scale-[0.98] opacity-0"}`}>
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="section-title">Filters</h2>
@@ -872,8 +871,6 @@ function FiltersPanel({ filters, setFilters, sourceTasks }: { filters: Filters; 
               <button className="btn-primary justify-center" onClick={() => setOpen(false)}>Apply</button>
             </div>
           </div>
-        </>
-      )}
     </div>
   );
 }
@@ -896,7 +893,7 @@ function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData:
   };
 
   return (
-    <article className="min-w-0 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft">
+    <article className="motion-card min-w-0 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft">
       <div className="flex min-w-0 items-start justify-between gap-3 p-3 sm:p-4">
         <h2 className="section-title break-words pt-2">{dataset.title}</h2>
         <button
@@ -1042,7 +1039,7 @@ function GroupedTaskTable({ tasks, groupBy, subgroupBy, onOpenTask, highlightMis
 
 function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { tasks: TrackerTask[]; onOpenTask: (task: TrackerTask) => void; highlightMissing: boolean; compact?: boolean }) {
   return (
-    <section className={`${compact ? "" : "rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft"}`}>
+    <section className={`${compact ? "" : "motion-card rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft"}`}>
       {!compact && (
         <div className="flex flex-col gap-2 border-b border-[var(--color-border)] p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -1081,7 +1078,7 @@ function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { t
       </div>
       <div className="space-y-3 p-2 sm:p-3 lg:hidden">
         {tasks.map((task) => (
-          <button key={task.id} className={`w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 text-left shadow-sm sm:p-4 ${dueRowClass(task)} ${highlightMissing && missingFields(task).length ? "border-l-4 border-l-[var(--color-important)]" : ""}`} onClick={() => onOpenTask(task)}>
+          <button key={task.id} className={`motion-card w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 text-left shadow-sm sm:p-4 ${dueRowClass(task)} ${highlightMissing && missingFields(task).length ? "border-l-4 border-l-[var(--color-important)]" : ""}`} onClick={() => onOpenTask(task)}>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <p className="break-words font-semibold text-[var(--color-text)]">{taskDisplayName(task)}</p>
@@ -1104,9 +1101,19 @@ function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { t
   );
 }
 
+function useAnimatedClose(onClose: () => void) {
+  const [closing, setClosing] = useState(false);
+  const close = () => {
+    setClosing(true);
+    window.setTimeout(onClose, MOTION_MS);
+  };
+  return { closing, close };
+}
+
 function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: TrackerTask; cities: string[]; onSave: (task: TrackerTask) => void; onClose: () => void; onDelete: (taskId: string) => void }) {
   const [draft, setDraft] = useState<TrackerTask>(() => normalizeTask(task));
   const [attachmentError, setAttachmentError] = useState("");
+  const { closing, close } = useAnimatedClose(onClose);
   useEffect(() => setDraft(normalizeTask(task)), [task]);
 
   const updateField = <K extends keyof TrackerTask>(key: K, value: TrackerTask[K]) => {
@@ -1146,14 +1153,14 @@ function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: Tracker
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0B4F3A]/35 lg:flex lg:justify-end">
-      <aside className="flex h-full w-full flex-col bg-[var(--color-card)] shadow-2xl lg:w-[620px]">
+    <div className={`motion-overlay fixed inset-0 z-50 bg-[#0B4F3A]/35 lg:flex lg:justify-end ${closing ? "motion-overlay-exit" : ""}`}>
+      <aside className={`motion-drawer flex h-full w-full flex-col bg-[var(--color-card)] shadow-2xl lg:w-[620px] ${closing ? "motion-drawer-exit" : ""}`}>
         <div className="flex items-start justify-between gap-3 border-b border-[var(--color-border)] p-3 sm:p-4">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase text-[var(--color-accent)]">Task detail / edit</p>
             <h2 className="mt-1 break-words text-base font-semibold text-[var(--color-primary)] sm:text-lg">{taskDisplayName(draft)}</h2>
           </div>
-          <button className="icon-btn" onClick={onClose} aria-label="Close task editor"><X size={18} /></button>
+          <button className="icon-btn" onClick={close} aria-label="Close task editor"><X size={18} /></button>
         </div>
         <div className="flex-1 space-y-4 overflow-y-auto p-3 sm:p-4">
           {missingFields(draft).length > 0 && <div className="rounded-lg border border-[var(--color-important)] bg-[#7A1F2B]/10 p-3 text-sm text-[var(--color-important)]">Missing required fields: {missingFields(draft).join(", ")}</div>}
@@ -1210,7 +1217,7 @@ function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: Tracker
         </div>
         <div className="flex flex-col gap-2 border-t border-[var(--color-border)] p-3 sm:flex-row sm:justify-between sm:p-4">
           <button className="btn-secondary justify-center text-[var(--color-important)] hover:bg-[#7A1F2B]/10" onClick={() => onDelete(draft.id)}>Delete</button>
-          <div className="grid gap-2 sm:flex"><button className="btn-secondary justify-center sm:flex-none" onClick={onClose}>Cancel</button><button className="btn-primary justify-center sm:flex-none" onClick={() => onSave({ ...draft, id: draft.id || makeTaskId(draft.city, draft.workstream, draft.taskName) })}>Save Changes</button></div>
+          <div className="grid gap-2 sm:flex"><button className="btn-secondary justify-center sm:flex-none" onClick={close}>Cancel</button><button className="btn-primary justify-center sm:flex-none" onClick={() => onSave({ ...draft, id: draft.id || makeTaskId(draft.city, draft.workstream, draft.taskName) })}>Save Changes</button></div>
         </div>
       </aside>
     </div>
@@ -1220,13 +1227,14 @@ function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: Tracker
 function DataModal({ dataset, onClose }: { dataset: ChartDataset; onClose: () => void }) {
   const summaryRows = dataset.rows.map((row) => ({ Label: row.label, Value: row.value, Percent: `${row.percent}%`, Status: row.status || "" }));
   const sourceRows = dataset.sourceRows;
+  const { closing, close } = useAnimatedClose(onClose);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B4F3A]/35 p-2 sm:p-4">
-      <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl">
+    <div className={`motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-[#0B4F3A]/35 p-2 sm:p-4 ${closing ? "motion-overlay-exit" : ""}`}>
+      <div className={`motion-modal max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl ${closing ? "motion-modal-exit" : ""}`}>
         <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] p-3 sm:p-4">
           <h2 className="section-title min-w-0 break-words">{dataset.title} data</h2>
-          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
+          <button className="icon-btn" onClick={close}><X size={18} /></button>
         </div>
         <div className="max-h-[76vh] overflow-auto p-3 sm:p-4">
           <div className="mb-4 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
@@ -1264,16 +1272,17 @@ function ChartSettingsModal({
   const toggleChart = (chartId: string) => {
     onChange(hiddenIds.includes(chartId) ? hiddenIds.filter((id) => id !== chartId) : [...hiddenIds, chartId]);
   };
+  const { closing, close } = useAnimatedClose(onClose);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B4F3A]/35 p-2 sm:p-4">
-      <div className="max-h-[92vh] w-full max-w-xl overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl">
+    <div className={`motion-overlay fixed inset-0 z-50 flex items-center justify-center bg-[#0B4F3A]/35 p-2 sm:p-4 ${closing ? "motion-overlay-exit" : ""}`}>
+      <div className={`motion-modal max-h-[92vh] w-full max-w-xl overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl ${closing ? "motion-modal-exit" : ""}`}>
         <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] p-3 sm:p-4">
           <div>
             <h2 className="section-title">Chart settings</h2>
             <p className="text-sm text-[var(--color-text-muted)]">{tab}</p>
           </div>
-          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
+          <button className="icon-btn" onClick={close}><X size={18} /></button>
         </div>
         <div className="max-h-[74vh] space-y-3 overflow-auto p-3 sm:p-4">
           {charts.map((chart) => (
@@ -1289,7 +1298,7 @@ function ChartSettingsModal({
 }
 
 function Panel({ children }: { children: ReactNode }) {
-  return <section className="min-w-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-soft sm:p-4">{children}</section>;
+  return <section className="motion-card min-w-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-soft sm:p-4">{children}</section>;
 }
 
 function SelectField({ label, value, options, onChange, includeAll = false }: { label: string; value: string; options: readonly string[]; onChange: (value: string) => void; includeAll?: boolean }) {
