@@ -111,7 +111,7 @@ type ChartDataset = {
   sourceColumns?: string[];
 };
 type ChartKind = "Bar" | "Line" | "Pie" | "Donut" | "Progress";
-type CustomMetric = "Count" | "Average progress" | "Task weight progress" | "Area weightage progress" | "Completed tasks";
+type CustomMetric = "Count" | "Progress" | "Completed tasks";
 type CustomField = "city" | "zoneArea" | "workstream" | "status" | "progress" | "taskWeight" | "priority" | "riskLevel" | "taskOwner" | "eventCriticality";
 type CustomChartDefinition = {
   id: string;
@@ -174,7 +174,7 @@ const CUSTOM_FIELDS: Array<{ key: CustomField; label: string }> = [
   { key: "taskOwner", label: "Task Owner / POC" },
   { key: "eventCriticality", label: "Event Criticality" }
 ];
-const CUSTOM_METRICS: CustomMetric[] = ["Count", "Average progress", "Task weight progress", "Area weightage progress", "Completed tasks"];
+const CUSTOM_METRICS: CustomMetric[] = ["Count", "Progress", "Completed tasks"];
 const DEFAULT_CUSTOM_COLUMNS = ["City", "Area", "Workstream", "Task Name", "Status", "Progress %", "Task Weight"];
 const AREA_WEIGHTAGE_GROUPS = {
   CMZ: {
@@ -810,10 +810,6 @@ function AreaPage({
           Workstreams: row.workstreams,
           Status: row.health,
           "Progress %": row.progress,
-          "Task Weight Progress %": row.taskWeightCompletion,
-          "Weightage Group": row.weightageGroup,
-          "Group Points": row.weightagePoints,
-          "Weightage Contribution": row.weightageContribution,
           "Due Soon": row.dueSoon,
           Overdue: row.overdue
         }))} />
@@ -904,7 +900,7 @@ function TimelinePage({ cityStats, tasks, onOpenTask }: { cityStats: ReturnType<
             <div key={city.city} className="grid gap-3 md:grid-cols-[11rem_1fr_8rem] md:items-center">
               <div>
                 <p className="font-semibold text-[var(--color-primary)]">{index + 1}. {city.city}</p>
-                <p className="text-sm text-[var(--color-text-muted)]">{city.health} / area weightage {city.weightageCompletion}%</p>
+                <p className="text-sm text-[var(--color-text-muted)]">{city.health}</p>
               </div>
               <ProgressBar value={city.completion} />
               <span className="text-sm font-semibold text-[var(--color-primary)]">{city.completion}% ready</span>
@@ -1537,7 +1533,7 @@ function AddChartModal({
     sourceColumns: DEFAULT_CUSTOM_COLUMNS,
     filters: EMPTY_FILTERS
   }));
-  const recommended = charts.filter((chart) => ["city-wise-progress", "weightage-progress", "task-weight-progress", "overall-progress", "completed-vs-total", "status-distribution", "workstream-wise-progress", "area-wise-completion"].some((id) => chart.id.includes(id)));
+  const recommended = charts.filter((chart) => ["city-wise-progress", "overall-progress", "completed-vs-total", "status-distribution", "workstream-wise-progress", "area-wise-progress"].some((id) => chart.id.includes(id)));
   const recommendedCharts = recommended.length ? recommended : charts.slice(0, 6);
   const visibleSource = useMemo(() => applyFilters(sourceTasks, draft.filters), [draft.filters, sourceTasks]);
   const preview = useMemo(() => buildCustomChart(draft, sourceTasks), [draft, sourceTasks]);
@@ -1839,8 +1835,7 @@ function getCityStats(rows: TrackerTask[], cities: string[]) {
   return cities.map((city) => {
     const cityRows = rows.filter((task) => task.city === city);
     const total = cityRows.length || 1;
-    const completion = averageProgress(cityRows);
-    const weightageCompletion = areaWeightageProgress(cityRows);
+    const completion = progressScore(cityRows);
     const delayed = cityRows.filter((task) => task.status === "Blocked" || isOverdue(task)).length;
     return {
       city,
@@ -1848,7 +1843,6 @@ function getCityStats(rows: TrackerTask[], cities: string[]) {
       completed: cityRows.filter(isClosed).length,
       delayed,
       completion,
-      weightageCompletion: weightageCompletion,
       health: delayed > 0 || completion < 40 ? "Critical" : completion < 75 ? "Attention Needed" : "Good"
     };
   });
@@ -1859,11 +1853,11 @@ function buildDashboardCharts(rows: TrackerTask[], cityStats: ReturnType<typeof 
   const completed = rows.filter(isClosed).length;
   const pending = rows.filter((task) => !isClosed(task) && task.status !== "Blocked").length;
   const delayed = rows.filter((task) => task.status === "Blocked" || isOverdue(task)).length;
+  const progress = progressScore(rows);
   return compactCharts([
-    makeChart("overall-progress", "Overall progress", [{ label: "Average of task progress percentages", value: averageProgress(rows), percent: averageProgress(rows), status: "good" }, { label: "Area weightage progress", value: areaWeightageProgress(rows), percent: areaWeightageProgress(rows), status: "good" }], rows, "Progress", "%"),
+    makeChart("overall-progress", "Overall progress", [{ label: "Progress", value: progress, percent: progress, status: progress >= 80 ? "good" : progress >= 40 ? "warning" : "critical" }], rows, "Progress", "%"),
     makeChart("completed-vs-total", "Completed tasks vs total tasks", [{ label: "Completed", value: completed, percent: Math.round((completed / total) * 100), status: "good" }, { label: "Remaining", value: Math.max(0, rows.length - completed), percent: Math.round(((rows.length - completed) / total) * 100), status: "warning" }], rows, "Donut"),
     makeChart("city-wise-progress", "City-wise progress", cityStats.map((city) => ({ label: city.city, value: city.completion, percent: city.completion, status: city.health === "Critical" ? "critical" : city.health === "Good" ? "good" : "warning" })), rows, "Bar", "%"),
-    makeChart("area-weightage-progress-by-city", "Area weightage progress by city", cityStats.map((city) => ({ label: city.city, value: city.weightageCompletion, percent: city.weightageCompletion, status: city.weightageCompletion >= 80 ? "good" : city.weightageCompletion >= 40 ? "warning" : "critical" })), rows, "Bar", "%"),
     ...buildTaskCharts(rows, "dashboard"),
     makeChart("task-completion", "Task completion", [{ label: "Completed", value: completed, percent: Math.round((completed / total) * 100), status: "good" }, { label: "Pending", value: pending, percent: Math.round((pending / total) * 100), status: "warning" }, { label: "Delayed", value: delayed, percent: Math.round((delayed / total) * 100), status: "critical" }], rows, "Donut")
   ]);
@@ -1874,32 +1868,23 @@ function buildCompareCharts(rows: TrackerTask[], cities: string[]): ChartDataset
   const stats = getCityStats(selected, cities);
   return compactCharts([
     makeChart("compare-overall-progress", "Overall progress by city", stats.map((city) => ({ label: city.city, value: city.completion, percent: city.completion, status: city.health === "Critical" ? "critical" : city.health === "Good" ? "good" : "warning" })), selected, "Bar", "%"),
-    makeChart("compare-area-weightage-progress", "Area weightage progress by city", stats.map((city) => ({ label: city.city, value: city.weightageCompletion, percent: city.weightageCompletion, status: city.weightageCompletion >= 80 ? "good" : city.weightageCompletion >= 40 ? "warning" : "critical" })), selected, "Bar", "%"),
     makeChart("compare-task-completion", "Task completion by city", stats.map((city) => ({ label: city.city, value: city.completed, percent: city.total ? Math.round((city.completed / city.total) * 100) : 0, status: "good" })), selected, "Bar"),
     makeChart("compare-delayed-items", "Delayed items by city", stats.map((city) => ({ label: city.city, value: city.delayed, percent: city.total ? Math.round((city.delayed / city.total) * 100) : 0, status: city.delayed ? "critical" : "good" })), selected, "Bar"),
     makeChart("compare-status-distribution", "Status distribution", distribution(selected, "status"), selected, "Donut"),
-    makeChart("compare-workstream-progress", "Workstream-wise progress", WORKSTREAMS.map((workstream) => averageRow(workstream.name, selected.filter((task) => task.workstream === workstream.name))), selected, "Bar", "%")
+    makeChart("compare-workstream-progress", "Workstream-wise progress", WORKSTREAMS.map((workstream) => progressRow(workstream.name, selected.filter((task) => task.workstream === workstream.name))), selected, "Bar", "%")
   ]);
 }
 
 function getAreaRows(rows: TrackerTask[]) {
   return ZONES.map((area) => {
     const areaTasks = rows.filter((task) => task.zoneArea === area);
-    const progress = averageProgress(areaTasks);
-    const taskWeightCompletion = taskWeightProgress(areaTasks);
-    const weightageGroup = areaWeightageGroupFor(area);
-    const weightagePoints = AREA_WEIGHTAGE_GROUPS[weightageGroup].points;
-    const weightageContribution = Math.round((taskWeightCompletion * weightagePoints) / AREA_WEIGHTAGE_TOTAL);
+    const progress = taskWeightProgress(areaTasks);
     const overdue = areaTasks.filter(isOverdue).length;
     return {
       area,
       tasks: areaTasks.length,
       workstreams: new Set(areaTasks.map((task) => task.workstream)).size,
       progress,
-      taskWeightCompletion,
-      weightageGroup,
-      weightagePoints,
-      weightageContribution,
       dueSoon: areaTasks.filter(isDueSoon).length,
       overdue,
       health: overdue > 0 || progress < 40 ? "Critical" : progress < 75 ? "Attention Needed" : "Good"
@@ -1909,9 +1894,7 @@ function getAreaRows(rows: TrackerTask[]) {
 
 function buildAreaCharts(rows: ReturnType<typeof getAreaRows>, sourceTasks: TrackerTask[]): ChartDataset[] {
   return compactCharts([
-    makeChart("area-wise-completion", "Area-wise completion", rows.map((row) => ({ label: row.area, value: row.progress, percent: row.progress, status: row.health === "Critical" ? "critical" : row.health === "Good" ? "good" : "warning" })), sourceTasks, "Bar", "%"),
-    makeChart("task-weight-progress-by-area", "Task weight progress by area", rows.map((row) => ({ label: row.area, value: row.taskWeightCompletion, percent: row.taskWeightCompletion, status: row.taskWeightCompletion >= 80 ? "good" : row.taskWeightCompletion >= 40 ? "warning" : "critical" })), sourceTasks, "Bar", "%"),
-    makeChart("area-weightage-contribution", "Area weightage contribution", areaWeightageRows(sourceTasks), sourceTasks, "Bar", "%"),
+    makeChart("area-wise-progress", "Area-wise progress", rows.map((row) => ({ label: row.area, value: row.progress, percent: row.progress, status: row.health === "Critical" ? "critical" : row.health === "Good" ? "good" : "warning" })), sourceTasks, "Bar", "%"),
     makeChart("area-wise-tasks", "Area-wise tasks", rows.map((row) => ({ label: row.area, value: row.tasks, percent: Math.min(100, row.tasks * 8), status: "muted" })), sourceTasks, "Bar"),
     makeChart("area-workstream-coverage", "Area-wise workstream coverage", rows.map((row) => ({ label: row.area, value: row.workstreams, percent: Math.min(100, row.workstreams * 8), status: row.workstreams ? "good" : "muted" })), sourceTasks, "Bar")
   ]);
@@ -1921,16 +1904,11 @@ function buildTaskCharts(rows: TrackerTask[], prefix: string): ChartDataset[] {
   return compactCharts([
     makeChart(`${prefix}-status-distribution`, "Status distribution", distribution(rows, "status"), rows, "Donut"),
     makeChart(`${prefix}-workstream-wise-tasks`, "Workstream-wise tasks", distribution(rows, "workstream"), rows, "Bar"),
-    makeChart(`${prefix}-workstream-wise-progress`, "Workstream-wise progress", WORKSTREAMS.map((workstream) => averageRow(workstream.name, rows.filter((task) => task.workstream === workstream.name))), rows, "Bar", "%"),
-    makeChart(`${prefix}-task-weight-progress-by-workstream`, "Task weight progress by workstream", WORKSTREAMS.map((workstream) => taskWeightRow(workstream.name, rows.filter((task) => task.workstream === workstream.name))), rows, "Bar", "%"),
-    makeChart(`${prefix}-area-weightage-progress-by-workstream`, "Area weightage progress by workstream", WORKSTREAMS.map((workstream) => areaWeightageRow(workstream.name, rows.filter((task) => task.workstream === workstream.name))), rows, "Bar", "%"),
-    makeChart(`${prefix}-area-wise-completion`, "Area-wise completion", ZONES.map((area) => averageRow(area, rows.filter((task) => task.zoneArea === area))), rows, "Bar", "%"),
-    makeChart(`${prefix}-task-weight-progress-by-area`, "Task weight progress by area", ZONES.map((area) => taskWeightRow(area, rows.filter((task) => task.zoneArea === area))), rows, "Bar", "%"),
-    makeChart(`${prefix}-area-weightage-contribution`, "Area weightage contribution", areaWeightageRows(rows), rows, "Bar", "%"),
+    makeChart(`${prefix}-workstream-wise-progress`, "Workstream-wise progress", WORKSTREAMS.map((workstream) => progressRow(workstream.name, rows.filter((task) => task.workstream === workstream.name))), rows, "Bar", "%"),
+    makeChart(`${prefix}-area-wise-progress`, "Area-wise progress", ZONES.map((area) => areaProgressRow(area, rows.filter((task) => task.zoneArea === area))), rows, "Bar", "%"),
     makeChart(`${prefix}-priority-distribution`, "Priority distribution", distribution(rows, "priority"), rows, "Donut"),
     makeChart(`${prefix}-risk-distribution`, "Risk distribution", distribution(rows, "riskLevel"), rows, "Donut"),
-    makeChart(`${prefix}-document-status`, "Document status distribution", distribution(rows, "documentStatus"), rows, "Donut"),
-    makeChart(`${prefix}-task-weight-distribution`, "Task weight distribution", distribution(rows, "taskWeight"), rows, "Donut")
+    makeChart(`${prefix}-document-status`, "Document status distribution", distribution(rows, "documentStatus"), rows, "Donut")
   ]);
 }
 
@@ -1984,9 +1962,7 @@ function groupTasksByCustomField(rows: TrackerTask[], groupBy: CustomField, subg
 
 function metricRow(label: string, rows: TrackerTask[], metric: CustomMetric, totalRows: number): ChartRow {
   const total = Math.max(totalRows, 1);
-  if (metric === "Average progress") return averageRow(label, rows);
-  if (metric === "Task weight progress") return taskWeightRow(label, rows);
-  if (metric === "Area weightage progress") return areaWeightageRow(label, rows);
+  if (metric === "Progress") return progressRow(label, rows);
   if (metric === "Completed tasks") {
     const completed = rows.filter(isClosed).length;
     return { label, value: completed, percent: Math.round((completed / Math.max(rows.length, 1)) * 100), status: completed === rows.length && rows.length ? "good" : completed ? "warning" : "muted" };
@@ -2019,23 +1995,22 @@ function chartsForTab(tab: TabId, charts: Partial<Record<TabId, ChartDataset[]>>
   return charts[tab] || [];
 }
 
-function averageRow(label: string, rows: TrackerTask[]): ChartRow {
-  const value = averageProgress(rows);
+function progressRow(label: string, rows: TrackerTask[]): ChartRow {
+  const value = progressScore(rows);
   return { label, value, percent: value, status: value >= 80 ? "good" : value >= 40 ? "warning" : "critical" };
 }
 
-function taskWeightRow(label: string, rows: TrackerTask[]): ChartRow {
+function areaProgressRow(label: string, rows: TrackerTask[]): ChartRow {
   const value = taskWeightProgress(rows);
-  return { label, value, percent: value, status: value >= 80 ? "good" : value >= 40 ? "warning" : "critical" };
-}
-
-function areaWeightageRow(label: string, rows: TrackerTask[]): ChartRow {
-  const value = areaWeightageProgress(rows);
   return { label, value, percent: value, status: value >= 80 ? "good" : value >= 40 ? "warning" : "critical" };
 }
 
 function averageProgress(rows: TrackerTask[]) {
   return rows.length ? Math.round(rows.reduce((sum, task) => sum + task.progress, 0) / rows.length) : 0;
+}
+
+function progressScore(rows: TrackerTask[]) {
+  return areaWeightageProgress(rows);
 }
 
 function taskWeightProgress(rows: TrackerTask[]) {
@@ -2063,11 +2038,6 @@ function areaWeightageRows(rows: TrackerTask[]): ChartRow[] {
       status: contribution >= config.points * 0.8 ? "good" : contribution >= config.points * 0.4 ? "warning" : "critical"
     };
   });
-}
-
-function areaWeightageGroupFor(area: TrackerTask["zoneArea"]) {
-  const entry = Object.entries(AREA_WEIGHTAGE_GROUPS).find(([, config]) => config.areas.includes(area));
-  return (entry?.[0] || "General") as keyof typeof AREA_WEIGHTAGE_GROUPS;
 }
 
 function taskWeightValue(weight: TrackerTask["taskWeight"]) {
