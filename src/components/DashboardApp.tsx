@@ -147,7 +147,7 @@ export default function DashboardApp() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [reportFilters, setReportFilters] = useState<Filters>(EMPTY_FILTERS);
   const [selectedTask, setSelectedTask] = useState<TrackerTask | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [cityDraft, setCityDraft] = useState("");
   const [highlightMissing, setHighlightMissing] = useState(true);
   const [chartData, setChartData] = useState<ChartDataset | null>(null);
@@ -180,6 +180,10 @@ export default function DashboardApp() {
     } finally {
       setHydrated(true);
     }
+  }, []);
+
+  useEffect(() => {
+    setSidebarOpen(window.innerWidth >= 1024);
   }, []);
 
   useEffect(() => {
@@ -313,7 +317,7 @@ export default function DashboardApp() {
   };
 
   return (
-    <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
+    <main className="min-h-screen overflow-x-hidden bg-[var(--color-bg)] text-[var(--color-text)]">
       {sidebarOpen && <button className="fixed inset-0 z-30 bg-[#0B4F3A]/35 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar overlay" />}
 
       <aside className={`fixed inset-y-0 left-0 z-40 flex w-[min(18rem,86vw)] flex-col border-r border-[var(--color-border)] bg-[var(--color-primary)] text-white shadow-2xl transition-transform duration-200 lg:w-72 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
@@ -352,30 +356,38 @@ export default function DashboardApp() {
 
       <section className={`min-h-screen transition-[padding] duration-200 ${sidebarOpen ? "lg:pl-72" : ""}`}>
         <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-[var(--color-card)]/95 shadow-sm backdrop-blur">
-          <div className="mx-auto flex max-w-[1800px] flex-col gap-4 px-4 py-4 sm:px-6 xl:flex-row xl:items-center xl:justify-between">
+          <div className="mx-auto flex max-w-[1800px] flex-col gap-3 px-3 py-3 sm:px-6 sm:py-4 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-center gap-3">
               <button className="icon-btn" onClick={() => setSidebarOpen((value) => !value)} aria-label={sidebarOpen ? "Close sidebar menu" : "Open sidebar menu"}>
                 <Menu size={18} />
               </button>
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase text-[var(--color-accent)]">{activeTab}</p>
-                <h2 className="truncate text-xl font-semibold text-[var(--color-primary)] sm:text-2xl">IT / Event Preparation Dashboard</h2>
+                <h2 className="truncate text-lg font-semibold text-[var(--color-primary)] sm:text-2xl">IT / Event Preparation Dashboard</h2>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
               {chartsForActiveTab.length > 0 && (
-                <button className="btn-secondary" onClick={() => setChartSettingsTab(activeTab)}><BarChart3 size={16} /> Chart Settings</button>
+                <button className="btn-secondary justify-center max-[380px]:col-span-2" onClick={() => setChartSettingsTab(activeTab)}><BarChart3 size={16} /> Chart Settings</button>
               )}
-              <button className="btn-primary" onClick={() => setSelectedTask(createBlankTask(cities[0] ?? "Nairobi"))}><Plus size={16} /> Add Task</button>
-              <button className="btn-secondary" onClick={() => exportTaskCsv(filteredTasks, "visible-tasks")}><Download size={16} /> Export CSV</button>
-              <button className="btn-secondary" onClick={() => importInputRef.current?.click()}><Upload size={16} /> Import CSV</button>
+              <button className="btn-primary justify-center" onClick={() => setSelectedTask(createBlankTask(cities[0] ?? "Nairobi"))}><Plus size={16} /> Add Task</button>
+              <button className="btn-secondary justify-center" onClick={() => exportTaskCsv(filteredTasks, "visible-tasks")}><Download size={16} /> Export CSV</button>
+              <button className="btn-secondary justify-center" onClick={() => importInputRef.current?.click()}><Upload size={16} /> Import CSV</button>
               <input ref={importInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={importCsv} />
-              <button className="btn-secondary" onClick={resetDemoData}><RefreshCcw size={16} /> Reset Demo</button>
+              <button className="btn-secondary justify-center" onClick={resetDemoData}><RefreshCcw size={16} /> Reset Demo</button>
+            </div>
+            <div className="lg:hidden">
+              <label className="space-y-1 block">
+                <span className="field-label">Current tab</span>
+                <select className="field" value={activeTab} onChange={(event) => setActiveTab(event.target.value as TabId)}>
+                  {TABS.map((tab) => <option key={tab.id} value={tab.id}>{tab.id}</option>)}
+                </select>
+              </label>
             </div>
           </div>
         </header>
 
-      <div className="mx-auto max-w-[1800px] space-y-5 px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1800px] space-y-4 px-3 py-4 sm:space-y-5 sm:px-6 sm:py-5 lg:px-8">
         <CityManager cityDraft={cityDraft} setCityDraft={setCityDraft} onAddCity={addCity} />
 
         {activeTab === "Dashboard" && (
@@ -520,11 +532,11 @@ function ComparePage({
   return (
     <section className="animate-fade-in space-y-5">
       <Panel>
-        <div className="flex flex-col gap-3">
+        <div className="flex min-w-0 flex-col gap-3">
           <h2 className="section-title">Choose cities to compare</h2>
-          <div className="flex flex-wrap gap-2">
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible">
             {cities.map((city) => (
-              <button key={city} className={`tab-choice ${selectedCities.includes(city) ? "tab-choice-active" : ""}`} onClick={() => toggleCity(city)}>
+              <button key={city} className={`tab-choice flex-none ${selectedCities.includes(city) ? "tab-choice-active" : ""}`} onClick={() => toggleCity(city)}>
                 {city}
               </button>
             ))}
@@ -581,7 +593,7 @@ function MasterListPage({
       </Panel>
       <ChartGrid charts={charts} onShowData={onShowData} />
       <Panel>
-        <div className="grid gap-3 md:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <SelectField label="Group by" value={groupBy} options={["none", ...MASTER_FIELDS]} onChange={(value) => setGroupBy(value as SortKey | "none")} />
           <SelectField label="Subgroup by" value={subgroupBy} options={["none", ...MASTER_FIELDS]} onChange={(value) => setSubgroupBy(value as SortKey | "none")} />
           <SelectField label="Sort by" value={sortKey} options={MASTER_FIELDS} onChange={(value) => setSortKey(value as SortKey)} />
@@ -612,7 +624,7 @@ function ContactsPage({
     <section className="animate-fade-in space-y-5">
       <Panel>
         <h2 className="section-title">Contact details</h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <InputField label="Name" value={contactDraft.name} onChange={(value) => setContactDraft({ ...contactDraft, name: value })} />
           <SelectField label="City" value={contactDraft.city} options={cities} onChange={(value) => setContactDraft({ ...contactDraft, city: value })} />
           <InputField label="Phone" value={contactDraft.phone} onChange={(value) => setContactDraft({ ...contactDraft, phone: value })} />
@@ -622,7 +634,7 @@ function ContactsPage({
           <InputField label="Custom responsibility" value={contactDraft.customResponsibility} onChange={(value) => setContactDraft({ ...contactDraft, customResponsibility: value })} />
           <InputField label="Notes" value={contactDraft.notes} onChange={(value) => setContactDraft({ ...contactDraft, notes: value })} />
         </div>
-        <div className="mt-4 flex justify-end"><button className="btn-primary" onClick={saveContact}><Plus size={16} /> Save Contact</button></div>
+        <div className="mt-4 grid sm:flex sm:justify-end"><button className="btn-primary justify-center" onClick={saveContact}><Plus size={16} /> Save Contact</button></div>
       </Panel>
       <div className="grid gap-5 lg:grid-cols-2">
         {Object.entries(grouped).map(([city, rows]) => (
@@ -631,14 +643,14 @@ function ContactsPage({
             <div className="mt-3 space-y-3">
               {rows.map((contact) => (
                 <button key={contact.id} className="w-full rounded-lg border border-[var(--color-border)] p-3 text-left transition hover:bg-[var(--color-bg)]" onClick={() => setContactDraft(contact)}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
                       <p className="font-semibold text-[var(--color-primary)]">{contact.name || "Unnamed POC"}</p>
-                      <p className="text-sm text-[var(--color-text-muted)]">{contact.role || "Role pending"} / {contact.workstreamHandled}</p>
+                      <p className="break-words text-sm text-[var(--color-text-muted)]">{contact.role || "Role pending"} / {contact.workstreamHandled}</p>
                     </div>
-                    <span className="badge-gold">{contact.phone || "Phone pending"}</span>
+                    <span className="badge-gold w-fit max-w-full break-all">{contact.phone || "Phone pending"}</span>
                   </div>
-                  <p className="mt-2 text-sm text-[var(--color-text-muted)]">{contact.email || "Email pending"} {contact.notes ? `- ${contact.notes}` : ""}</p>
+                  <p className="mt-2 break-words text-sm text-[var(--color-text-muted)]">{contact.email || "Email pending"} {contact.notes ? `- ${contact.notes}` : ""}</p>
                 </button>
               ))}
             </div>
@@ -824,7 +836,7 @@ function FiltersPanel({ filters, setFilters, sourceTasks }: { filters: Filters; 
       {open && (
         <>
           <button className="fixed inset-0 z-20 cursor-default bg-transparent" onClick={() => setOpen(false)} aria-label="Close filter panel" />
-          <div className="absolute left-0 top-12 z-30 w-[min(72rem,calc(100vw-2rem))] rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-2xl animate-fade-in">
+          <div className="fixed inset-x-3 top-24 z-30 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-2xl animate-fade-in sm:absolute sm:left-0 sm:right-auto sm:top-12 sm:w-[min(72rem,calc(100vw-2rem))] sm:p-4">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h2 className="section-title">Filters</h2>
@@ -832,7 +844,7 @@ function FiltersPanel({ filters, setFilters, sourceTasks }: { filters: Filters; 
               </div>
               <button className="icon-btn" onClick={() => setOpen(false)} aria-label="Close filters"><X size={16} /></button>
             </div>
-            <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               <label className="space-y-1 md:col-span-2">
                 <span className="field-label">Search</span>
                 <span className="relative block">
@@ -853,9 +865,9 @@ function FiltersPanel({ filters, setFilters, sourceTasks }: { filters: Filters; 
               <InputField label="Due from" type="date" value={filters.dueFrom} onChange={(value) => update("dueFrom", value)} />
               <InputField label="Due to" type="date" value={filters.dueTo} onChange={(value) => update("dueTo", value)} />
             </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button className="btn-secondary" onClick={() => setFilters(EMPTY_FILTERS)}><X size={16} /> Clear Filters</button>
-              <button className="btn-primary" onClick={() => setOpen(false)}>Apply</button>
+            <div className="mt-4 grid gap-2 sm:flex sm:justify-end">
+              <button className="btn-secondary justify-center" onClick={() => setFilters(EMPTY_FILTERS)}><X size={16} /> Clear Filters</button>
+              <button className="btn-primary justify-center" onClick={() => setOpen(false)}>Apply</button>
             </div>
           </div>
         </>
@@ -866,7 +878,7 @@ function FiltersPanel({ filters, setFilters, sourceTasks }: { filters: Filters; 
 
 function ChartGrid({ charts, onShowData }: { charts: ChartDataset[]; onShowData: (dataset: ChartDataset) => void }) {
   return (
-    <section className="grid gap-5 xl:grid-cols-3">
+    <section className="grid min-w-0 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
       {charts.map((chart) => <ChartCard key={chart.id} dataset={chart} onShowData={onShowData} />)}
     </section>
   );
@@ -882,10 +894,10 @@ function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData:
   };
 
   return (
-    <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-soft">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <h2 className="section-title">{dataset.title}</h2>
-        <div className="flex flex-wrap gap-2">
+    <article className="min-w-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-soft sm:p-4">
+      <div className="flex min-w-0 flex-col gap-3">
+        <h2 className="section-title break-words">{dataset.title}</h2>
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           <select className="chart-select" value={chartKind} onChange={(event) => setChartKind(event.target.value as ChartKind)}>
             <option value="Bar">Bar chart</option>
             <option value="Line">Line chart</option>
@@ -893,11 +905,11 @@ function ChartCard({ dataset, onShowData }: { dataset: ChartDataset; onShowData:
             <option value="Donut">Donut chart</option>
             <option value="Progress">Progress bars</option>
           </select>
-          <button className="btn-compact" onClick={() => onShowData(dataset)}>View data</button>
-          <button className="btn-compact" onClick={() => downloadChartVisual(dataset, chartKind, "png")}>PNG</button>
-          <button className="btn-compact" onClick={() => downloadChartVisual(dataset, chartKind, "pdf")}>PDF</button>
-          <button className="btn-compact" onClick={resetChart}>Reset</button>
-          <button className="btn-compact" onClick={() => setCollapsed((value) => !value)}>{collapsed ? "Expand" : "Collapse"}</button>
+          <button className="btn-compact justify-center" onClick={() => onShowData(dataset)}>View data</button>
+          <button className="btn-compact justify-center" onClick={() => downloadChartVisual(dataset, chartKind, "png")}>PNG</button>
+          <button className="btn-compact justify-center" onClick={() => downloadChartVisual(dataset, chartKind, "pdf")}>PDF</button>
+          <button className="btn-compact justify-center" onClick={resetChart}>Reset</button>
+          <button className="btn-compact justify-center" onClick={() => setCollapsed((value) => !value)}>{collapsed ? "Expand" : "Collapse"}</button>
         </div>
       </div>
       {!collapsed && <ChartVisual dataset={dataset} chartKind={chartKind} />}
@@ -936,8 +948,8 @@ function LineChartVisual({ dataset }: { dataset: ChartDataset }) {
   });
 
   return (
-    <div className="mt-4 overflow-x-auto">
-      <svg className="min-w-[520px]" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={dataset.title}>
+    <div className="mt-4 min-w-0">
+      <svg className="h-auto w-full max-w-full" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={dataset.title}>
         <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="var(--color-border)" strokeWidth="2" />
         <polyline points={points.map((point) => `${point.x},${point.y}`).join(" ")} fill="none" stroke="var(--color-secondary)" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
         {points.map((point, index) => (
@@ -956,13 +968,13 @@ function PieLikeChart({ dataset, chartKind }: { dataset: ChartDataset; chartKind
   const gradient = conicGradient(rows.length ? rows : dataset.rows);
 
   return (
-    <div className="mt-4 grid gap-4 md:grid-cols-[180px_1fr] md:items-center">
-      <div className="mx-auto flex h-44 w-44 items-center justify-center rounded-full border border-[var(--color-border)] shadow-inner" style={{ background: gradient }}>
+    <div className="mt-4 grid min-w-0 gap-4 md:grid-cols-[minmax(9rem,180px)_1fr] md:items-center">
+      <div className="mx-auto flex aspect-square w-36 items-center justify-center rounded-full border border-[var(--color-border)] shadow-inner sm:w-44" style={{ background: gradient }}>
         {chartKind === "Donut" && (
-          <div className="h-24 w-24 rounded-full border border-[var(--color-border)] bg-[var(--color-card)]" aria-hidden="true" />
+          <div className="aspect-square w-20 rounded-full border border-[var(--color-border)] bg-[var(--color-card)] sm:w-24" aria-hidden="true" />
         )}
       </div>
-      <div className="space-y-2">
+      <div className="min-w-0 space-y-2">
         {dataset.rows.map((row, index) => (
           <div key={row.label} className="flex items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm" title={`${row.label}: ${row.value}${dataset.suffix || ""} (${row.percent}%)`}>
             <span className="flex min-w-0 items-center gap-2">
@@ -1054,19 +1066,19 @@ function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { t
           </tbody>
         </table>
       </div>
-      <div className="space-y-3 p-3 lg:hidden">
+      <div className="space-y-3 p-2 sm:p-3 lg:hidden">
         {tasks.map((task) => (
-          <button key={task.id} className={`w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 text-left shadow-sm ${dueRowClass(task)} ${highlightMissing && missingFields(task).length ? "border-l-4 border-l-[var(--color-important)]" : ""}`} onClick={() => onOpenTask(task)}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-semibold text-[var(--color-text)]">{taskDisplayName(task)}</p>
-                <p className="mt-1 text-sm text-[var(--color-text-muted)]">{task.city} / {task.zoneArea}</p>
+          <button key={task.id} className={`w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 text-left shadow-sm sm:p-4 ${dueRowClass(task)} ${highlightMissing && missingFields(task).length ? "border-l-4 border-l-[var(--color-important)]" : ""}`} onClick={() => onOpenTask(task)}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="break-words font-semibold text-[var(--color-text)]">{taskDisplayName(task)}</p>
+                <p className="mt-1 break-words text-sm text-[var(--color-text-muted)]">{task.city} / {task.zoneArea}</p>
               </div>
-              <StatusBadge status={task.status} />
+              <div className="w-fit"><StatusBadge status={task.status} /></div>
             </div>
-            <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-[var(--color-text-muted)]">
-              <span>Owner: {task.taskOwner || "Missing"}</span>
-              <span>Due: {task.dueDate || "Missing"}</span>
+            <div className="mt-3 grid gap-2 text-sm text-[var(--color-text-muted)] sm:grid-cols-2">
+              <span className="break-words">Owner: {task.taskOwner || "Missing"}</span>
+              <span className="break-words">Due: {task.dueDate || "Missing"}</span>
               <span>Risk: {task.riskLevel}</span>
               <span>Missing: {missingFields(task).length}</span>
             </div>
@@ -1119,14 +1131,14 @@ function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: Tracker
   return (
     <div className="fixed inset-0 z-50 bg-[#0B4F3A]/35 lg:flex lg:justify-end">
       <aside className="flex h-full w-full flex-col bg-[var(--color-card)] shadow-2xl lg:w-[620px]">
-        <div className="flex items-start justify-between gap-4 border-b border-[var(--color-border)] p-4">
-          <div>
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--color-border)] p-3 sm:p-4">
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase text-[var(--color-accent)]">Task detail / edit</p>
-            <h2 className="mt-1 text-lg font-semibold text-[var(--color-primary)]">{taskDisplayName(draft)}</h2>
+            <h2 className="mt-1 break-words text-base font-semibold text-[var(--color-primary)] sm:text-lg">{taskDisplayName(draft)}</h2>
           </div>
           <button className="icon-btn" onClick={onClose} aria-label="Close task editor"><X size={18} /></button>
         </div>
-        <div className="flex-1 space-y-4 overflow-y-auto p-4">
+        <div className="flex-1 space-y-4 overflow-y-auto p-3 sm:p-4">
           {missingFields(draft).length > 0 && <div className="rounded-lg border border-[var(--color-important)] bg-[#7A1F2B]/10 p-3 text-sm text-[var(--color-important)]">Missing required fields: {missingFields(draft).join(", ")}</div>}
           <InputField label="Task name" value={draft.taskName} onChange={(value) => updateField("taskName", value)} />
           <div className="grid gap-3 sm:grid-cols-2">
@@ -1172,9 +1184,9 @@ function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: Tracker
             {draft.attachments.map((file) => <span key={`${file.name}-${file.addedAt}`} className="badge-gold">{file.name}</span>)}
           </div>
         </div>
-        <div className="flex flex-col gap-2 border-t border-[var(--color-border)] p-4 sm:flex-row sm:justify-between">
+        <div className="flex flex-col gap-2 border-t border-[var(--color-border)] p-3 sm:flex-row sm:justify-between sm:p-4">
           <button className="btn-secondary justify-center text-[var(--color-important)] hover:bg-[#7A1F2B]/10" onClick={() => onDelete(draft.id)}>Delete</button>
-          <div className="flex gap-2"><button className="btn-secondary flex-1 justify-center sm:flex-none" onClick={onClose}>Cancel</button><button className="btn-primary flex-1 justify-center sm:flex-none" onClick={() => onSave({ ...draft, id: draft.id || makeTaskId(draft.city, draft.workstream, draft.taskName) })}>Save Changes</button></div>
+          <div className="grid gap-2 sm:flex"><button className="btn-secondary justify-center sm:flex-none" onClick={onClose}>Cancel</button><button className="btn-primary justify-center sm:flex-none" onClick={() => onSave({ ...draft, id: draft.id || makeTaskId(draft.city, draft.workstream, draft.taskName) })}>Save Changes</button></div>
         </div>
       </aside>
     </div>
@@ -1186,14 +1198,14 @@ function DataModal({ dataset, onClose }: { dataset: ChartDataset; onClose: () =>
   const sourceRows = dataset.sourceRows;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B4F3A]/35 p-4">
-      <div className="max-h-[86vh] w-full max-w-3xl overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] p-4">
-          <h2 className="section-title">{dataset.title} data</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B4F3A]/35 p-2 sm:p-4">
+      <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] p-3 sm:p-4">
+          <h2 className="section-title min-w-0 break-words">{dataset.title} data</h2>
           <button className="icon-btn" onClick={onClose}><X size={18} /></button>
         </div>
-        <div className="max-h-[70vh] overflow-auto p-4">
-          <div className="mb-4 flex flex-wrap gap-2">
+        <div className="max-h-[76vh] overflow-auto p-3 sm:p-4">
+          <div className="mb-4 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
             <button className="btn-compact" onClick={() => downloadCsv(sourceRows.length ? sourceRows : summaryRows, `${slug(dataset.title)}-source.csv`)}>CSV</button>
             <button className="btn-compact" onClick={() => downloadExcel(sourceRows.length ? sourceRows : summaryRows, `${slug(dataset.title)}-source.xls`)}>Excel</button>
             <button className="btn-compact" onClick={() => openTablePdf(dataset.title, sourceRows.length ? sourceRows : summaryRows)}>PDF</button>
@@ -1230,19 +1242,19 @@ function ChartSettingsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B4F3A]/35 p-4">
-      <div className="w-full max-w-xl rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0B4F3A]/35 p-2 sm:p-4">
+      <div className="max-h-[92vh] w-full max-w-xl overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] p-3 sm:p-4">
           <div>
             <h2 className="section-title">Chart settings</h2>
             <p className="text-sm text-[var(--color-text-muted)]">{tab}</p>
           </div>
           <button className="icon-btn" onClick={onClose}><X size={18} /></button>
         </div>
-        <div className="space-y-3 p-4">
+        <div className="max-h-[74vh] space-y-3 overflow-auto p-3 sm:p-4">
           {charts.map((chart) => (
             <label key={chart.id} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3 text-sm font-semibold text-[var(--color-primary)]">
-              <span>{chart.title}</span>
+              <span className="min-w-0 break-words">{chart.title}</span>
               <input type="checkbox" checked={!hiddenIds.includes(chart.id)} onChange={() => toggleChart(chart.id)} />
             </label>
           ))}
@@ -1253,7 +1265,7 @@ function ChartSettingsModal({
 }
 
 function Panel({ children }: { children: ReactNode }) {
-  return <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-soft">{children}</section>;
+  return <section className="min-w-0 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-soft sm:p-4">{children}</section>;
 }
 
 function SelectField({ label, value, options, onChange, includeAll = false }: { label: string; value: string; options: readonly string[]; onChange: (value: string) => void; includeAll?: boolean }) {
@@ -1299,8 +1311,8 @@ function Table({ rows }: { rows: Array<Record<string, string | number>> }) {
   if (!rows.length) return <p className="p-8 text-center text-sm text-[var(--color-text-muted)]">No data available.</p>;
   const keys = Object.keys(rows[0]);
   return (
-    <div className="overflow-x-auto rounded-lg border border-[var(--color-border)]">
-      <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+    <div className="max-w-full overflow-x-auto rounded-lg border border-[var(--color-border)]">
+      <table className="w-full min-w-[640px] border-collapse text-left text-sm">
         <thead className="bg-[var(--color-accent-light)] text-xs uppercase text-[var(--color-primary)]">
           <tr>{keys.map((key) => <th key={key} className="border-b border-[var(--color-border)] px-3 py-2">{key}</th>)}</tr>
         </thead>
