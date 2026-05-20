@@ -197,7 +197,7 @@ export default function DashboardApp() {
   const [cities, setCities] = useState<string[]>(INITIAL_CITIES);
   const [contacts, setContacts] = useState<Contact[]>(() => createDefaultContacts(INITIAL_CITIES));
   const [activity, setActivity] = useState<ActivityEntry[]>(() => [
-    createActivity("Dashboard created", "Ashara tracker", "Initial local tracker data generated.")
+    createActivity("Dashboard created", "ASHARA MUBARAKAH tracker", "Initial local tracker data generated.")
   ]);
   const [activeTab, setActiveTab] = useState<TabId>("Dashboard");
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
@@ -361,11 +361,11 @@ export default function DashboardApp() {
   };
 
   const resetDemoData = () => {
-    if (!window.confirm("Reset all local data to the default Asharah dashboard setup?")) return;
+    if (!window.confirm("Reset all local data to the default ASHARA MUBARAKAH dashboard setup?")) return;
     setCities(INITIAL_CITIES);
     setTasks(normalizeTasks(generateDefaultTasksForCities(INITIAL_CITIES)));
     setContacts(createDefaultContacts(INITIAL_CITIES));
-    setActivity([createActivity("Demo data reset", "Ashara tracker", "Default tasks and contacts restored.")]);
+    setActivity([createActivity("Demo data reset", "ASHARA MUBARAKAH tracker", "Default tasks and contacts restored.")]);
     setFilters(EMPTY_FILTERS);
   };
 
@@ -420,7 +420,7 @@ export default function DashboardApp() {
       <aside className={`fixed inset-y-0 left-0 z-40 flex w-[min(18rem,86vw)] flex-col border-r border-[var(--color-border)] bg-[var(--color-primary)] text-white shadow-2xl transition-transform duration-300 ease-out lg:w-72 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex min-h-24 items-start justify-between gap-3 border-b border-white/15 p-5">
           <div>
-            <p className="text-xs font-semibold uppercase text-[var(--color-accent-light)]">Asharah Mubarak</p>
+            <p className="text-xs font-semibold uppercase text-[var(--color-accent-light)]">ASHARA MUBARAKAH</p>
             <h1 className="mt-1 text-xl font-semibold leading-tight text-white">IT / Event Preparation</h1>
           </div>
           <button className="rounded-md p-2 text-white hover:bg-white/10 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close sidebar">
@@ -569,7 +569,7 @@ export default function DashboardApp() {
 
       <footer className="border-t border-[var(--color-border)] bg-[var(--color-card)]">
         <div className="mx-auto flex max-w-[1800px] flex-col gap-1 px-4 py-4 text-sm text-[var(--color-text-muted)] sm:px-6 lg:px-8">
-          <span className="font-semibold text-[var(--color-primary)]">Asharah Mubarak IT / Event Preparation Dashboard</span>
+          <span className="font-semibold text-[var(--color-primary)]">ASHARA MUBARAKAH IT / Event Preparation Dashboard</span>
           <span>City-wise readiness, area progress, contacts, reports, and activity in one tracker.</span>
         </div>
       </footer>
@@ -2273,7 +2273,7 @@ function downloadExcelReport(rows: TrackerTask[], charts: ChartDataset[], format
     }).join("")
     : "";
   const taskTable = `<h2>Task table</h2><table><thead><tr>${keys.map((key) => `<th>${escapeHtml(key)}</th>`).join("")}</tr></thead><tbody>${tableRows.map((row) => `<tr>${keys.map((key) => `<td>${escapeHtml(String(row[key] ?? ""))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
-  const html = `<html><head><meta charset="utf-8" /><style>body{font-family:Arial,sans-serif;color:#1F2933}h1,h2{color:#0B4F3A}table{border-collapse:collapse;margin-bottom:18px}th{background:#F3E7C3;color:#0B4F3A}td,th{border:1px solid #E8DDC5;padding:6px;vertical-align:top}</style></head><body><h1>Asharah Mubarak IT / Event Preparation Report</h1>${chartTables}${taskTable}</body></html>`;
+  const html = `<html><head><meta charset="utf-8" /><style>body{font-family:Arial,sans-serif;color:#1F2933}h1,h2{color:#0B4F3A}table{border-collapse:collapse;margin-bottom:18px}th{background:#F3E7C3;color:#0B4F3A}td,th{border:1px solid #E8DDC5;padding:6px;vertical-align:top}</style></head><body><h1>ASHARA MUBARAKAH IT / Event Preparation Report</h1>${chartTables}${taskTable}</body></html>`;
   downloadBlob(html, filename, "application/vnd.ms-excel");
 }
 
@@ -2284,7 +2284,7 @@ function openPdfReport(rows: TrackerTask[], charts: ChartDataset[], format: Repo
   const tableHtml = `<section class="card"><h2>Task table</h2><table><thead><tr>${keys.map((key) => `<th>${escapeHtml(key)}</th>`).join("")}</tr></thead><tbody>${tableRows.map((row) => `<tr>${keys.map((key) => `<td>${escapeHtml(String(row[key] ?? ""))}</td>`).join("")}</tr>`).join("")}</tbody></table></section>`;
   const win = window.open("", "_blank");
   if (!win) return;
-  win.document.write(`<!doctype html><html><head><title>Asharah IT Report</title><style>@page{size:A4 portrait;margin:18mm}body{font-family:Arial,sans-serif;background:#FAF7EF;color:#1F2933}h1,h2{color:#0B4F3A}.card{background:#fff;border:1px solid #E8DDC5;border-radius:8px;padding:14px;margin:0 0 14px}.bar{position:relative;margin:10px 0;padding-bottom:8px;border-bottom:1px solid #E8DDC5}.bar span{display:inline-block;width:70%}.bar strong{float:right;color:#0B4F3A}.bar i{display:block;height:7px;background:#2E7D5B;border-radius:99px;margin-top:6px}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#F3E7C3;color:#0B4F3A}td,th{border:1px solid #E8DDC5;padding:5px;vertical-align:top}</style></head><body><h1>Asharah Mubarak IT / Event Preparation Report</h1><p>${new Date().toLocaleString()}</p>${format !== "Tables only" ? chartHtml : ""}${format !== "Charts only" ? tableHtml : ""}<script>window.print()</script></body></html>`);
+  win.document.write(`<!doctype html><html><head><title>ASHARA MUBARAKAH IT Report</title><style>@page{size:A4 portrait;margin:18mm}body{font-family:Arial,sans-serif;background:#FAF7EF;color:#1F2933}h1,h2{color:#0B4F3A}.card{background:#fff;border:1px solid #E8DDC5;border-radius:8px;padding:14px;margin:0 0 14px}.bar{position:relative;margin:10px 0;padding-bottom:8px;border-bottom:1px solid #E8DDC5}.bar span{display:inline-block;width:70%}.bar strong{float:right;color:#0B4F3A}.bar i{display:block;height:7px;background:#2E7D5B;border-radius:99px;margin-top:6px}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#F3E7C3;color:#0B4F3A}td,th{border:1px solid #E8DDC5;padding:5px;vertical-align:top}</style></head><body><h1>ASHARA MUBARAKAH IT / Event Preparation Report</h1><p>${new Date().toLocaleString()}</p>${format !== "Tables only" ? chartHtml : ""}${format !== "Charts only" ? tableHtml : ""}<script>window.print()</script></body></html>`);
   win.document.close();
 }
 

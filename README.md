@@ -1,6 +1,6 @@
-# Ashara IT Readiness Master Tracker
+# ASHARA MUBARAKAH IT Readiness Master Tracker
 
-Internal React/Next.js dashboard for tracking Ashara IT preparation across cities, workstreams, owners, risks, documents, and readiness status.
+Internal React/Next.js dashboard for tracking ASHARA MUBARAKAH IT preparation across cities, workstreams, owners, risks, documents, and readiness status.
 
 ## Run locally
 
