@@ -8,6 +8,7 @@ export const ZONES = [
   "Checkpoints",
   "Relay Area",
   "Public Wi-Fi Area",
+  "CCTV / Security",
   "Construction",
   "General"
 ] as const;
@@ -172,7 +173,32 @@ const CSV_TASK_ROWS: Array<{ zoneArea: Zone; workstream: string; taskName: strin
   { zoneArea: "General", workstream: "Power Backup & UPS", taskName: "UPS requirement finalized" },
   { zoneArea: "General", workstream: "Power Backup & UPS", taskName: "Generator backup coordination completed" },
   { zoneArea: "General", workstream: "Power Backup & UPS", taskName: "Power failover test completed" },
-  { zoneArea: "General", workstream: "Power Backup & UPS", taskName: "Spare adapters and extensions arranged" }
+  { zoneArea: "General", workstream: "Power Backup & UPS", taskName: "Spare adapters and extensions arranged" },
+  { zoneArea: "CCTV / Security", workstream: "CCTV & Surveillance Systems", taskName: "CCTV scope and ownership confirmed" },
+  { zoneArea: "CCTV / Security", workstream: "CCTV & Surveillance Systems", taskName: "CCTV vendor / local security SPOC confirmed" },
+  { zoneArea: "CCTV / Security", workstream: "CCTV & Surveillance Systems", taskName: "Camera location and coverage plan collected" },
+  { zoneArea: "Masjid", workstream: "CCTV & Surveillance Systems", taskName: "Masjid CCTV coverage requirement confirmed" },
+  { zoneArea: "SHZ OFFICES", workstream: "CCTV & Surveillance Systems", taskName: "SHZ OFFICES CCTV requirement confirmed" },
+  { zoneArea: "Checkpoints", workstream: "CCTV & Surveillance Systems", taskName: "Checkpoint CCTV coverage requirement confirmed" },
+  { zoneArea: "CCTV / Security", workstream: "CCTV & Surveillance Systems", taskName: "DVR / NVR location and access confirmed" },
+  { zoneArea: "CCTV / Security", workstream: "CCTV & Surveillance Systems", taskName: "CCTV storage and recording duration confirmed" },
+  { zoneArea: "CCTV / Security", workstream: "CCTV & Surveillance Systems", taskName: "CCTV network / IP requirement confirmed" },
+  { zoneArea: "CCTV / Security", workstream: "CCTV & Surveillance Systems", taskName: "CCTV VLAN / network segregation requirement confirmed" },
+  { zoneArea: "CCTV / Security", workstream: "CCTV & Surveillance Systems", taskName: "CCTV power and UPS backup requirement confirmed" },
+  { zoneArea: "CCTV / Security", workstream: "CCTV & Surveillance Systems", taskName: "CCTV installation status verified" },
+  { zoneArea: "CCTV / Security", workstream: "CCTV & Surveillance Systems", taskName: "Live monitoring display / control room requirement confirmed" },
+  { zoneArea: "CCTV / Security", workstream: "CCTV & Surveillance Systems", taskName: "CCTV live view and recording test completed" },
+  { zoneArea: "CCTV / Security", workstream: "CCTV & Surveillance Systems", taskName: "CCTV escalation contact list documented" },
+  { zoneArea: "General", workstream: "ISP & Internet Connectivity", taskName: "ISP equipment list planned and quotation ready" },
+  { zoneArea: "General", workstream: "Network Design, VLANs & Firewall", taskName: "Network, firewall and VLAN equipment list planned and quotation ready" },
+  { zoneArea: "Construction", workstream: "Cabling & Construction Coordination", taskName: "Cabling material list planned and quotation ready" },
+  { zoneArea: "General", workstream: "Hardware Procurement & Inventory", taskName: "Hardware procurement list planned and quotation ready" },
+  { zoneArea: "Public Wi-Fi Area", workstream: "Wi-Fi & Access Points", taskName: "Wi-Fi/AP equipment list planned and quotation ready" },
+  { zoneArea: "General", workstream: "Servers, Applications & Services", taskName: "Server/application equipment list planned and quotation ready" },
+  { zoneArea: "Checkpoints", workstream: "Scanning, E-Pass & Checkpoint IT", taskName: "Scanning/checkpoint equipment list planned and quotation ready" },
+  { zoneArea: "Central Offices", workstream: "Printers, Office IT & Department Support", taskName: "Office IT and printer equipment list planned and quotation ready" },
+  { zoneArea: "General", workstream: "Power Backup & UPS", taskName: "UPS/power backup equipment list planned and quotation ready" },
+  { zoneArea: "CCTV / Security", workstream: "CCTV & Surveillance Systems", taskName: "CCTV equipment list planned and quotation ready" },
 ];
 
 
