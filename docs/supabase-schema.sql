@@ -99,6 +99,17 @@ alter table public.ashara_equipment enable row level security;
 alter table public.ashara_activity enable row level security;
 alter table public.ashara_chart_configs enable row level security;
 
+grant usage on schema public to anon, authenticated, service_role;
+
+grant select, insert, update, delete on public.ashara_tasks to anon, authenticated, service_role;
+grant select, insert, update, delete on public.ashara_cities to anon, authenticated, service_role;
+grant select, insert, update, delete on public.ashara_contacts to anon, authenticated, service_role;
+grant select, insert, update, delete on public.ashara_equipment to anon, authenticated, service_role;
+grant select, insert, update, delete on public.ashara_activity to anon, authenticated, service_role;
+grant select, insert, update, delete on public.ashara_chart_configs to anon, authenticated, service_role;
+
+alter default privileges in schema public grant select, insert, update, delete on tables to anon, authenticated, service_role;
+
 -- Temporary open policies for an internal dashboard without authentication.
 -- Replace these with authenticated policies before using sensitive production data.
 drop policy if exists "Internal read tasks" on public.ashara_tasks;
