@@ -21,11 +21,11 @@ Task, city, contact, activity, equipment, and chart configuration data can now b
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 NEXT_PUBLIC_TRACKER_USER_NAME=Unknown user
 ```
 
-When the variables are present, the dashboard loads from Supabase, writes edits/imports to Supabase, listens for realtime changes, and falls back to polling every 15 seconds. If the variables are missing or Supabase is unavailable, the app uses local browser storage only as a temporary fallback.
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` also works as a fallback if your Supabase project still labels the browser key as `anon`. When the variables are present, the dashboard loads from Supabase, writes edits/imports to Supabase, listens for realtime changes, and falls back to polling every 15 seconds. If the variables are missing or Supabase is unavailable, the app uses local browser storage only as a temporary fallback.
 
 ## Build check
 

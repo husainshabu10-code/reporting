@@ -22,18 +22,18 @@ type PayloadRow<T> = {
 };
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const CHART_CONFIG_ID = "global-dashboard-config";
 let client: SupabaseClient | null = null;
 
 export function isSharedDatabaseConfigured() {
-  return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
+  return Boolean(SUPABASE_URL && SUPABASE_KEY);
 }
 
 function supabase() {
   if (!isSharedDatabaseConfigured()) return null;
   if (!client) {
-    client = createClient(SUPABASE_URL as string, SUPABASE_ANON_KEY as string, {
+    client = createClient(SUPABASE_URL as string, SUPABASE_KEY as string, {
       realtime: { params: { eventsPerSecond: 5 } }
     });
   }
