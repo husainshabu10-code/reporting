@@ -690,7 +690,6 @@ export default function DashboardApp() {
               <button className="btn-secondary justify-center" onClick={() => exportTaskCsv(filteredTasks, "visible-tasks")}><Download size={16} /> Export CSV</button>
               <button className="btn-secondary justify-center" onClick={() => importInputRef.current?.click()}><Upload size={16} /> Import CSV</button>
               <input ref={importInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={importCsv} />
-              <button className="btn-secondary justify-center" onClick={resetDemoData}><RefreshCcw size={16} /> Reset Demo</button>
             </div>
             <div className="lg:hidden">
               <label className="space-y-1 block">
