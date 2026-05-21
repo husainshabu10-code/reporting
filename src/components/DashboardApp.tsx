@@ -2710,8 +2710,6 @@ function missingFields(task: TrackerTask) {
     ["City", !isMissingValue(task.city)],
     ["Area", !isMissingValue(task.zoneArea)],
     ["Ownership Type", !isMissingValue(task.ownershipType)],
-    ["Task Owner / POC", !isMissingValue(task.taskOwner)],
-    ["Supporting Person", !isMissingValue(task.supportingPerson)],
     ["Priority", !isMissingValue(task.priority)],
     ["Event Criticality", !isMissingValue(task.eventCriticality)],
     ["Status", !isMissingValue(task.status)],
@@ -2738,7 +2736,7 @@ function isMissingTableField(task: TrackerTask, field: TableField) {
     case "zoneArea":
       return isMissingValue(task.zoneArea);
     case "taskOwner":
-      return isMissingValue(task.taskOwner);
+      return false;
     case "vendors":
       return !task.vendors?.some((vendor) => !isMissingValue(vendor.name) || !isMissingValue(vendor.contact));
     case "status":
