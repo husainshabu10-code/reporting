@@ -276,6 +276,7 @@ table {
 
   .mini-icon-btn {
     display: inline-flex;
+    position: relative;
     min-height: 2rem;
     height: 2rem;
     width: 2rem;

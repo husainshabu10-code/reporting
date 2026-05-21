@@ -21,6 +21,7 @@ import {
   RefreshCcw,
   Search,
   Settings,
+  Trash2,
   Upload,
   Users,
   X
@@ -55,6 +56,13 @@ type ReportFormat = "Charts only" | "Tables only" | "Both charts and tables";
 type ExcelReportFormat = "Table only" | "Table with chart summaries";
 type SortKey = "city" | "workstream" | "taskName" | "zoneArea" | "taskOwner" | "status" | "progress" | "dueDate" | "riskLevel" | "taskWeight";
 type TableField = "city" | "workstream" | "taskName" | "zoneArea" | "taskOwner" | "vendors" | "status" | "progress" | "riskLevel" | "dueDate" | "documentStatus" | "taskWeight";
+type CardFilterOperator = "Is" | "Is not" | "Contains" | "Is empty" | "Is not empty";
+type CardFilterRule = {
+  id: string;
+  field: string;
+  operator: CardFilterOperator;
+  value: string;
+};
 
 type Filters = {
   city: string;
@@ -105,10 +113,12 @@ type ChartDataset = {
   id: string;
   title: string;
   rows: ChartRow[];
+  sourceTasks: TrackerTask[];
   sourceRows: Array<Record<string, string | number>>;
   defaultKind: ChartKind;
   suffix?: string;
   sourceColumns?: string[];
+  customDefinition?: CustomChartDefinition;
 };
 type ChartKind = "Bar" | "Line" | "Pie" | "Donut" | "Progress";
 type CustomMetric = "Count" | "Progress" | "Completed tasks";
@@ -161,6 +171,28 @@ const EMPTY_FILTERS: Filters = {
   dueTo: "",
   search: ""
 };
+
+const CARD_FILTER_FIELDS = [
+  "City",
+  "Area",
+  "Workstream",
+  "Task Name",
+  "Ownership Type",
+  "Task Owner",
+  "Supporting Person",
+  "Priority",
+  "Event Criticality",
+  "Status",
+  "Progress %",
+  "Due Date",
+  "Vendors",
+  "Budget Status",
+  "Document Status",
+  "Risk Level",
+  "Task Weight",
+  "Remarks"
+];
+const CARD_FILTER_OPERATORS: CardFilterOperator[] = ["Is", "Is not", "Contains", "Is empty", "Is not empty"];
 
 const CUSTOM_FIELDS: Array<{ key: CustomField; label: string }> = [
   { key: "city", label: "City" },
@@ -1082,10 +1114,15 @@ function ChartCard({
   const [collapsed, setCollapsed] = useState(false);
   const [bodyMounted, setBodyMounted] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [cardFilters, setCardFilters] = useState<CardFilterRule[]>([]);
   const [showLegend, setShowLegend] = useState(true);
   const [showDataLabels, setShowDataLabels] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const filterRef = useRef<HTMLDivElement | null>(null);
+  const filteredDataset = useMemo(() => applyChartCardFilters(dataset, cardFilters), [cardFilters, dataset]);
+  const activeCardFilterCount = cardFilters.filter(isActiveCardFilter).length;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -1096,11 +1133,22 @@ function ChartCard({
     return () => document.removeEventListener("mousedown", closeMenu);
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (!filterOpen) return;
+    const closeFilter = (event: MouseEvent) => {
+      if (!filterRef.current?.contains(event.target as Node)) setFilterOpen(false);
+    };
+    document.addEventListener("mousedown", closeFilter);
+    return () => document.removeEventListener("mousedown", closeFilter);
+  }, [filterOpen]);
+
   const resetChart = () => {
     setChartKind(dataset.defaultKind);
     setShowLegend(true);
     setShowDataLabels(false);
     setMenuOpen(false);
+    setFilterOpen(false);
+    setCardFilters([]);
     setBodyMounted(true);
     setCollapsed(false);
   };
@@ -1134,7 +1182,20 @@ function ChartCard({
           <span className="hidden rounded-full bg-[var(--color-bg)] px-2 py-1 text-xs font-semibold text-[var(--color-text-muted)] xl:inline-flex">Refreshed now</span>
           <button className="mini-icon-btn" onClick={resetChart} aria-label="Refresh chart" title="Refresh"><RefreshCcw size={15} /></button>
           <button className="mini-icon-btn" onClick={() => setFullscreen(true)} aria-label="Expand chart" title="Expand"><Maximize2 size={15} /></button>
-          <button className="mini-icon-btn" onClick={() => onShowData(dataset)} aria-label="Filter source data" title="View data"><Filter size={15} /></button>
+          <div ref={filterRef} className="relative">
+            <button className={`mini-icon-btn ${activeCardFilterCount ? "border-[var(--color-accent)] bg-[var(--color-accent-light)] text-[var(--color-primary)]" : ""}`} onClick={() => setFilterOpen((value) => !value)} aria-label="Filter chart data" aria-expanded={filterOpen} title="Filter chart data">
+              <Filter size={15} />
+              {activeCardFilterCount > 0 && <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-[var(--color-primary)] px-1 text-[10px] leading-4 text-white">{activeCardFilterCount}</span>}
+            </button>
+            {filterOpen && (
+              <CardFilterPopover
+                rules={cardFilters}
+                sourceTasks={dataset.sourceTasks}
+                onChange={setCardFilters}
+                onClose={() => setFilterOpen(false)}
+              />
+            )}
+          </div>
           <button className="mini-icon-btn" onClick={resetChart} aria-label="Chart settings" title="Reset settings"><Settings size={15} /></button>
           <div ref={menuRef} className="relative">
             <button className="mini-icon-btn" onClick={() => setMenuOpen((value) => !value)} aria-label="More chart options" aria-expanded={menuOpen} title="More options">
@@ -1146,8 +1207,8 @@ function ChartCard({
                 <button className="export-menu-item" onClick={() => setShowDataLabels((value) => !value)}>{showDataLabels ? "Hide data labels" : "Show data labels"}</button>
                 <div className="border-t border-[var(--color-border)] py-1">
                   <p className="px-2 py-1 text-xs font-semibold uppercase text-[var(--color-text-muted)]">Export</p>
-                  <button className="export-menu-item" onClick={() => { downloadChartVisual(dataset, chartKind, "png", showDataLabels); setMenuOpen(false); }}>Export as PNG</button>
-                  <button className="export-menu-item" onClick={() => { downloadChartVisual(dataset, chartKind, "pdf", showDataLabels); setMenuOpen(false); }}>Export as PDF</button>
+                  <button className="export-menu-item" onClick={() => { downloadChartVisual(filteredDataset, chartKind, "png", showDataLabels); setMenuOpen(false); }}>Export as PNG</button>
+                  <button className="export-menu-item" onClick={() => { downloadChartVisual(filteredDataset, chartKind, "pdf", showDataLabels); setMenuOpen(false); }}>Export as PDF</button>
                 </div>
                 <button className="export-menu-item text-[var(--color-important)]" onClick={() => { setMenuOpen(false); onDeleteChart(dataset.id); }}>Delete card</button>
               </div>
@@ -1174,10 +1235,10 @@ function ChartCard({
                 <option value="Donut">Donut chart</option>
                 <option value="Progress">Progress bars</option>
               </select>
-              <button className="btn-compact justify-center" onClick={() => onShowData(dataset)}>View data</button>
+              <button className="btn-compact justify-center" onClick={() => onShowData(filteredDataset)}>View data</button>
               <button className="btn-compact justify-center" onClick={resetChart}>Reset</button>
             </div>
-            <ChartVisual dataset={dataset} chartKind={chartKind} showLegend={showLegend} showDataLabels={showDataLabels} />
+            <ChartVisual dataset={filteredDataset} chartKind={chartKind} showLegend={showLegend} showDataLabels={showDataLabels} />
           </div>
         </div>
       )}
@@ -1185,14 +1246,77 @@ function ChartCard({
         <div className="motion-overlay blur-overlay fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
           <div className="motion-modal max-h-[92vh] w-full max-w-6xl overflow-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-2xl">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="section-title">{dataset.title}</h2>
+              <h2 className="section-title">{filteredDataset.title}</h2>
               <button className="icon-btn" onClick={() => setFullscreen(false)} aria-label="Close expanded chart"><X size={18} /></button>
             </div>
-            <ChartVisual dataset={dataset} chartKind={chartKind} showLegend={showLegend} showDataLabels={showDataLabels} />
+            <ChartVisual dataset={filteredDataset} chartKind={chartKind} showLegend={showLegend} showDataLabels={showDataLabels} />
           </div>
         </div>
       )}
     </article>
+  );
+}
+
+function CardFilterPopover({
+  rules,
+  sourceTasks,
+  onChange,
+  onClose
+}: {
+  rules: CardFilterRule[];
+  sourceTasks: TrackerTask[];
+  onChange: (rules: CardFilterRule[]) => void;
+  onClose: () => void;
+}) {
+  const visibleRules = rules.length ? rules : [createCardFilterRule()];
+  const updateRule = (id: string, patch: Partial<CardFilterRule>) => {
+    onChange(visibleRules.map((rule) => (rule.id === id ? { ...rule, ...patch } : rule)));
+  };
+  const removeRule = (id: string) => onChange(visibleRules.filter((rule) => rule.id !== id));
+  const addRule = () => onChange([...visibleRules, createCardFilterRule()]);
+
+  return (
+    <div className="absolute right-0 top-9 z-40 w-[min(92vw,620px)] rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-2xl animate-fade-in sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-bold text-[var(--color-text)]">Card Filters</h3>
+        <div className="flex items-center gap-2">
+          <select className="chart-select min-w-32" defaultValue="Saved filters" aria-label="Saved filters">
+            <option>Saved filters</option>
+          </select>
+          <button className="icon-btn" onClick={onClose} aria-label="Close card filters"><X size={15} /></button>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {visibleRules.map((rule) => {
+          const needsValue = rule.operator !== "Is empty" && rule.operator !== "Is not empty";
+          return (
+            <div key={rule.id} className="grid gap-2 rounded-lg bg-[var(--color-bg)] p-2 sm:grid-cols-[minmax(130px,1fr)_minmax(110px,0.7fr)_minmax(160px,1.6fr)_auto] sm:items-center">
+              <select className="field h-10" value={rule.field} onChange={(event) => updateRule(rule.id, { field: event.target.value, value: "" })} aria-label="Filter field">
+                {CARD_FILTER_FIELDS.map((field) => <option key={field} value={field}>{field}</option>)}
+              </select>
+              <select className="field h-10" value={rule.operator} onChange={(event) => updateRule(rule.id, { operator: event.target.value as CardFilterOperator })} aria-label="Filter operator">
+                {CARD_FILTER_OPERATORS.map((operator) => <option key={operator} value={operator}>{operator}</option>)}
+              </select>
+              {needsValue ? (
+                <select className="field h-10" value={rule.value} onChange={(event) => updateRule(rule.id, { value: event.target.value })} aria-label="Filter value">
+                  <option value="">Select value</option>
+                  {cardFilterValues(sourceTasks, rule.field).map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              ) : (
+                <div className="field flex h-10 items-center text-sm text-[var(--color-text-muted)]">No value needed</div>
+              )}
+              <button className="icon-btn justify-self-start sm:justify-self-end" onClick={() => removeRule(rule.id)} aria-label="Remove filter">
+                <Trash2 size={15} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <button className="btn-compact" onClick={addRule}><Plus size={15} /> Add filter</button>
+        <button className="btn-compact" onClick={() => onChange([])}><X size={15} /> Clear</button>
+      </div>
+    </div>
   );
 }
 
@@ -1317,7 +1441,7 @@ function GroupedTaskTable({ tasks, groupBy, subgroupBy, onOpenTask, highlightMis
 
 function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { tasks: TrackerTask[]; onOpenTask: (task: TrackerTask) => void; highlightMissing: boolean; compact?: boolean }) {
   const cellClass = (task: TrackerTask, field: TableField) => `cell-box ${highlightMissing && isMissingTableField(task, field) ? "missing-cell-box" : ""}`;
-  const headings = ["City", "Workstream", "Task", "Area", "Owner", "Vendors", "Status", "Progress", "Risk", "Due", "Docs", "Task weight"];
+  const headings = ["", "City", "Workstream", "Task", "Area", "Owner", "Vendors", "Status", "Progress", "Risk", "Due", "Docs", "Task weight"];
 
   return (
     <section className={`${compact ? "" : "motion-card rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft"}`}>
@@ -1332,6 +1456,7 @@ function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { t
       <div className="hidden overflow-x-auto lg:block">
         <table className="task-table w-full min-w-[1480px] table-fixed border-collapse text-left text-sm">
           <colgroup>
+            <col className="w-[0.75rem]" />
             <col className="w-[8rem]" />
             <col className="w-[15rem]" />
             <col className="w-[21rem]" />
@@ -1349,50 +1474,58 @@ function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { t
             <tr>{headings.map((heading) => <th key={heading} className="border-b border-[var(--color-border)] px-3 py-3 font-semibold">{heading}</th>)}</tr>
           </thead>
           <tbody>
-            {tasks.map((task) => (
-              <tr key={task.id} className={`cursor-pointer border-b border-[var(--color-border)] transition hover:bg-[var(--color-bg)] ${dueRowClass(task)}`} onClick={() => onOpenTask(task)}>
-                <td className="px-3 py-3 font-medium text-[var(--color-primary)]"><div className={cellClass(task, "city")}>{task.city || "-"}</div></td>
-                <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "workstream")}>{task.workstream || "-"}</div></td>
-                <td className="px-3 py-3 text-[var(--color-text)]"><div className={cellClass(task, "taskName")}>{taskDisplayName(task) || "-"}</div></td>
-                <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "zoneArea")}>{task.zoneArea || "-"}</div></td>
-                <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "taskOwner")}>{task.taskOwner || "-"}</div></td>
-                <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "vendors")}>{vendorSummary(task) || "-"}</div></td>
-                <td className="px-3 py-3"><div className={cellClass(task, "status")}><StatusBadge status={task.status} /></div></td>
-                <td className="px-3 py-3"><div className={`${cellClass(task, "progress")} min-w-28`}><ProgressBar value={task.progress} compact /><span className="text-xs text-[var(--color-text-muted)]">{task.progress}%</span></div></td>
-                <td className="px-3 py-3"><div className={cellClass(task, "riskLevel")}><RiskBadge risk={task.riskLevel} /></div></td>
-                <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "dueDate")}>{task.dueDate || "-"}</div></td>
-                <td className="px-3 py-3"><div className={cellClass(task, "documentStatus")}><DocumentBadge status={task.documentStatus} /></div></td>
-                <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "taskWeight")}>{task.taskWeight || "-"}</div></td>
-              </tr>
-            ))}
+            {tasks.map((task) => {
+              const showMissingIndicator = highlightMissing && hasMissingRequiredFields(task);
+              return (
+                <tr key={task.id} className={`cursor-pointer border-b border-[var(--color-border)] transition hover:bg-[var(--color-bg)] ${dueRowClass(task)}`} onClick={() => onOpenTask(task)}>
+                  <td className="px-0 py-2 align-stretch"><span className={`mx-auto block h-full min-h-10 w-1 rounded-full transition-opacity ${showMissingIndicator ? "bg-[var(--color-important)] opacity-100" : "opacity-0"}`} aria-hidden="true" /></td>
+                  <td className="px-3 py-3 font-medium text-[var(--color-primary)]"><div className={cellClass(task, "city")}>{task.city || "-"}</div></td>
+                  <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "workstream")}>{task.workstream || "-"}</div></td>
+                  <td className="px-3 py-3 text-[var(--color-text)]"><div className={cellClass(task, "taskName")}>{taskDisplayName(task) || "-"}</div></td>
+                  <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "zoneArea")}>{task.zoneArea || "-"}</div></td>
+                  <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "taskOwner")}>{task.taskOwner || "-"}</div></td>
+                  <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "vendors")}>{vendorSummary(task) || "-"}</div></td>
+                  <td className="px-3 py-3"><div className={cellClass(task, "status")}><StatusBadge status={task.status} /></div></td>
+                  <td className="px-3 py-3"><div className={`${cellClass(task, "progress")} min-w-28`}><ProgressBar value={task.progress} compact /><span className="text-xs text-[var(--color-text-muted)]">{task.progress}%</span></div></td>
+                  <td className="px-3 py-3"><div className={cellClass(task, "riskLevel")}><RiskBadge risk={task.riskLevel} /></div></td>
+                  <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "dueDate")}>{task.dueDate || "-"}</div></td>
+                  <td className="px-3 py-3"><div className={cellClass(task, "documentStatus")}><DocumentBadge status={task.documentStatus} /></div></td>
+                  <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "taskWeight")}>{task.taskWeight || "-"}</div></td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
       <div className="space-y-3 p-2 sm:p-3 lg:hidden">
-        {tasks.map((task) => (
-          <button key={task.id} className={`motion-card w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 text-left shadow-sm sm:p-4 ${dueRowClass(task)}`} onClick={() => onOpenTask(task)}>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <p className={`${cellClass(task, "taskName")} break-words font-semibold text-[var(--color-text)]`}>{taskDisplayName(task) || "-"}</p>
-                <div className="mt-2 grid gap-2 text-sm text-[var(--color-text-muted)] sm:grid-cols-2">
-                  <span className={cellClass(task, "city")}>City: {task.city || "-"}</span>
-                  <span className={cellClass(task, "zoneArea")}>Area: {task.zoneArea || "-"}</span>
-                  <span className={`${cellClass(task, "workstream")} sm:col-span-2`}>Workstream: {task.workstream || "-"}</span>
+        {tasks.map((task) => {
+          const showMissingIndicator = highlightMissing && hasMissingRequiredFields(task);
+          return (
+            <button key={task.id} className={`motion-card relative w-full overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 pl-4 text-left shadow-sm sm:p-4 sm:pl-5 ${dueRowClass(task)}`} onClick={() => onOpenTask(task)}>
+              <span className={`absolute left-0 top-0 h-full w-1 transition-opacity ${showMissingIndicator ? "bg-[var(--color-important)] opacity-100" : "opacity-0"}`} aria-hidden="true" />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className={`${cellClass(task, "taskName")} break-words font-semibold text-[var(--color-text)]`}>{taskDisplayName(task) || "-"}</p>
+                  <div className="mt-2 grid gap-2 text-sm text-[var(--color-text-muted)] sm:grid-cols-2">
+                    <span className={cellClass(task, "city")}>City: {task.city || "-"}</span>
+                    <span className={cellClass(task, "zoneArea")}>Area: {task.zoneArea || "-"}</span>
+                    <span className={`${cellClass(task, "workstream")} sm:col-span-2`}>Workstream: {task.workstream || "-"}</span>
+                  </div>
                 </div>
+                <div className={`${cellClass(task, "status")} w-fit`}><StatusBadge status={task.status} /></div>
               </div>
-              <div className={`${cellClass(task, "status")} w-fit`}><StatusBadge status={task.status} /></div>
-            </div>
-            <div className="mt-3 grid gap-2 text-sm text-[var(--color-text-muted)] sm:grid-cols-2">
-              <span className={`${cellClass(task, "taskOwner")} break-words`}>Owner: {task.taskOwner || "-"}</span>
-              <span className={`${cellClass(task, "vendors")} break-words`}>Vendors: {vendorSummary(task) || "-"}</span>
-              <span className={`${cellClass(task, "dueDate")} break-words`}>Due: {task.dueDate || "-"}</span>
-              <span className={cellClass(task, "riskLevel")}>Risk: {task.riskLevel || "-"}</span>
-              <span className={cellClass(task, "documentStatus")}>Docs: {task.documentStatus || "-"}</span>
-              <span className={cellClass(task, "taskWeight")}>Task weight: {task.taskWeight || "-"}</span>
-            </div>
-            <div className={`mt-3 ${cellClass(task, "progress")}`}><ProgressBar value={task.progress} /><span className="mt-1 block text-xs text-[var(--color-text-muted)]">{task.progress}%</span></div>
-          </button>
-        ))}
+              <div className="mt-3 grid gap-2 text-sm text-[var(--color-text-muted)] sm:grid-cols-2">
+                <span className={`${cellClass(task, "taskOwner")} break-words`}>Owner: {task.taskOwner || "-"}</span>
+                <span className={`${cellClass(task, "vendors")} break-words`}>Vendors: {vendorSummary(task) || "-"}</span>
+                <span className={`${cellClass(task, "dueDate")} break-words`}>Due: {task.dueDate || "-"}</span>
+                <span className={cellClass(task, "riskLevel")}>Risk: {task.riskLevel || "-"}</span>
+                <span className={cellClass(task, "documentStatus")}>Docs: {task.documentStatus || "-"}</span>
+                <span className={cellClass(task, "taskWeight")}>Task weight: {task.taskWeight || "-"}</span>
+              </div>
+              <div className={`mt-3 ${cellClass(task, "progress")}`}><ProgressBar value={task.progress} /><span className="mt-1 block text-xs text-[var(--color-text-muted)]">{task.progress}%</span></div>
+            </button>
+          );
+        })}
       </div>
       {tasks.length === 0 && <div className="p-12 text-center text-sm text-[var(--color-text-muted)]">No tasks match the selected filters.</div>}
     </section>
@@ -2026,6 +2159,7 @@ function makeChart(id: string, title: string, rows: ChartRow[], sourceTasks: Tra
     id,
     title,
     rows,
+    sourceTasks,
     sourceRows: tasksToRows(sourceTasks),
     defaultKind,
     suffix
@@ -2034,18 +2168,24 @@ function makeChart(id: string, title: string, rows: ChartRow[], sourceTasks: Tra
 
 function buildCustomChart(definition: CustomChartDefinition, sourceTasks: TrackerTask[]): ChartDataset {
   const filtered = applyFilters(sourceTasks, definition.filters);
-  const groups = groupTasksByCustomField(filtered, definition.groupBy, definition.subgroupBy);
-  const rows = Object.entries(groups).map(([label, groupRows]) => metricRow(label, groupRows, definition.metric, filtered.length));
+  const rows = buildCustomChartRows(definition, filtered);
   const suffix = definition.metric.includes("progress") ? "%" : undefined;
   return {
     id: definition.id,
     title: definition.title || "Custom task chart",
     rows,
+    sourceTasks: filtered,
     sourceRows: selectSourceColumns(filtered, definition.sourceColumns),
     sourceColumns: definition.sourceColumns,
+    customDefinition: definition,
     defaultKind: definition.chartKind,
     suffix
   };
+}
+
+function buildCustomChartRows(definition: CustomChartDefinition, sourceTasks: TrackerTask[]) {
+  const groups = groupTasksByCustomField(sourceTasks, definition.groupBy, definition.subgroupBy);
+  return Object.entries(groups).map(([label, groupRows]) => metricRow(label, groupRows, definition.metric, sourceTasks.length));
 }
 
 function groupTasksByCustomField(rows: TrackerTask[], groupBy: CustomField, subgroupBy: CustomField | "none") {
@@ -2113,6 +2253,91 @@ function moveChartId(sourceId: string, targetId: string, currentOrder: string[],
   return next;
 }
 
+function createCardFilterRule(): CardFilterRule {
+  return { id: `card-filter-${Date.now()}-${Math.random().toString(36).slice(2)}`, field: "Status", operator: "Is", value: "" };
+}
+
+function isActiveCardFilter(rule: CardFilterRule) {
+  return rule.operator === "Is empty" || rule.operator === "Is not empty" || Boolean(rule.value.trim());
+}
+
+function cardFilterValues(sourceTasks: TrackerTask[], field: string) {
+  return unique(sourceTasks.map((task) => String(taskRowValue(task, field))).filter((value) => !isMissingValue(value)));
+}
+
+function applyChartCardFilters(dataset: ChartDataset, rules: CardFilterRule[]): ChartDataset {
+  const activeRules = rules.filter(isActiveCardFilter);
+  if (!activeRules.length) return dataset;
+  const sourceTasks = applyCardFilterRules(dataset.sourceTasks, activeRules);
+  return {
+    ...dataset,
+    rows: rebuildChartRows(dataset, sourceTasks),
+    sourceTasks,
+    sourceRows: dataset.sourceColumns ? selectSourceColumns(sourceTasks, dataset.sourceColumns) : tasksToRows(sourceTasks)
+  };
+}
+
+function applyCardFilterRules(tasks: TrackerTask[], rules: CardFilterRule[]) {
+  return tasks.filter((task) => rules.every((rule) => matchesCardFilter(taskRowValue(task, rule.field), rule)));
+}
+
+function matchesCardFilter(rawValue: string | number, rule: CardFilterRule) {
+  const value = String(rawValue ?? "").trim();
+  const expected = rule.value.trim();
+  if (rule.operator === "Is empty") return isMissingValue(value);
+  if (rule.operator === "Is not empty") return !isMissingValue(value);
+  if (!expected) return true;
+  if (rule.operator === "Is") return value === expected;
+  if (rule.operator === "Is not") return value !== expected;
+  return value.toLowerCase().includes(expected.toLowerCase());
+}
+
+function taskRowValue(task: TrackerTask, field: string): string | number {
+  const row = tasksToRows([task])[0] || {};
+  return row[field] ?? "";
+}
+
+function rebuildChartRows(dataset: ChartDataset, rows: TrackerTask[]): ChartRow[] {
+  if (!rows.length) return [];
+  const id = dataset.id;
+  const title = dataset.title.toLowerCase();
+  const total = Math.max(rows.length, 1);
+  const completed = rows.filter(isClosed).length;
+  const pending = rows.filter((task) => !isClosed(task) && task.status !== "Blocked").length;
+  const delayed = rows.filter((task) => task.status === "Blocked" || isOverdue(task)).length;
+
+  if (dataset.customDefinition) return buildCustomChartRows(dataset.customDefinition, rows);
+  if (id.includes("task-completion-by-city") || title.includes("task completion by city")) {
+    return getCityStats(rows, unique(rows.map((task) => task.city))).map((city) => ({ label: city.city, value: city.completed, percent: city.total ? Math.round((city.completed / city.total) * 100) : 0, status: "good" }));
+  }
+  if (id.includes("delayed-items") || title.includes("delayed items by city")) {
+    return getCityStats(rows, unique(rows.map((task) => task.city))).map((city) => ({ label: city.city, value: city.delayed, percent: city.total ? Math.round((city.delayed / city.total) * 100) : 0, status: city.delayed ? "critical" : "good" }));
+  }
+  if (id.includes("city-wise-progress") || title.includes("progress by city")) {
+    return getCityStats(rows, unique(rows.map((task) => task.city))).map((city) => ({ label: city.city, value: city.completion, percent: city.completion, status: city.health === "Critical" ? "critical" : city.health === "Good" ? "good" : "warning" }));
+  }
+  if (id === "overall-progress") {
+    const progress = progressScore(rows);
+    return [{ label: "Progress", value: progress, percent: progress, status: progress >= 80 ? "good" : progress >= 40 ? "warning" : "critical" }];
+  }
+  if (id.includes("completed-vs-total")) {
+    return [{ label: "Completed", value: completed, percent: Math.round((completed / total) * 100), status: "good" }, { label: "Remaining", value: Math.max(0, rows.length - completed), percent: Math.round(((rows.length - completed) / total) * 100), status: "warning" }];
+  }
+  if (id.includes("task-completion")) {
+    return [{ label: "Completed", value: completed, percent: Math.round((completed / total) * 100), status: "good" }, { label: "Pending", value: pending, percent: Math.round((pending / total) * 100), status: "warning" }, { label: "Delayed", value: delayed, percent: Math.round((delayed / total) * 100), status: "critical" }];
+  }
+  if (id.includes("status-distribution") || title.includes("status distribution")) return distribution(rows, "status");
+  if (id.includes("priority-distribution") || title.includes("priority distribution")) return distribution(rows, "priority");
+  if (id.includes("risk-distribution") || title.includes("risk distribution")) return distribution(rows, "riskLevel");
+  if (id.includes("document-status") || title.includes("document status")) return distribution(rows, "documentStatus");
+  if (id.includes("workstream-wise-progress") || title.includes("workstream-wise progress")) return WORKSTREAMS.map((workstream) => progressRow(workstream.name, rows.filter((task) => task.workstream === workstream.name)));
+  if (id.includes("workstream-wise-tasks") || title.includes("workstream-wise tasks")) return distribution(rows, "workstream");
+  if (id.includes("area-wise-progress") || title.includes("area-wise progress")) return ZONES.map((area) => areaProgressRow(area, rows.filter((task) => task.zoneArea === area)));
+  if (id.includes("area-wise-tasks") || title.includes("area-wise tasks")) return getAreaRows(rows).map((row) => ({ label: row.area, value: row.tasks, percent: Math.min(100, row.tasks * 8), status: "muted" }));
+  if (id.includes("area-workstream-coverage") || title.includes("area-wise workstream coverage")) return getAreaRows(rows).map((row) => ({ label: row.area, value: row.workstreams, percent: Math.min(100, row.workstreams * 8), status: row.workstreams ? "good" : "muted" }));
+  return dataset.rows.filter((row) => rows.some((task) => Object.values(tasksToRows([task])[0] || {}).map(String).includes(row.label)));
+}
+
 function progressRow(label: string, rows: TrackerTask[]): ChartRow {
   const value = progressScore(rows);
   return { label, value, percent: value, status: value >= 80 ? "good" : value >= 40 ? "warning" : "critical" };
@@ -2168,21 +2393,25 @@ function taskWeightValue(weight: TrackerTask["taskWeight"]) {
 
 function missingFields(task: TrackerTask) {
   const checks: Array<[string, boolean]> = [
-    ["Task name", Boolean(task.taskName)],
-    ["City", Boolean(task.city)],
-    ["Area", Boolean(task.zoneArea)],
-    ["Ownership Type", Boolean(task.ownershipType)],
-    ["Task Owner / POC", Boolean(task.taskOwner)],
-    ["Supporting Person", Boolean(task.supportingPerson)],
-    ["Priority", Boolean(task.priority)],
-    ["Event Criticality", Boolean(task.eventCriticality)],
-    ["Status", Boolean(task.status)],
+    ["Task name", !isMissingValue(task.taskName)],
+    ["City", !isMissingValue(task.city)],
+    ["Area", !isMissingValue(task.zoneArea)],
+    ["Ownership Type", !isMissingValue(task.ownershipType)],
+    ["Task Owner / POC", !isMissingValue(task.taskOwner)],
+    ["Supporting Person", !isMissingValue(task.supportingPerson)],
+    ["Priority", !isMissingValue(task.priority)],
+    ["Event Criticality", !isMissingValue(task.eventCriticality)],
+    ["Status", !isMissingValue(task.status)],
     ["Progress %", task.progress !== null && task.progress !== undefined && PROGRESS_VALUES.some((value) => value === nearestProgress(task.progress))],
-    ["Due Date", Boolean(task.dueDate)],
-    ["Budget Status", Boolean(task.budgetStatus)],
-    ["Task weight", Boolean(task.taskWeight)]
+    ["Due Date", !isMissingValue(task.dueDate)],
+    ["Budget Status", !isMissingValue(task.budgetStatus)],
+    ["Task weight", !isMissingValue(task.taskWeight)]
   ];
   return checks.filter(([, ok]) => !ok).map(([label]) => label);
+}
+
+function hasMissingRequiredFields(task: TrackerTask) {
+  return missingFields(task).length > 0;
 }
 
 function isMissingTableField(task: TrackerTask, field: TableField) {
