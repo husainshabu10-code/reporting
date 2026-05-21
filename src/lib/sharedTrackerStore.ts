@@ -41,11 +41,11 @@ const CHART_CONFIG_ID = "global-dashboard-config";
 let client: SupabaseClient | null = null;
 
 export function isSharedDatabaseConfigured() {
-  return Boolean(SUPABASE_URL && SUPABASE_KEY);
+  return typeof window !== "undefined" || Boolean(SUPABASE_URL && SUPABASE_KEY);
 }
 
 function supabase() {
-  if (!isSharedDatabaseConfigured()) return null;
+  if (!SUPABASE_URL || !SUPABASE_KEY) return null;
   if (!client) {
     client = createClient(SUPABASE_URL as string, SUPABASE_KEY as string, {
       realtime: { params: { eventsPerSecond: 5 } }
@@ -59,6 +59,13 @@ export function currentSharedUser() {
 }
 
 export async function loadSharedTrackerState<Contact extends SharedTrackerContact, ActivityEntry extends SharedTrackerActivity>(): Promise<SharedTrackerState<Contact, ActivityEntry> | null> {
+  if (typeof window !== "undefined") {
+    try {
+      return await trackerApiRequest<SharedTrackerState<Contact, ActivityEntry>>();
+    } catch {
+      // Fall through to direct Supabase client if public realtime variables are available.
+    }
+  }
   const db = supabase();
   if (!db) return null;
   const [tasks, cities, contacts, activity, chartConfig, equipment] = await Promise.all([
@@ -81,6 +88,7 @@ export async function loadSharedTrackerState<Contact extends SharedTrackerContac
 }
 
 export async function seedSharedTrackerState<Contact extends SharedTrackerContact, ActivityEntry extends SharedTrackerActivity>(state: SharedTrackerState<Contact, ActivityEntry>) {
+  if (await trackerApiMutation({ action: "seed", state })) return;
   await Promise.all([
     upsertSharedTasks(state.tasks),
     upsertSharedCities(state.cities),
@@ -95,8 +103,10 @@ export async function upsertSharedTask(task: TrackerTask) {
 }
 
 export async function upsertSharedTasks(tasks: TrackerTask[]) {
+  if (!tasks.length) return;
+  if (await trackerApiMutation({ action: "upsertTasks", tasks })) return;
   const db = supabase();
-  if (!db || !tasks.length) return;
+  if (!db) throw new Error("Shared database is not configured.");
   const { error } = await db.from("ashara_tasks").upsert(
     tasks.map((task) => ({
       id: task.id,
@@ -113,23 +123,27 @@ export async function upsertSharedTasks(tasks: TrackerTask[]) {
 }
 
 export async function replaceSharedTasks(tasks: TrackerTask[]) {
+  if (await trackerApiMutation({ action: "replaceTasks", tasks })) return;
   const db = supabase();
-  if (!db) return;
+  if (!db) throw new Error("Shared database is not configured.");
   const { error: deleteError } = await db.from("ashara_tasks").delete().neq("id", "__never__");
   if (deleteError) throw deleteError;
   await upsertSharedTasks(tasks);
 }
 
 export async function deleteSharedTask(taskId: string) {
+  if (await trackerApiMutation({ action: "deleteTask", taskId })) return;
   const db = supabase();
-  if (!db) return;
+  if (!db) throw new Error("Shared database is not configured.");
   const { error } = await db.from("ashara_tasks").delete().eq("id", taskId);
   if (error) throw error;
 }
 
 export async function upsertSharedCities(cities: string[]) {
+  if (!cities.length) return;
+  if (await trackerApiMutation({ action: "upsertCities", cities })) return;
   const db = supabase();
-  if (!db || !cities.length) return;
+  if (!db) throw new Error("Shared database is not configured.");
   const { error } = await db.from("ashara_cities").upsert(
     cities.map((name, index) => ({
       id: slugId(name),
@@ -147,8 +161,10 @@ export async function upsertSharedContact<Contact extends SharedTrackerContact>(
 }
 
 export async function upsertSharedContacts<Contact extends SharedTrackerContact>(contacts: Contact[]) {
+  if (!contacts.length) return;
+  if (await trackerApiMutation({ action: "upsertContacts", contacts })) return;
   const db = supabase();
-  if (!db || !contacts.length) return;
+  if (!db) throw new Error("Shared database is not configured.");
   const { error } = await db.from("ashara_contacts").upsert(
     contacts.map((contact) => ({
       id: contact.id,
@@ -163,8 +179,10 @@ export async function upsertSharedContacts<Contact extends SharedTrackerContact>
 }
 
 export async function upsertSharedActivity<ActivityEntry extends SharedTrackerActivity>(activity: ActivityEntry[]) {
+  if (!activity.length) return;
+  if (await trackerApiMutation({ action: "upsertActivity", activity })) return;
   const db = supabase();
-  if (!db || !activity.length) return;
+  if (!db) throw new Error("Shared database is not configured.");
   const { error } = await db.from("ashara_activity").upsert(
     activity.map((entry) => ({
       id: entry.id,
@@ -181,8 +199,9 @@ export async function upsertSharedActivity<ActivityEntry extends SharedTrackerAc
 }
 
 export async function saveSharedChartConfig(config: SharedChartConfig) {
+  if (await trackerApiMutation({ action: "saveChartConfig", chartConfig: config })) return;
   const db = supabase();
-  if (!db) return;
+  if (!db) throw new Error("Shared database is not configured.");
   const { error } = await db.from("ashara_chart_configs").upsert(
     { id: CHART_CONFIG_ID, data: config, updated_at: new Date().toISOString() },
     { onConflict: "id" }
@@ -221,6 +240,29 @@ async function loadSinglePayload<T>(db: SupabaseClient, table: string, id: strin
   const { data, error } = await db.from(table).select("id,data").eq("id", id).maybeSingle();
   if (error) throw new Error(formatSupabaseError(error, `Unable to load ${table}.`));
   return (data as PayloadRow<T> | null)?.data || null;
+}
+
+async function trackerApiRequest<T>(body?: unknown): Promise<T> {
+  const response = await fetch("/api/tracker", {
+    method: body ? "POST" : "GET",
+    headers: body ? { "Content-Type": "application/json" } : undefined,
+    body: body ? JSON.stringify(body) : undefined,
+    cache: "no-store"
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(String((data as { error?: string }).error || "Tracker API request failed."));
+  return data as T;
+}
+
+async function trackerApiMutation(body: unknown) {
+  if (typeof window === "undefined") return false;
+  try {
+    await trackerApiRequest<{ ok: boolean }>(body);
+    return true;
+  } catch (error) {
+    if (supabase()) return false;
+    throw error;
+  }
 }
 
 function slugId(value: string) {

@@ -336,7 +336,7 @@ export default function DashboardApp() {
       }
     };
     const unsubscribe = subscribeToSharedTrackerChanges(refreshSharedData);
-    const poll = window.setInterval(refreshSharedData, 15000);
+    const poll = window.setInterval(refreshSharedData, 3000);
     return () => {
       unsubscribe();
       window.clearInterval(poll);

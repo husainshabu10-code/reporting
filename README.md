@@ -25,7 +25,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 NEXT_PUBLIC_TRACKER_USER_NAME=Unknown user
 ```
 
-`NEXT_PUBLIC_SUPABASE_ANON_KEY` also works as a fallback if your Supabase project still labels the browser key as `anon`. When the variables are present, the dashboard loads from Supabase, writes edits/imports to Supabase, listens for realtime changes, and falls back to polling every 15 seconds. If the variables are missing or Supabase is unavailable, the app uses local browser storage only as a temporary fallback.
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` also works as a fallback if your Supabase project still labels the browser key as `anon`. The server API also accepts `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, or the `VITE_SUPABASE_*` names. When the variables are present, the dashboard loads from Supabase, writes edits/imports to Supabase through the shared API, listens for realtime changes when browser keys are available, and falls back to polling every 3 seconds. If the variables are missing or Supabase is unavailable, the app uses local browser storage only as a temporary fallback.
 
 ## Build check
 
