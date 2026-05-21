@@ -11,6 +11,7 @@ type PayloadRow<T> = {
   id: string;
   data: T;
 };
+type TrackerDbClient = ReturnType<typeof serverSupabase>;
 
 type TrackerAction =
   | { action: "seed"; state: SharedTrackerState<SharedTrackerContact, SharedTrackerActivity> }
@@ -90,7 +91,7 @@ function serverSupabase() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-async function loadState(db: ReturnType<typeof createClient>): Promise<SharedTrackerState<SharedTrackerContact, SharedTrackerActivity>> {
+async function loadState(db: TrackerDbClient): Promise<SharedTrackerState<SharedTrackerContact, SharedTrackerActivity>> {
   const [tasks, cities, contacts, activity, chartConfig, equipment] = await Promise.all([
     loadPayloadTable<TrackerTask>(db, "ashara_tasks", "city", true),
     loadPayloadTable<{ name: string }>(db, "ashara_cities", "name", true),
@@ -109,7 +110,7 @@ async function loadState(db: ReturnType<typeof createClient>): Promise<SharedTra
   };
 }
 
-async function upsertTasks(db: ReturnType<typeof createClient>, tasks: TrackerTask[]) {
+async function upsertTasks(db: TrackerDbClient, tasks: TrackerTask[]) {
   if (!tasks.length) return;
   const { error } = await db.from("ashara_tasks").upsert(
     tasks.map((task) => ({
@@ -126,18 +127,18 @@ async function upsertTasks(db: ReturnType<typeof createClient>, tasks: TrackerTa
   if (error) throw new Error(formatSupabaseError(error, "Unable to save tasks."));
 }
 
-async function replaceTasks(db: ReturnType<typeof createClient>, tasks: TrackerTask[]) {
+async function replaceTasks(db: TrackerDbClient, tasks: TrackerTask[]) {
   const { error } = await db.from("ashara_tasks").delete().neq("id", "__never__");
   if (error) throw new Error(formatSupabaseError(error, "Unable to replace tasks."));
   await upsertTasks(db, tasks);
 }
 
-async function deleteTask(db: ReturnType<typeof createClient>, taskId: string) {
+async function deleteTask(db: TrackerDbClient, taskId: string) {
   const { error } = await db.from("ashara_tasks").delete().eq("id", taskId);
   if (error) throw new Error(formatSupabaseError(error, "Unable to delete task."));
 }
 
-async function upsertCities(db: ReturnType<typeof createClient>, cities: string[]) {
+async function upsertCities(db: TrackerDbClient, cities: string[]) {
   if (!cities.length) return;
   const { error } = await db.from("ashara_cities").upsert(
     cities.map((name, index) => ({
@@ -151,7 +152,7 @@ async function upsertCities(db: ReturnType<typeof createClient>, cities: string[
   if (error) throw new Error(formatSupabaseError(error, "Unable to save cities."));
 }
 
-async function upsertContacts(db: ReturnType<typeof createClient>, contacts: SharedTrackerContact[]) {
+async function upsertContacts(db: TrackerDbClient, contacts: SharedTrackerContact[]) {
   if (!contacts.length) return;
   const { error } = await db.from("ashara_contacts").upsert(
     contacts.map((contact) => ({
@@ -166,7 +167,7 @@ async function upsertContacts(db: ReturnType<typeof createClient>, contacts: Sha
   if (error) throw new Error(formatSupabaseError(error, "Unable to save contacts."));
 }
 
-async function upsertActivity(db: ReturnType<typeof createClient>, activity: SharedTrackerActivity[]) {
+async function upsertActivity(db: TrackerDbClient, activity: SharedTrackerActivity[]) {
   if (!activity.length) return;
   const { error } = await db.from("ashara_activity").upsert(
     activity.map((entry) => ({
@@ -183,7 +184,7 @@ async function upsertActivity(db: ReturnType<typeof createClient>, activity: Sha
   if (error) throw new Error(formatSupabaseError(error, "Unable to save activity."));
 }
 
-async function saveChartConfig(db: ReturnType<typeof createClient>, chartConfig: SharedChartConfig) {
+async function saveChartConfig(db: TrackerDbClient, chartConfig: SharedChartConfig) {
   const { error } = await db.from("ashara_chart_configs").upsert(
     { id: CHART_CONFIG_ID, data: chartConfig, updated_at: new Date().toISOString() },
     { onConflict: "id" }
@@ -191,7 +192,7 @@ async function saveChartConfig(db: ReturnType<typeof createClient>, chartConfig:
   if (error) throw new Error(formatSupabaseError(error, "Unable to save chart settings."));
 }
 
-async function loadPayloadTable<T>(db: ReturnType<typeof createClient>, table: string, orderColumn: string, ascending: boolean, limit?: number) {
+async function loadPayloadTable<T>(db: TrackerDbClient, table: string, orderColumn: string, ascending: boolean, limit?: number) {
   let query = db.from(table).select("id,data").order(orderColumn, { ascending });
   if (limit) query = query.limit(limit);
   const { data, error } = await query;
@@ -199,7 +200,7 @@ async function loadPayloadTable<T>(db: ReturnType<typeof createClient>, table: s
   return ((data || []) as Array<PayloadRow<T>>).map((row) => row.data).filter(Boolean);
 }
 
-async function loadSinglePayload<T>(db: ReturnType<typeof createClient>, table: string, id: string) {
+async function loadSinglePayload<T>(db: TrackerDbClient, table: string, id: string) {
   const { data, error } = await db.from(table).select("id,data").eq("id", id).maybeSingle();
   if (error) throw new Error(formatSupabaseError(error, `Unable to load ${table}.`));
   return (data as PayloadRow<T> | null)?.data || null;
