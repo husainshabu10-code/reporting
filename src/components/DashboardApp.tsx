@@ -1496,12 +1496,13 @@ function ChartVisual({ dataset, chartKind, showLegend = true, showDataLabels = f
   return (
     <div className="mt-4 space-y-3">
       {dataset.rows.map((row) => (
-        <div key={row.label} className="space-y-1" title={`${row.label}: ${row.value}${dataset.suffix || ""} (${row.percent}%)`}>
+        <div key={row.label} className="group/chartbar relative space-y-1" title={chartTooltipText(row, dataset.suffix)}>
           <div className="flex items-center justify-between gap-3 text-sm">
             <span className="truncate text-[var(--color-text-muted)]">{row.label}</span>
             {showDataLabels && <span className="flex-none text-xs font-semibold text-[var(--color-primary)]">{formatChartLabel(row, dataset.suffix)}</span>}
           </div>
           <ProgressBar value={row.percent} tone={row.status} />
+          <ChartHoverTooltip row={row} suffix={dataset.suffix} />
         </div>
       ))}
     </div>
@@ -1527,7 +1528,7 @@ function LineChartVisual({ dataset, showLegend, showDataLabels }: { dataset: Cha
         {points.map((point, index) => (
           <g key={`${point.row.label}-${index}`}>
             <circle cx={point.x} cy={point.y} r="5" fill={chartColor(point.row, index)}>
-              <title>{`${point.row.label}: ${point.row.value}${dataset.suffix || ""} (${point.row.percent}%)`}</title>
+              <title>{chartTooltipText(point.row, dataset.suffix)}</title>
             </circle>
             {showDataLabels && (
               <text x={point.x} y={Math.max(12, point.y - 10)} textAnchor="middle" className="fill-[var(--color-primary)] text-[11px] font-semibold">
@@ -1544,18 +1545,62 @@ function LineChartVisual({ dataset, showLegend, showDataLabels }: { dataset: Cha
 
 function PieLikeChart({ dataset, chartKind, showLegend, showDataLabels }: { dataset: ChartDataset; chartKind: "Pie" | "Donut"; showLegend: boolean; showDataLabels: boolean }) {
   const rows = dataset.rows.filter((row) => row.value > 0 || row.percent > 0);
-  const gradient = conicGradient(rows.length ? rows : dataset.rows);
+  const chartRows = rows.length ? rows : dataset.rows;
+  const total = chartRows.reduce((sum, row) => sum + Math.max(0, row.value || row.percent), 0);
+  const [hoveredRow, setHoveredRow] = useState<ChartRow | null>(null);
+  let startAngle = -90;
 
   return (
     <div className="mt-4 grid min-w-0 gap-4 md:grid-cols-[minmax(9rem,180px)_1fr] md:items-center">
-      <div className="mx-auto flex aspect-square w-36 items-center justify-center rounded-full border border-[var(--color-border)] shadow-inner sm:w-44" style={{ background: gradient }}>
-        {chartKind === "Donut" && (
-          <div className="aspect-square w-20 rounded-full border border-[var(--color-border)] bg-[var(--color-card)] sm:w-24" aria-hidden="true" />
+      <div className="relative mx-auto flex aspect-square w-36 items-center justify-center sm:w-44">
+        <svg className="h-full w-full overflow-visible drop-shadow-sm" viewBox="0 0 180 180" role="img" aria-label={dataset.title} shapeRendering="geometricPrecision">
+          {chartRows.length === 1 || total <= 0 ? (
+            <circle
+              cx="90"
+              cy="90"
+              r="76"
+              fill={cssColor(chartColor(chartRows[0] || { label: "No data", value: 1, percent: 100, status: "muted" }, 0))}
+              stroke="var(--color-card)"
+              strokeWidth="1"
+              onMouseEnter={() => setHoveredRow(chartRows[0] || null)}
+              onMouseLeave={() => setHoveredRow(null)}
+            >
+              <title>{chartRows[0] ? chartTooltipText(chartRows[0], dataset.suffix) : "No data"}</title>
+            </circle>
+          ) : (
+            chartRows.map((row, index) => {
+              const sliceValue = Math.max(0, row.value || row.percent);
+              const endAngle = startAngle + (sliceValue / total) * 360;
+              const path = describePieSlice(90, 90, 76, startAngle, endAngle);
+              startAngle = endAngle;
+              return (
+                <path
+                  key={row.label}
+                  d={path}
+                  fill={cssColor(chartColor(row, index))}
+                  stroke="var(--color-card)"
+                  strokeWidth="1"
+                  className="transition-opacity duration-150 hover:opacity-85"
+                  onMouseEnter={() => setHoveredRow(row)}
+                  onMouseLeave={() => setHoveredRow(null)}
+                >
+                  <title>{chartTooltipText(row, dataset.suffix)}</title>
+                </path>
+              );
+            })
+          )}
+          {chartKind === "Donut" && <circle cx="90" cy="90" r="43" fill="var(--color-card)" stroke="var(--color-border)" strokeWidth="1" />}
+        </svg>
+        {hoveredRow && (
+          <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 w-max max-w-52 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2 text-xs font-semibold text-[var(--color-text)] shadow-2xl">
+            <p className="text-[var(--color-primary)]">{hoveredRow.label}</p>
+            <p className="text-[var(--color-text-muted)]">{formatChartLabel(hoveredRow, dataset.suffix)}</p>
+          </div>
         )}
       </div>
       {(showLegend || showDataLabels) && <div className="min-w-0 space-y-2">
         {dataset.rows.map((row, index) => (
-          <div key={row.label} className="flex items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm" title={`${row.label}: ${row.value}${dataset.suffix || ""} (${row.percent}%)`}>
+          <div key={row.label} className="flex items-center justify-between gap-3 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm" title={chartTooltipText(row, dataset.suffix)}>
             <span className="flex min-w-0 items-center gap-2">
               {showLegend && <span className="h-3 w-3 flex-none rounded-full" style={{ background: chartColor(row, index) }} />}
               <span className="truncate text-[var(--color-text-muted)]">{row.label}</span>
@@ -1564,6 +1609,15 @@ function PieLikeChart({ dataset, chartKind, showLegend, showDataLabels }: { data
           </div>
         ))}
       </div>}
+    </div>
+  );
+}
+
+function ChartHoverTooltip({ row, suffix }: { row: ChartRow; suffix?: string }) {
+  return (
+    <div className="pointer-events-none absolute right-0 top-0 z-10 hidden max-w-64 -translate-y-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2 text-xs font-semibold text-[var(--color-text)] shadow-2xl group-hover/chartbar:block">
+      <p className="truncate text-[var(--color-primary)]">{row.label}</p>
+      <p className="text-[var(--color-text-muted)]">{formatChartLabel(row, suffix)}</p>
     </div>
   );
 }
@@ -2963,6 +3017,10 @@ function statusBadgeClass(status: TrackerTask["status"]) {
 
 function formatChartLabel(row: ChartRow, suffix?: string) {
   return `${row.value}${suffix || ""} (${row.percent}%)`;
+}
+
+function chartTooltipText(row: ChartRow, suffix?: string) {
+  return `${row.label}: ${formatChartLabel(row, suffix)}`;
 }
 
 function pieSlicesSvg(rows: ChartRow[], cx: number, cy: number, radius: number) {
