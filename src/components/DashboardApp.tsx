@@ -50,6 +50,23 @@ import {
   toSentenceCase
 } from "@/lib/asharaTrackerData";
 import type { AttachmentReference, TrackerTask, VendorEntry } from "@/lib/asharaTrackerData";
+import {
+  currentSharedUser,
+  deleteSharedTask,
+  isSharedDatabaseConfigured,
+  loadSharedTrackerState,
+  replaceSharedTasks,
+  saveSharedChartConfig,
+  seedSharedTrackerState,
+  subscribeToSharedTrackerChanges,
+  upsertSharedActivity,
+  upsertSharedCities,
+  upsertSharedContact,
+  upsertSharedContacts,
+  upsertSharedTask,
+  upsertSharedTasks
+} from "@/lib/sharedTrackerStore";
+import type { SharedChartConfig, SharedTrackerState } from "@/lib/sharedTrackerStore";
 
 type TabId = "Dashboard" | "Compare" | "Master List" | "Contacts" | "Area" | "Activity" | "Report" | "Timeline";
 type ReportFormat = "Charts only" | "Tables only" | "Both charts and tables";
@@ -100,6 +117,11 @@ type ActivityEntry = {
   action: string;
   item: string;
   details: string;
+  changedField?: string;
+  oldValue?: string;
+  newValue?: string;
+  city?: string;
+  taskId?: string;
 };
 
 type ChartRow = {
@@ -254,46 +276,103 @@ export default function DashboardApp() {
   const [reportFormat, setReportFormat] = useState<ReportFormat>("Both charts and tables");
   const [excelReportFormat, setExcelReportFormat] = useState<ExcelReportFormat>("Table only");
   const [hydrated, setHydrated] = useState(false);
+  const [sharedDbEnabled] = useState(() => isSharedDatabaseConfigured());
+  const [syncStatus, setSyncStatus] = useState(() => isSharedDatabaseConfigured() ? "Connecting to Supabase" : "Local fallback mode");
+  const [syncError, setSyncError] = useState("");
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    try {
-      const savedTasks = window.localStorage.getItem(STORAGE_TASKS_KEY);
-      const savedCities = window.localStorage.getItem(STORAGE_CITIES_KEY);
-      const savedContacts = window.localStorage.getItem(STORAGE_CONTACTS_KEY);
-      const savedActivity = window.localStorage.getItem(STORAGE_ACTIVITY_KEY);
-      const savedVersion = window.localStorage.getItem(STORAGE_DATA_VERSION_KEY);
-      const parsedCities = savedCities ? JSON.parse(savedCities) as string[] : INITIAL_CITIES;
-      const parsedActivity = savedActivity ? JSON.parse(savedActivity) as ActivityEntry[] : activity;
-      if (savedVersion !== CURRENT_DATA_VERSION) {
-        setCities(parsedCities);
-        setTasks(normalizeTasks(generateDefaultTasksForCities(parsedCities)));
-        setActivity([createActivity("Task data replaced", "CSV task list", "Existing task data replaced with the imported full task list for every city."), ...parsedActivity].slice(0, 250));
-      } else if (savedTasks) {
-        setTasks(normalizeTasks(JSON.parse(savedTasks) as TrackerTask[]));
-        setCities(parsedCities);
-        setActivity(parsedActivity);
+    let cancelled = false;
+    const boot = async () => {
+      const fallback = readLocalFallbackState();
+      if (!sharedDbEnabled) {
+        applySharedState(fallback);
+        setHydrated(true);
+        return;
       }
-      if (savedContacts) setContacts(JSON.parse(savedContacts) as Contact[]);
-    } catch {
-      setTasks(normalizeTasks(generateDefaultTasksForCities(INITIAL_CITIES)));
-    } finally {
-      setHydrated(true);
-    }
-  }, []);
+
+      try {
+        setSyncStatus("Loading shared database");
+        const shared = await loadSharedTrackerState<Contact, ActivityEntry>();
+        if (cancelled) return;
+        if (!shared || shared.tasks.length === 0) {
+          await seedSharedTrackerState(fallback);
+          if (cancelled) return;
+          applySharedState(fallback);
+          setSyncStatus("Shared database seeded");
+        } else {
+          applySharedState(shared);
+          setSyncStatus("Synced with Supabase");
+        }
+      } catch (error) {
+        if (cancelled) return;
+        applySharedState(fallback);
+        setSyncStatus("Using local fallback");
+        setSyncError(error instanceof Error ? error.message : "Unable to load Supabase data.");
+      } finally {
+        if (!cancelled) setHydrated(true);
+      }
+    };
+    boot();
+    return () => {
+      cancelled = true;
+    };
+  }, [sharedDbEnabled]);
+
+  useEffect(() => {
+    if (!hydrated || !sharedDbEnabled) return;
+    const refreshSharedData = async () => {
+      try {
+        const shared = await loadSharedTrackerState<Contact, ActivityEntry>();
+        if (!shared) return;
+        applySharedState(shared);
+        setSyncStatus("Synced with Supabase");
+        setSyncError("");
+      } catch (error) {
+        setSyncStatus("Sync issue");
+        setSyncError(error instanceof Error ? error.message : "Unable to refresh shared data.");
+      }
+    };
+    const unsubscribe = subscribeToSharedTrackerChanges(refreshSharedData);
+    const poll = window.setInterval(refreshSharedData, 15000);
+    return () => {
+      unsubscribe();
+      window.clearInterval(poll);
+    };
+  }, [hydrated, sharedDbEnabled]);
 
   useEffect(() => {
     setSidebarOpen(window.innerWidth >= 1024);
   }, []);
 
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || sharedDbEnabled) return;
     window.localStorage.setItem(STORAGE_TASKS_KEY, JSON.stringify(tasks));
     window.localStorage.setItem(STORAGE_CITIES_KEY, JSON.stringify(cities));
     window.localStorage.setItem(STORAGE_CONTACTS_KEY, JSON.stringify(contacts));
     window.localStorage.setItem(STORAGE_ACTIVITY_KEY, JSON.stringify(activity));
     window.localStorage.setItem(STORAGE_DATA_VERSION_KEY, CURRENT_DATA_VERSION);
-  }, [activity, cities, contacts, hydrated, tasks]);
+  }, [activity, cities, contacts, hydrated, sharedDbEnabled, tasks]);
+
+  useEffect(() => {
+    if (!hydrated || !sharedDbEnabled) return;
+    saveSharedChartConfig({ hiddenChartIds, chartOrder, customCharts }).catch((error) => {
+      setSyncStatus("Chart settings not saved");
+      setSyncError(error instanceof Error ? error.message : "Unable to save chart settings.");
+    });
+  }, [chartOrder, customCharts, hiddenChartIds, hydrated, sharedDbEnabled]);
+
+  const applySharedState = (state: SharedTrackerState<Contact, ActivityEntry>) => {
+    const nextTasks = normalizeTasks(state.tasks.length ? state.tasks : generateDefaultTasksForCities(INITIAL_CITIES));
+    const nextCities = state.cities.length ? state.cities : unique(nextTasks.map((task) => task.city));
+    setTasks(nextTasks);
+    setCities(nextCities.length ? nextCities : INITIAL_CITIES);
+    setContacts(state.contacts.length ? state.contacts : createDefaultContacts(nextCities.length ? nextCities : INITIAL_CITIES));
+    setActivity(state.activity.length ? state.activity.slice(0, 250) : [createActivity("Dashboard connected", "ASHARA MUBARAKAH tracker", sharedDbEnabled ? "Shared database initialized." : "Local fallback initialized.")]);
+    setHiddenChartIds(state.chartConfig.hiddenChartIds || {});
+    setChartOrder(state.chartConfig.chartOrder || {});
+    setCustomCharts((state.chartConfig.customCharts as Record<string, CustomChartDefinition[]>) || {});
+  };
 
   const filteredTasks = useMemo(() => applyFilters(tasks, filters), [filters, tasks]);
   const reportTasks = useMemo(() => applyFilters(tasks, reportFilters), [reportFilters, tasks]);
@@ -354,8 +433,15 @@ export default function DashboardApp() {
     logActivity("Chart created", definition.title, `${tab} custom chart added.`);
   };
 
-  const logActivity = (action: string, item: string, details: string) => {
-    setActivity((current) => [createActivity(action, item, details), ...current].slice(0, 250));
+  const logActivity = (action: string, item: string, details: string, meta: Partial<ActivityEntry> = {}) => {
+    const entry = createActivity(action, item, details, meta);
+    setActivity((current) => [entry, ...current].slice(0, 250));
+    if (sharedDbEnabled) {
+      upsertSharedActivity([entry]).catch((error) => {
+        setSyncStatus("Activity not saved");
+        setSyncError(error instanceof Error ? error.message : "Unable to save activity.");
+      });
+    }
   };
 
   const upsertTask = (task: TrackerTask) => {
@@ -366,15 +452,32 @@ export default function DashboardApp() {
       return exists ? current.map((item) => (item.id === normalized.id ? normalized : item)) : [normalized, ...current];
     });
     setSelectedTask(normalized);
+    if (sharedDbEnabled) {
+      upsertSharedTask(normalized)
+        .then(() => setSyncStatus("Task saved to Supabase"))
+        .catch((error) => {
+          setSyncStatus("Task not saved");
+          setSyncError(error instanceof Error ? error.message : "Unable to save task.");
+        });
+    }
     if (!existing) {
-      logActivity("Task created", normalized.taskName, `${normalized.city} / ${normalized.workstream}`);
+      logActivity("Task created", normalized.taskName, `${normalized.city} / ${normalized.workstream}`, { city: normalized.city, taskId: normalized.id });
       return;
     }
-    if (existing.status !== normalized.status) logActivity("Status changed", normalized.taskName, `${existing.status} to ${normalized.status}`);
-    if (existing.progress !== normalized.progress) logActivity("Progress changed", normalized.taskName, `${existing.progress}% to ${normalized.progress}%`);
-    if (vendorSummary(existing) !== vendorSummary(normalized)) logActivity("Vendor added or updated", normalized.taskName, vendorSummary(normalized));
-    if (existing.attachments.length !== normalized.attachments.length) logActivity("Attachment uploaded", normalized.taskName, `${normalized.attachments.length} attachment(s) recorded`);
-    logActivity("Task updated", normalized.taskName, `${normalized.city} / ${normalized.zoneArea}`);
+    logTaskFieldChange(existing, normalized, "Status", existing.status, normalized.status);
+    logTaskFieldChange(existing, normalized, "Progress", `${existing.progress}%`, `${normalized.progress}%`);
+    logTaskFieldChange(existing, normalized, "Task Owner / POC", existing.taskOwner, normalized.taskOwner);
+    logTaskFieldChange(existing, normalized, "Area", existing.zoneArea, normalized.zoneArea);
+    logTaskFieldChange(existing, normalized, "Task weight", existing.taskWeight, normalized.taskWeight);
+    logTaskFieldChange(existing, normalized, "Document status", existing.documentStatus, normalized.documentStatus);
+    if (vendorSummary(existing) !== vendorSummary(normalized)) logActivity("Vendor added or updated", normalized.taskName, "Vendor information changed.", { changedField: "Vendors", oldValue: vendorSummary(existing), newValue: vendorSummary(normalized), city: normalized.city, taskId: normalized.id });
+    if (existing.attachments.length !== normalized.attachments.length) logActivity("Attachment uploaded", normalized.taskName, `${normalized.attachments.length} attachment(s) recorded`, { changedField: "Attachments", oldValue: String(existing.attachments.length), newValue: String(normalized.attachments.length), city: normalized.city, taskId: normalized.id });
+    logActivity("Task updated", normalized.taskName, `${normalized.city} / ${normalized.zoneArea}`, { city: normalized.city, taskId: normalized.id });
+  };
+
+  const logTaskFieldChange = (oldTask: TrackerTask, nextTask: TrackerTask, field: string, oldValue: string, newValue: string) => {
+    if (oldValue === newValue) return;
+    logActivity("Field changed", nextTask.taskName, `${field}: ${oldValue || "-"} to ${newValue || "-"}`, { changedField: field, oldValue, newValue, city: nextTask.city, taskId: nextTask.id });
   };
 
   const deleteTask = (taskId: string) => {
@@ -382,6 +485,12 @@ export default function DashboardApp() {
     if (!window.confirm("Delete this task from the tracker?")) return;
     setTasks((current) => current.filter((item) => item.id !== taskId));
     setSelectedTask(null);
+    if (sharedDbEnabled) {
+      deleteSharedTask(taskId).catch((error) => {
+        setSyncStatus("Delete not saved");
+        setSyncError(error instanceof Error ? error.message : "Unable to delete task.");
+      });
+    }
     if (task) logActivity("Task deleted", task.taskName, `${task.city} / ${task.workstream}`);
   };
 
@@ -392,9 +501,21 @@ export default function DashboardApp() {
       window.alert("This city already exists.");
       return;
     }
-    setCities((current) => [...current, city]);
-    setContacts((current) => [...current, blankContact(city)]);
-    if (generateTasks) setTasks((current) => [...current, ...normalizeTasks(generateDefaultTasksForCity(city))]);
+    const nextContact = blankContact(city);
+    const generatedTasks = generateTasks ? normalizeTasks(generateDefaultTasksForCity(city)) : [];
+    setCities((current) => {
+      const next = [...current, city];
+      if (sharedDbEnabled) upsertSharedCities(next).catch((error) => setSyncError(error instanceof Error ? error.message : "Unable to save city."));
+      return next;
+    });
+    setContacts((current) => [...current, nextContact]);
+    if (generateTasks) setTasks((current) => [...current, ...generatedTasks]);
+    if (sharedDbEnabled) {
+      Promise.all([upsertSharedContact(nextContact), upsertSharedTasks(generatedTasks)]).catch((error) => {
+        setSyncStatus("City not fully saved");
+        setSyncError(error instanceof Error ? error.message : "Unable to save city records.");
+      });
+    }
     logActivity("City added", city, generateTasks ? "Default tasks generated." : "City shell created.");
     setCityDraft("");
   };
@@ -402,27 +523,52 @@ export default function DashboardApp() {
   const resetDemoData = () => {
     if (!window.confirm("Reset all local data to the default ASHARA MUBARAKAH dashboard setup?")) return;
     setCities(INITIAL_CITIES);
-    setTasks(normalizeTasks(generateDefaultTasksForCities(INITIAL_CITIES)));
-    setContacts(createDefaultContacts(INITIAL_CITIES));
-    setActivity([createActivity("Demo data reset", "ASHARA MUBARAKAH tracker", "Default tasks and contacts restored.")]);
+    const resetTasks = normalizeTasks(generateDefaultTasksForCities(INITIAL_CITIES));
+    const resetContacts = createDefaultContacts(INITIAL_CITIES);
+    const resetActivity = [createActivity("Demo data reset", "ASHARA MUBARAKAH tracker", "Default tasks and contacts restored.")];
+    setTasks(resetTasks);
+    setContacts(resetContacts);
+    setActivity(resetActivity);
     setFilters(EMPTY_FILTERS);
+    if (sharedDbEnabled) {
+      Promise.all([replaceSharedTasks(resetTasks), upsertSharedCities(INITIAL_CITIES), upsertSharedContacts(resetContacts), upsertSharedActivity(resetActivity)]).catch((error) => {
+        setSyncStatus("Reset not fully saved");
+        setSyncError(error instanceof Error ? error.message : "Unable to reset shared records.");
+      });
+    }
   };
 
   const importCsv = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const text = await file.text();
-    const imported = parseCsv(text).map(rowToTask).filter(Boolean) as TrackerTask[];
+    const csvRows = parseCsv(text);
+    const hasCityData = csvRows.some((row) => Boolean((row.City || row.city || row["City Name"] || "").trim()));
+    const imported = (hasCityData
+      ? csvRows.map(rowToTask)
+      : csvRows.flatMap((row) => cities.map((city) => rowToTask({ ...row, City: city })))
+    ).filter(Boolean) as TrackerTask[];
     if (!imported.length) {
       window.alert("No valid task rows found in this CSV.");
       return;
     }
-    setTasks((current) => {
-      const byId = new Map(current.map((task) => [task.id, task]));
-      normalizeTasks(imported).forEach((task) => byId.set(task.id, task));
-      return Array.from(byId.values());
+    const normalizedImported = normalizeTasks(imported);
+    const merged = mergeImportedTasks(tasks, normalizedImported);
+    setTasks(merged.tasks);
+    const importedCities = Array.from(new Set(imported.map((task) => task.city)));
+    setCities((current) => {
+      const next = Array.from(new Set([...current, ...importedCities]));
+      if (sharedDbEnabled) upsertSharedCities(next).catch((error) => setSyncError(error instanceof Error ? error.message : "Unable to save imported cities."));
+      return next;
     });
-    setCities((current) => Array.from(new Set([...current, ...imported.map((task) => task.city)])));
+    if (sharedDbEnabled) {
+      upsertSharedTasks(merged.updatedTasks)
+        .then(() => setSyncStatus("CSV import saved to Supabase"))
+        .catch((error) => {
+          setSyncStatus("CSV import not saved");
+          setSyncError(error instanceof Error ? error.message : "Unable to save imported tasks.");
+        });
+    }
     logActivity("Tasks imported", file.name, `${imported.length} row(s) imported or updated.`);
     event.target.value = "";
   };
@@ -433,6 +579,12 @@ export default function DashboardApp() {
       const exists = current.some((item) => item.id === saved.id);
       return exists ? current.map((item) => (item.id === saved.id ? saved : item)) : [saved, ...current];
     });
+    if (sharedDbEnabled) {
+      upsertSharedContact(saved).catch((error) => {
+        setSyncStatus("Contact not saved");
+        setSyncError(error instanceof Error ? error.message : "Unable to save contact.");
+      });
+    }
     logActivity("Contact added or updated", saved.name || "Unnamed contact", `${saved.city} / ${saved.workstreamHandled}`);
     setContactDraft(blankContact(saved.city));
   };
@@ -500,6 +652,12 @@ export default function DashboardApp() {
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase text-[var(--color-accent)]">{activeTab}</p>
                 <h2 className="truncate text-lg font-semibold text-[var(--color-primary)] sm:text-2xl">IT / Event Preparation Dashboard</h2>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                  <span className={`inline-flex rounded-full px-2 py-0.5 font-semibold ${sharedDbEnabled ? "bg-[var(--color-accent-light)] text-[var(--color-primary)]" : "bg-[#F4F1EA] text-[var(--color-text-muted)]"}`}>
+                    {syncStatus}
+                  </span>
+                  {syncError && <span className="max-w-md truncate text-[var(--color-important)]" title={syncError}>{syncError}</span>}
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
@@ -879,6 +1037,11 @@ function ActivityPage({ activity }: { activity: ActivityEntry[] }) {
               <p className="font-semibold text-[var(--color-primary)]">{item.action}</p>
               <p className="text-sm text-[var(--color-text)]">{item.item}</p>
               <p className="mt-1 text-sm text-[var(--color-text-muted)]">{item.details}</p>
+              {(item.changedField || item.city) && (
+                <p className="mt-2 text-xs font-semibold text-[var(--color-text-muted)]">
+                  {[item.city, item.changedField, item.oldValue || item.newValue ? `${item.oldValue || "-"} to ${item.newValue || "-"}` : ""].filter(Boolean).join(" / ")}
+                </p>
+              )}
             </div>
             <div className="text-sm text-[var(--color-text-muted)] sm:text-right">
               <p>{new Date(item.at).toLocaleString()}</p>
@@ -2487,8 +2650,58 @@ function blankContact(city: string): Contact {
   return { id: `contact-${Date.now()}`, name: "", city, phone: "", email: "", role: "", workstreamHandled: WORKSTREAMS[0].name, customResponsibility: "", notes: "" };
 }
 
-function createActivity(action: string, item: string, details: string): ActivityEntry {
-  return { id: `activity-${Date.now()}-${Math.random().toString(36).slice(2)}`, at: new Date().toISOString(), user: CURRENT_USER, action, item, details };
+function createActivity(action: string, item: string, details: string, meta: Partial<ActivityEntry> = {}): ActivityEntry {
+  return { id: `activity-${Date.now()}-${Math.random().toString(36).slice(2)}`, at: new Date().toISOString(), user: currentSharedUser() || CURRENT_USER, action, item, details, ...meta };
+}
+
+function readLocalFallbackState(): SharedTrackerState<Contact, ActivityEntry> {
+  try {
+    const savedTasks = window.localStorage.getItem(STORAGE_TASKS_KEY);
+    const savedCities = window.localStorage.getItem(STORAGE_CITIES_KEY);
+    const savedContacts = window.localStorage.getItem(STORAGE_CONTACTS_KEY);
+    const savedActivity = window.localStorage.getItem(STORAGE_ACTIVITY_KEY);
+    const savedVersion = window.localStorage.getItem(STORAGE_DATA_VERSION_KEY);
+    const parsedCities = savedCities ? JSON.parse(savedCities) as string[] : INITIAL_CITIES;
+    const parsedActivity = savedActivity ? JSON.parse(savedActivity) as ActivityEntry[] : [];
+    const tasks = savedVersion === CURRENT_DATA_VERSION && savedTasks
+      ? normalizeTasks(JSON.parse(savedTasks) as TrackerTask[])
+      : normalizeTasks(generateDefaultTasksForCities(parsedCities));
+    return {
+      tasks,
+      cities: parsedCities,
+      contacts: savedContacts ? JSON.parse(savedContacts) as Contact[] : createDefaultContacts(parsedCities),
+      activity: parsedActivity.length ? parsedActivity : [createActivity("Dashboard connected", "ASHARA MUBARAKAH tracker", "Local fallback data loaded.")],
+      chartConfig: { hiddenChartIds: {}, chartOrder: {}, customCharts: {} },
+      equipment: []
+    };
+  } catch {
+    return {
+      tasks: normalizeTasks(generateDefaultTasksForCities(INITIAL_CITIES)),
+      cities: INITIAL_CITIES,
+      contacts: createDefaultContacts(INITIAL_CITIES),
+      activity: [createActivity("Dashboard connected", "ASHARA MUBARAKAH tracker", "Default fallback data loaded.")],
+      chartConfig: { hiddenChartIds: {}, chartOrder: {}, customCharts: {} },
+      equipment: []
+    };
+  }
+}
+
+function mergeImportedTasks(current: TrackerTask[], imported: TrackerTask[]) {
+  const byId = new Map(current.map((task) => [task.id, task]));
+  const keyToId = new Map(current.map((task) => [taskMergeKey(task), task.id]));
+  const updatedTasks = imported.map((task) => {
+    const existingId = keyToId.get(taskMergeKey(task));
+    const existing = existingId ? byId.get(existingId) : byId.get(task.id);
+    const next = existing ? normalizeTask({ ...task, id: existing.id, createdAt: existing.createdAt, updatedAt: new Date().toISOString() }) : task;
+    byId.set(next.id, next);
+    keyToId.set(taskMergeKey(next), next.id);
+    return next;
+  });
+  return { tasks: Array.from(byId.values()), updatedTasks };
+}
+
+function taskMergeKey(task: TrackerTask) {
+  return [task.city, task.workstream, task.zoneArea, task.taskName].map((part) => String(part || "").trim().toLowerCase()).join("|");
 }
 
 function tasksToRows(rows: TrackerTask[]): Array<Record<string, string | number>> {

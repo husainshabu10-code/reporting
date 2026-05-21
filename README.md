@@ -11,6 +11,22 @@ npm run dev
 
 Open the local URL shown by Next.js, usually `http://localhost:3000`.
 
+## Shared Supabase database
+
+Task, city, contact, activity, equipment, and chart configuration data can now be shared through Supabase instead of being kept only in one browser.
+
+1. Create a Supabase project.
+2. Run `docs/supabase-schema.sql` in the Supabase SQL editor.
+3. Add these environment variables locally and in Vercel:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+NEXT_PUBLIC_TRACKER_USER_NAME=Unknown user
+```
+
+When the variables are present, the dashboard loads from Supabase, writes edits/imports to Supabase, listens for realtime changes, and falls back to polling every 15 seconds. If the variables are missing or Supabase is unavailable, the app uses local browser storage only as a temporary fallback.
+
 ## Build check
 
 ```bash
@@ -25,7 +41,7 @@ Placeholder city names are defined in `src/lib/asharaTrackerData.ts`:
 export const INITIAL_CITIES = ["Nairobi", "Mombasa", "Daresalam", "Mumbai", "Surat", "Pune", "Nagpur", "Colombo"];
 ```
 
-Replace those values with the actual city names before first use, or add cities from the dashboard using **Add City + Default Tasks**. Existing browser data is stored in localStorage, so use **Reset Demo Data** after changing the constants if you want to regenerate the default local demo set.
+Replace those values with the actual city names before first use, or add cities from the dashboard using **Add City + Default Tasks**. Existing shared data is loaded from Supabase when configured. Use **Add City + Default Tasks** for runtime changes, or update the constants before first seeding a fresh database.
 
 ## Export for Asana or Excel
 
@@ -33,4 +49,4 @@ Use **Export Visible CSV** for the current filtered view or **Export Full CSV** 
 
 ## Backend / Asana API path
 
-The app keeps a clean `TrackerTask` data model in `src/lib/asharaTrackerData.ts`. To connect a backend later, replace the localStorage load/save calls in `src/components/DashboardApp.tsx` with API calls, keeping the same task field names. For Asana, map each exported field to a project custom field and sync `id`, `status`, `owner`, dates, document reference, and remarks through the Asana API.
+The app keeps a clean `TrackerTask` data model in `src/lib/asharaTrackerData.ts` and syncs it through `src/lib/sharedTrackerStore.ts`. For Asana, map each exported field to a project custom field and sync `id`, `status`, `owner`, dates, document reference, and remarks through the Asana API.
