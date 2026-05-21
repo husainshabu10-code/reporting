@@ -171,7 +171,6 @@ const STORAGE_ACTIVITY_KEY = "ashara-it-readiness-activity";
 const STORAGE_DATA_VERSION_KEY = "ashara-it-readiness-data-version";
 const CURRENT_DATA_VERSION = "csv-full-task-list-83-2026-05-20";
 const CURRENT_USER = "Admin";
-const ATTACHMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx"];
 const CLOSED_STATUSES = new Set(["Completed", "Tested", "Not Required"]);
 const STATUS_SEGMENT_ORDER = [
   "Completed",
@@ -1798,7 +1797,6 @@ function useAnimatedClose(onClose: () => void) {
 
 function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: TrackerTask; cities: string[]; onSave: (task: TrackerTask) => void; onClose: () => void; onDelete: (taskId: string) => void }) {
   const [draft, setDraft] = useState<TrackerTask>(() => normalizeTask(task));
-  const [attachmentError, setAttachmentError] = useState("");
   const { closing, close } = useAnimatedClose(onClose);
   useEffect(() => setDraft(normalizeTask(task)), [task]);
 
@@ -1826,15 +1824,8 @@ function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: Tracker
 
   const addAttachments = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
-    const invalid = files.find((file) => !ATTACHMENT_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext)));
-    if (invalid) {
-      setAttachmentError("Only PDF, Word, PowerPoint, and Excel files are allowed.");
-      event.target.value = "";
-      return;
-    }
     const nextFiles: AttachmentReference[] = files.map((file) => ({ name: file.name, type: file.name.split(".").pop()?.toUpperCase() || "FILE", addedAt: new Date().toISOString() }));
     setDraft({ ...draft, attachments: [...draft.attachments, ...nextFiles], documentStatus: "Draft Attached" });
-    setAttachmentError("");
     event.target.value = "";
   };
 
@@ -1895,9 +1886,8 @@ function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: Tracker
           <InputField label="Document Link / Attachment Reference" value={draft.documentLinkAttachmentReference} onChange={(value) => updateField("documentLinkAttachmentReference", value)} />
           <label className="space-y-1 block">
             <span className="field-label">Upload attachment reference</span>
-            <input className="field" type="file" multiple accept={ATTACHMENT_EXTENSIONS.join(",")} onChange={addAttachments} />
+            <input className="field" type="file" multiple onChange={addAttachments} />
           </label>
-          {attachmentError && <p className="text-sm text-[var(--color-important)]">{attachmentError}</p>}
           <div className="flex flex-wrap gap-2">
             {draft.attachments.map((file) => <span key={`${file.name}-${file.addedAt}`} className="badge-gold">{file.name}</span>)}
           </div>
