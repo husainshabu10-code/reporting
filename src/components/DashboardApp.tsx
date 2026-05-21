@@ -130,6 +130,13 @@ type ChartRow = {
   value: number;
   percent: number;
   status?: "good" | "warning" | "critical" | "muted";
+  segments?: ChartSegment[];
+};
+type ChartSegment = {
+  label: string;
+  value: number;
+  percent: number;
+  color: string;
 };
 
 type ChartDataset = {
@@ -1524,10 +1531,11 @@ function ChartVisual({ dataset, chartKind, showLegend = true, showDataLabels = f
             <span className="truncate text-[var(--color-text-muted)]">{row.label}</span>
             {showDataLabels && <span className="flex-none text-xs font-semibold text-[var(--color-primary)]">{formatChartLabel(row, dataset.suffix)}</span>}
           </div>
-          <ProgressBar value={row.percent} tone={row.status} />
+          {row.segments?.length ? <StackedProgressBar row={row} /> : <ProgressBar value={row.percent} tone={row.status} />}
           <ChartHoverTooltip row={row} suffix={dataset.suffix} />
         </div>
       ))}
+      {dataset.rows.some((row) => row.segments?.length) && <StackedLegend rows={dataset.rows} />}
     </div>
   );
 }
@@ -1641,6 +1649,19 @@ function ChartHoverTooltip({ row, suffix }: { row: ChartRow; suffix?: string }) 
     <div className="pointer-events-none absolute right-0 top-0 z-10 hidden max-w-64 -translate-y-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] px-3 py-2 text-xs font-semibold text-[var(--color-text)] shadow-2xl group-hover/chartbar:block">
       <p className="truncate text-[var(--color-primary)]">{row.label}</p>
       <p className="text-[var(--color-text-muted)]">{formatChartLabel(row, suffix)}</p>
+      {row.segments?.length ? (
+        <div className="mt-2 space-y-1">
+          {row.segments.map((segment) => (
+            <div key={segment.label} className="flex items-center justify-between gap-3">
+              <span className="inline-flex min-w-0 items-center gap-1.5 text-[var(--color-text-muted)]">
+                <span className="h-2 w-2 flex-none rounded-full" style={{ background: segment.color }} />
+                <span className="truncate">{segment.label}</span>
+              </span>
+              <span className="flex-none text-[var(--color-primary)]">{segment.value} ({segment.percent}%)</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -2172,6 +2193,39 @@ function ProgressBar({ value, compact = false, tone }: { value: number; compact?
   return <div className={`overflow-hidden rounded-full bg-[var(--color-accent-light)] ${compact ? "h-2" : "h-2.5"}`}><div className={`h-full rounded-full ${color}`} style={{ width: `${clamp(value, 0, 100)}%` }} /></div>;
 }
 
+function StackedProgressBar({ row }: { row: ChartRow }) {
+  const segments = row.segments || [];
+  return (
+    <div className="flex h-3 overflow-hidden rounded-full bg-[var(--color-accent-light)]" aria-label={stackedTooltipText(row)}>
+      {segments.map((segment) => (
+        <div
+          key={segment.label}
+          className="h-full transition-opacity hover:opacity-80"
+          style={{ width: `${segment.percent}%`, background: segment.color }}
+          title={`${segment.label}: ${segment.value} task(s) (${segment.percent}%)`}
+        />
+      ))}
+    </div>
+  );
+}
+
+function StackedLegend({ rows }: { rows: ChartRow[] }) {
+  const seen = new Map<string, ChartSegment>();
+  rows.flatMap((row) => row.segments || []).forEach((segment) => {
+    if (!seen.has(segment.label)) seen.set(segment.label, segment);
+  });
+  return (
+    <div className="flex flex-wrap gap-2 pt-1">
+      {Array.from(seen.values()).map((segment) => (
+        <span key={segment.label} className="inline-flex items-center gap-2 rounded-full bg-[var(--color-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--color-text-muted)]">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: segment.color }} />
+          {segment.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function chartSvg(dataset: ChartDataset, chartKind: ChartKind, showDataLabels = false) {
   const rows = dataset.rows;
   const width = 900;
@@ -2180,9 +2234,10 @@ function chartSvg(dataset: ChartDataset, chartKind: ChartKind, showDataLabels = 
   const bars = chartRows.map((row, index) => {
     const y = 86 + index * 34;
     const barWidth = Math.max(4, row.percent * 5.8);
-    const labelX = Math.min(850, 285 + barWidth);
+    const labelX = row.segments?.length ? 860 : Math.min(850, 285 + barWidth);
     const valueLabel = showDataLabels ? `<text x="${labelX}" y="${y + 14}" font-size="12" font-weight="700" fill="#0B4F3A">${escapeHtml(formatChartLabel(row, dataset.suffix))}</text>` : "";
-    return `<text x="40" y="${y + 14}" font-size="14" fill="#6B7280">${escapeHtml(row.label)}</text><rect x="270" y="${y}" width="${barWidth}" height="18" rx="9" fill="${cssColor(chartColor(row, index))}"><title>${escapeHtml(`${row.label}: ${row.value}${dataset.suffix || ""} (${row.percent}%)`)}</title></rect>${valueLabel}`;
+    const bar = row.segments?.length ? stackedBarSvg(row, y, 580) : `<rect x="270" y="${y}" width="${barWidth}" height="18" rx="9" fill="${cssColor(chartColor(row, index))}"><title>${escapeHtml(chartTooltipText(row, dataset.suffix))}</title></rect>`;
+    return `<text x="40" y="${y + 14}" font-size="14" fill="#6B7280">${escapeHtml(row.label)}</text>${bar}${valueLabel}`;
   }).join("");
   const legend = chartRows.map((row, index) => `<circle cx="${40 + (index % 4) * 190}" cy="${height - 44 + Math.floor(index / 4) * 22}" r="6" fill="${cssColor(chartColor(row, index))}"/><text x="${52 + (index % 4) * 190}" y="${height - 39 + Math.floor(index / 4) * 22}" font-size="12" fill="#6B7280">${escapeHtml(showDataLabels ? `${row.label} - ${formatChartLabel(row, dataset.suffix)}` : row.label)}</text>`).join("");
   const pie = `${pieSlicesSvg(chartRows, 450, 250, 130)}${chartKind === "Donut" ? '<circle cx="450" cy="250" r="72" fill="#FFFFFF" stroke="#E8DDC5"/>' : ""}${legend}`;
@@ -2324,9 +2379,9 @@ function buildDashboardCharts(rows: TrackerTask[], cityStats: ReturnType<typeof 
   const delayed = rows.filter((task) => task.status === "Blocked" || isOverdue(task)).length;
   const progress = progressScore(rows);
   return compactCharts([
-    makeChart("overall-progress", "Overall progress", [{ label: "Progress", value: progress, percent: progress, status: progress >= 80 ? "good" : progress >= 40 ? "warning" : "critical" }], rows, "Progress", "%"),
+    makeChart("overall-progress", "Overall progress", [progressRow("Progress", rows)], rows, "Progress", "%"),
     makeChart("completed-vs-total", "Completed tasks vs total tasks", [{ label: "Completed", value: completed, percent: Math.round((completed / total) * 100), status: "good" }, { label: "Remaining", value: Math.max(0, rows.length - completed), percent: Math.round(((rows.length - completed) / total) * 100), status: "warning" }], rows, "Donut"),
-    makeChart("city-wise-progress", "City-wise progress", cityStats.map((city) => ({ label: city.city, value: city.completion, percent: city.completion, status: city.health === "Critical" ? "critical" : city.health === "Good" ? "good" : "warning" })), rows, "Bar", "%"),
+    makeChart("city-wise-progress", "City-wise progress", cityStats.map((city) => progressRow(city.city, rows.filter((task) => task.city === city.city))), rows, "Bar", "%"),
     ...buildTaskCharts(rows, "dashboard"),
     makeChart("task-completion", "Task completion", [{ label: "Completed", value: completed, percent: Math.round((completed / total) * 100), status: "good" }, { label: "Pending", value: pending, percent: Math.round((pending / total) * 100), status: "warning" }, { label: "Delayed", value: delayed, percent: Math.round((delayed / total) * 100), status: "critical" }], rows, "Donut")
   ]);
@@ -2336,7 +2391,7 @@ function buildCompareCharts(rows: TrackerTask[], cities: string[]): ChartDataset
   const selected = rows.filter((task) => cities.includes(task.city));
   const stats = getCityStats(selected, cities);
   return compactCharts([
-    makeChart("compare-overall-progress", "Overall progress by city", stats.map((city) => ({ label: city.city, value: city.completion, percent: city.completion, status: city.health === "Critical" ? "critical" : city.health === "Good" ? "good" : "warning" })), selected, "Bar", "%"),
+    makeChart("compare-overall-progress", "Overall progress by city", stats.map((city) => progressRow(city.city, selected.filter((task) => task.city === city.city))), selected, "Bar", "%"),
     makeChart("compare-task-completion", "Task completion by city", stats.map((city) => ({ label: city.city, value: city.completed, percent: city.total ? Math.round((city.completed / city.total) * 100) : 0, status: "good" })), selected, "Bar"),
     makeChart("compare-delayed-items", "Delayed items by city", stats.map((city) => ({ label: city.city, value: city.delayed, percent: city.total ? Math.round((city.delayed / city.total) * 100) : 0, status: city.delayed ? "critical" : "good" })), selected, "Bar"),
     makeChart("compare-status-distribution", "Status distribution", distribution(selected, "status"), selected, "Donut"),
@@ -2363,7 +2418,7 @@ function getAreaRows(rows: TrackerTask[]) {
 
 function buildAreaCharts(rows: ReturnType<typeof getAreaRows>, sourceTasks: TrackerTask[]): ChartDataset[] {
   return compactCharts([
-    makeChart("area-wise-progress", "Area-wise progress", rows.map((row) => ({ label: row.area, value: row.progress, percent: row.progress, status: row.health === "Critical" ? "critical" : row.health === "Good" ? "good" : "warning" })), sourceTasks, "Bar", "%"),
+    makeChart("area-wise-progress", "Area-wise progress", rows.map((row) => areaProgressRow(row.area, sourceTasks.filter((task) => task.zoneArea === row.area))), sourceTasks, "Bar", "%"),
     makeChart("area-wise-tasks", "Area-wise tasks", rows.map((row) => ({ label: row.area, value: row.tasks, percent: Math.min(100, row.tasks * 8), status: "muted" })), sourceTasks, "Bar"),
     makeChart("area-workstream-coverage", "Area-wise workstream coverage", rows.map((row) => ({ label: row.area, value: row.workstreams, percent: Math.min(100, row.workstreams * 8), status: row.workstreams ? "good" : "muted" })), sourceTasks, "Bar")
   ]);
@@ -2551,11 +2606,10 @@ function rebuildChartRows(dataset: ChartDataset, rows: TrackerTask[]): ChartRow[
     return getCityStats(rows, unique(rows.map((task) => task.city))).map((city) => ({ label: city.city, value: city.delayed, percent: city.total ? Math.round((city.delayed / city.total) * 100) : 0, status: city.delayed ? "critical" : "good" }));
   }
   if (id.includes("city-wise-progress") || title.includes("progress by city")) {
-    return getCityStats(rows, unique(rows.map((task) => task.city))).map((city) => ({ label: city.city, value: city.completion, percent: city.completion, status: city.health === "Critical" ? "critical" : city.health === "Good" ? "good" : "warning" }));
+    return unique(rows.map((task) => task.city)).map((city) => progressRow(city, rows.filter((task) => task.city === city)));
   }
   if (id === "overall-progress") {
-    const progress = progressScore(rows);
-    return [{ label: "Progress", value: progress, percent: progress, status: progress >= 80 ? "good" : progress >= 40 ? "warning" : "critical" }];
+    return [progressRow("Progress", rows)];
   }
   if (id.includes("completed-vs-total")) {
     return [{ label: "Completed", value: completed, percent: Math.round((completed / total) * 100), status: "good" }, { label: "Remaining", value: Math.max(0, rows.length - completed), percent: Math.round(((rows.length - completed) / total) * 100), status: "warning" }];
@@ -2577,12 +2631,23 @@ function rebuildChartRows(dataset: ChartDataset, rows: TrackerTask[]): ChartRow[
 
 function progressRow(label: string, rows: TrackerTask[]): ChartRow {
   const value = progressScore(rows);
-  return { label, value, percent: value, status: value >= 80 ? "good" : value >= 40 ? "warning" : "critical" };
+  return { label, value, percent: value, status: value >= 80 ? "good" : value >= 40 ? "warning" : "critical", segments: statusSegments(rows) };
 }
 
 function areaProgressRow(label: string, rows: TrackerTask[]): ChartRow {
   const value = taskWeightProgress(rows);
-  return { label, value, percent: value, status: value >= 80 ? "good" : value >= 40 ? "warning" : "critical" };
+  return { label, value, percent: value, status: value >= 80 ? "good" : value >= 40 ? "warning" : "critical", segments: statusSegments(rows) };
+}
+
+function statusSegments(rows: TrackerTask[]): ChartSegment[] {
+  const total = Math.max(rows.length, 1);
+  const labels = ["Blank", ...STATUSES];
+  return labels.map((status) => {
+    const value = status === "Blank"
+      ? rows.filter((task) => !task.status).length
+      : rows.filter((task) => task.status === status).length;
+    return { label: status, value, percent: Math.round((value / total) * 100), color: cssColor(fieldValueColor(status) || chartColor({ label: status, value, percent: 0 }, 0)) };
+  }).filter((segment) => segment.value > 0);
 }
 
 function averageProgress(rows: TrackerTask[]) {
@@ -3043,7 +3108,23 @@ function formatChartLabel(row: ChartRow, suffix?: string) {
 }
 
 function chartTooltipText(row: ChartRow, suffix?: string) {
-  return `${row.label}: ${formatChartLabel(row, suffix)}`;
+  const stack = row.segments?.length ? ` | ${stackedTooltipText(row)}` : "";
+  return `${row.label}: ${formatChartLabel(row, suffix)}${stack}`;
+}
+
+function stackedTooltipText(row: ChartRow) {
+  return (row.segments || []).map((segment) => `${segment.label}: ${segment.value}`).join(", ");
+}
+
+function stackedBarSvg(row: ChartRow, y: number, width: number) {
+  let x = 270;
+  const segments = row.segments || [];
+  return segments.map((segment, index) => {
+    const segmentWidth = index === segments.length - 1 ? Math.max(0, 270 + width - x) : Math.max(2, (segment.percent / 100) * width);
+    const rect = `<rect x="${x}" y="${y}" width="${segmentWidth}" height="18" rx="${segments.length === 1 ? 9 : 0}" fill="${cssColor(segment.color)}"><title>${escapeHtml(`${segment.label}: ${segment.value} task(s) (${segment.percent}%)`)}</title></rect>`;
+    x += segmentWidth;
+    return rect;
+  }).join("");
 }
 
 function pieSlicesSvg(rows: ChartRow[], cx: number, cy: number, radius: number) {
