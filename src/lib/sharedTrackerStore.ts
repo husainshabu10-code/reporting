@@ -7,7 +7,21 @@ export type SharedChartConfig = {
   customCharts: Record<string, unknown[]>;
 };
 
-export type SharedTrackerState<Contact, ActivityEntry> = {
+export type SharedTrackerContact = {
+  id: string;
+  city?: string;
+  name?: string;
+};
+
+export type SharedTrackerActivity = {
+  id: string;
+  at?: string;
+  action?: string;
+  item?: string;
+  user?: string;
+};
+
+export type SharedTrackerState<Contact extends SharedTrackerContact, ActivityEntry extends SharedTrackerActivity> = {
   tasks: TrackerTask[];
   cities: string[];
   contacts: Contact[];
@@ -44,7 +58,7 @@ export function currentSharedUser() {
   return process.env.NEXT_PUBLIC_TRACKER_USER_NAME || "Unknown user";
 }
 
-export async function loadSharedTrackerState<Contact, ActivityEntry>(): Promise<SharedTrackerState<Contact, ActivityEntry> | null> {
+export async function loadSharedTrackerState<Contact extends SharedTrackerContact, ActivityEntry extends SharedTrackerActivity>(): Promise<SharedTrackerState<Contact, ActivityEntry> | null> {
   const db = supabase();
   if (!db) return null;
   const [tasks, cities, contacts, activity, chartConfig, equipment] = await Promise.all([
@@ -66,7 +80,7 @@ export async function loadSharedTrackerState<Contact, ActivityEntry>(): Promise<
   };
 }
 
-export async function seedSharedTrackerState<Contact, ActivityEntry>(state: SharedTrackerState<Contact, ActivityEntry>) {
+export async function seedSharedTrackerState<Contact extends SharedTrackerContact, ActivityEntry extends SharedTrackerActivity>(state: SharedTrackerState<Contact, ActivityEntry>) {
   await Promise.all([
     upsertSharedTasks(state.tasks),
     upsertSharedCities(state.cities),
@@ -128,11 +142,11 @@ export async function upsertSharedCities(cities: string[]) {
   if (error) throw error;
 }
 
-export async function upsertSharedContact<Contact extends { id: string; city?: string; name?: string }>(contact: Contact) {
+export async function upsertSharedContact<Contact extends SharedTrackerContact>(contact: Contact) {
   await upsertSharedContacts([contact]);
 }
 
-export async function upsertSharedContacts<Contact extends { id: string; city?: string; name?: string }>(contacts: Contact[]) {
+export async function upsertSharedContacts<Contact extends SharedTrackerContact>(contacts: Contact[]) {
   const db = supabase();
   if (!db || !contacts.length) return;
   const { error } = await db.from("ashara_contacts").upsert(
@@ -148,7 +162,7 @@ export async function upsertSharedContacts<Contact extends { id: string; city?: 
   if (error) throw error;
 }
 
-export async function upsertSharedActivity<ActivityEntry extends { id: string; at?: string; action?: string; item?: string; user?: string }>(activity: ActivityEntry[]) {
+export async function upsertSharedActivity<ActivityEntry extends SharedTrackerActivity>(activity: ActivityEntry[]) {
   const db = supabase();
   if (!db || !activity.length) return;
   const { error } = await db.from("ashara_activity").upsert(
