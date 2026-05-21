@@ -193,7 +193,7 @@ export async function saveSharedChartConfig(config: SharedChartConfig) {
 export function subscribeToSharedTrackerChanges(onChange: () => void) {
   const db = supabase();
   if (!db) return () => undefined;
-  let timer: ReturnType<typeof window.setTimeout> | null = null;
+  let timer: number | null = null;
   const schedule = () => {
     if (timer) window.clearTimeout(timer);
     timer = window.setTimeout(onChange, 400);
