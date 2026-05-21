@@ -490,6 +490,11 @@ table {
     vertical-align: middle;
   }
 
+  .task-table th + th,
+  .task-table td + td {
+    border-left: 1px solid rgba(232, 221, 197, 0.58);
+  }
+
   .task-table .cell-box {
     min-height: 2.25rem;
     display: flex;
@@ -498,6 +503,25 @@ table {
 
   .task-table .missing-cell-box {
     min-height: 2.25rem;
+  }
+
+  .task-face-card {
+    background-image: linear-gradient(180deg, rgba(243, 231, 195, 0.18), rgba(255, 255, 255, 0) 42%);
+  }
+
+  .task-face-fields {
+    border-top: 1px solid rgba(232, 221, 197, 0.72);
+    padding-top: 0.65rem;
+  }
+
+  .task-face-field {
+    border-left: 1px solid rgba(201, 162, 39, 0.34);
+    background: linear-gradient(90deg, rgba(243, 231, 195, 0.28), rgba(255, 255, 255, 0) 70%);
+  }
+
+  .task-face-field.missing-cell-box {
+    border-color: var(--color-important);
+    background: rgba(122, 31, 43, 0.06);
   }
 
   @media (min-width: 1024px) {

@@ -1765,7 +1765,7 @@ function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { t
         {tasks.map((task) => {
           const showMissingIndicator = highlightMissing && hasMissingRequiredFields(task);
           return (
-            <button key={task.id} className={`motion-card relative w-full overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 pl-4 text-left shadow-sm sm:p-4 sm:pl-5 ${dueRowClass(task)}`} onClick={() => onOpenTask(task)}>
+            <button key={task.id} className={`task-face-card motion-card relative w-full overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 pl-4 text-left shadow-sm sm:p-4 sm:pl-5 ${dueRowClass(task)}`} onClick={() => onOpenTask(task)}>
               <span className={`absolute left-0 top-0 h-full w-1 transition-opacity ${showMissingIndicator ? "bg-[var(--color-important)] opacity-100" : "opacity-0"}`} aria-hidden="true" />
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
@@ -1773,10 +1773,10 @@ function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { t
                 </div>
                 <div className={`${cellClass(task, "status")} w-fit`}><StatusBadge status={task.status} /></div>
               </div>
-              <div className="mt-3 grid gap-2 text-sm text-[var(--color-text-muted)] sm:grid-cols-2">
-                <span className={cellClass(task, "taskWeight")}>Task weight: {task.taskWeight || "-"}</span>
-                <span className={cellClass(task, "priority")}>Priority: {task.priority || "-"}</span>
-                <span className={`${cellClass(task, "ownershipType")} sm:col-span-2`}>Ownership Type: {task.ownershipType || "-"}</span>
+              <div className="task-face-fields mt-3 grid gap-2 text-sm text-[var(--color-text-muted)] sm:grid-cols-2">
+                <span className={`${cellClass(task, "taskWeight")} task-face-field`}>Task weight: {task.taskWeight || "-"}</span>
+                <span className={`${cellClass(task, "priority")} task-face-field`}>Priority: {task.priority || "-"}</span>
+                <span className={`${cellClass(task, "ownershipType")} task-face-field sm:col-span-2`}>Ownership Type: {task.ownershipType || "-"}</span>
               </div>
             </button>
           );
