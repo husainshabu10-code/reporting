@@ -173,6 +173,18 @@ const CURRENT_DATA_VERSION = "csv-full-task-list-83-2026-05-20";
 const CURRENT_USER = "Admin";
 const ATTACHMENT_EXTENSIONS = [".pdf", ".doc", ".docx", ".ppt", ".pptx", ".xls", ".xlsx"];
 const CLOSED_STATUSES = new Set(["Completed", "Tested", "Not Required"]);
+const STATUS_SEGMENT_ORDER = [
+  "Completed",
+  "Tested",
+  "Ready for Testing",
+  "In Progress",
+  "Under Review",
+  "Info Awaited",
+  "Blocked",
+  "Not Required",
+  "Not Started",
+  "Blank"
+];
 const MOTION_MS = 180;
 const TABS: Array<{ id: TabId; icon: LucideIcon }> = [
   { id: "Dashboard", icon: BarChart3 },
@@ -1754,7 +1766,7 @@ function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { t
                   <td className="px-3 py-3"><div className={cellClass(task, "status")}><StatusBadge status={task.status} /></div></td>
                   <td className="px-3 py-3"><div className={`${cellClass(task, "progress")} min-w-28`}><ProgressBar value={task.progress} compact /><span className="text-xs text-[var(--color-text-muted)]">{task.progress}%</span></div></td>
                   <td className="px-3 py-3"><div className={cellClass(task, "riskLevel")}><RiskBadge risk={task.riskLevel} /></div></td>
-                  <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "dueDate")}>{task.dueDate || "-"}</div></td>
+                  <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "dueDate")}>{isClosed(task) ? "" : visibleDueDate(task) || "-"}</div></td>
                   <td className="px-3 py-3"><div className={cellClass(task, "documentStatus")}><DocumentBadge status={task.documentStatus} /></div></td>
                   <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "taskWeight")}>{task.taskWeight || "-"}</div></td>
                 </tr>
@@ -1783,7 +1795,7 @@ function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { t
               <div className="mt-3 grid gap-2 text-sm text-[var(--color-text-muted)] sm:grid-cols-2">
                 <span className={`${cellClass(task, "taskOwner")} break-words`}>Owner: {task.taskOwner || "-"}</span>
                 <span className={`${cellClass(task, "vendors")} break-words`}>Vendors: {vendorSummary(task) || "-"}</span>
-                <span className={`${cellClass(task, "dueDate")} break-words`}>Due: {task.dueDate || "-"}</span>
+                {!isClosed(task) && <span className={`${cellClass(task, "dueDate")} break-words`}>Due: {visibleDueDate(task) || "-"}</span>}
                 <span className={cellClass(task, "riskLevel")}>Risk: {task.riskLevel || "-"}</span>
                 <span className={cellClass(task, "documentStatus")}>Docs: {task.documentStatus || "-"}</span>
                 <span className={cellClass(task, "taskWeight")}>Task weight: {task.taskWeight || "-"}</span>
@@ -1873,7 +1885,7 @@ function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: Tracker
             <SelectField label="Event Criticality" value={draft.eventCriticality} options={EVENT_CRITICALITIES} onChange={(value) => updateField("eventCriticality", value as TrackerTask["eventCriticality"])} />
             <SelectField label="Status" value={draft.status} options={STATUSES} onChange={(value) => updateField("status", value as TrackerTask["status"])} />
             <SelectField label="Progress %" value={String(draft.progress)} options={PROGRESS_VALUES.map(String)} onChange={(value) => updateField("progress", Number(value))} />
-            <InputField label="Due Date" type="date" value={draft.dueDate} onChange={(value) => updateField("dueDate", value)} />
+            {!isClosed(draft) && <InputField label="Due Date" type="date" value={draft.dueDate} onChange={(value) => updateField("dueDate", value)} />}
             <InputField label="Target Readiness Date" type="date" value={draft.targetReadinessDate} onChange={(value) => updateField("targetReadinessDate", value)} />
             <InputField label="Dependency" value={draft.dependency} onChange={(value) => updateField("dependency", value)} />
             <SelectField label="Budget Status" value={draft.budgetStatus} options={BUDGET_STATUSES} onChange={(value) => updateField("budgetStatus", value as TrackerTask["budgetStatus"])} />
@@ -2641,8 +2653,7 @@ function areaProgressRow(label: string, rows: TrackerTask[]): ChartRow {
 
 function statusSegments(rows: TrackerTask[]): ChartSegment[] {
   const total = Math.max(rows.length, 1);
-  const labels = ["Blank", ...STATUSES];
-  return labels.map((status) => {
+  return STATUS_SEGMENT_ORDER.map((status) => {
     const value = status === "Blank"
       ? rows.filter((task) => !task.status).length
       : rows.filter((task) => task.status === status).length;
@@ -2705,7 +2716,7 @@ function missingFields(task: TrackerTask) {
     ["Event Criticality", !isMissingValue(task.eventCriticality)],
     ["Status", !isMissingValue(task.status)],
     ["Progress %", task.progress !== null && task.progress !== undefined && PROGRESS_VALUES.some((value) => value === nearestProgress(task.progress))],
-    ["Due Date", !isMissingValue(task.dueDate)],
+    ["Due Date", isClosed(task) || !isMissingValue(task.dueDate)],
     ["Budget Status", !isMissingValue(task.budgetStatus)],
     ["Task weight", !isMissingValue(task.taskWeight)]
   ];
@@ -2737,7 +2748,7 @@ function isMissingTableField(task: TrackerTask, field: TableField) {
     case "riskLevel":
       return isMissingValue(task.riskLevel);
     case "dueDate":
-      return isMissingValue(task.dueDate);
+      return !isClosed(task) && isMissingValue(task.dueDate);
     case "documentStatus":
       return task.documentStatus === "Not Attached" || isMissingValue(task.documentStatus) || (!task.documentLinkAttachmentReference && !task.attachments.length);
     case "taskWeight":
@@ -2867,7 +2878,7 @@ function tasksToRows(rows: TrackerTask[]): Array<Record<string, string | number>
     "Event Criticality": task.eventCriticality,
     Status: task.status,
     "Progress %": task.progress,
-    "Due Date": task.dueDate,
+    "Due Date": visibleDueDate(task),
     "Target Readiness Date": task.targetReadinessDate,
     Dependency: task.dependency,
     Vendors: vendorSummary(task),
@@ -3009,6 +3020,10 @@ function parseCsv(text: string) {
 
 function isClosed(task: TrackerTask) {
   return CLOSED_STATUSES.has(task.status);
+}
+
+function visibleDueDate(task: TrackerTask) {
+  return isClosed(task) ? "" : task.dueDate;
 }
 
 function todayStart() {
