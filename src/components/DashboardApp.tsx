@@ -2149,25 +2149,17 @@ function downloadChartVisual(dataset: ChartDataset, chartKind: ChartKind, format
 }
 
 function StatusBadge({ status }: { status: TrackerTask["status"] }) {
-  const className = status === "Completed" || status === "Tested" || status === "Not Required"
-    ? "bg-[var(--color-primary)] text-white"
-    : status === "Blocked"
-      ? "bg-[var(--color-important)] text-white"
-      : status === "In Progress" || status === "Under Review" || status === "Ready for Testing"
-        ? "bg-[var(--color-accent)] text-[var(--color-primary)]"
-        : status === "Not Started"
-          ? "bg-[#F4F1EA] text-[var(--color-text-muted)]"
-          : "bg-[var(--color-accent-light)] text-[var(--color-text)]";
+  const className = statusBadgeClass(status);
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{status || "-"}</span>;
 }
 
 function RiskBadge({ risk }: { risk: TrackerTask["riskLevel"] }) {
-  const className = risk === "High" ? "bg-[var(--color-important)] text-white" : risk === "Medium" ? "bg-[var(--color-accent)] text-[var(--color-primary)]" : "bg-[var(--color-primary)] text-white";
+  const className = risk === "High" ? "bg-[var(--color-important)] text-white" : risk === "Medium" ? "bg-[var(--color-accent)] text-[var(--color-primary)]" : risk === "Low" ? "bg-[var(--color-secondary)] text-white" : "bg-[#F4F1EA] text-[var(--color-text-muted)]";
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{risk || "-"}</span>;
 }
 
 function DocumentBadge({ status }: { status: TrackerTask["documentStatus"] }) {
-  const className = status === "Final Attached" ? "bg-[var(--color-primary)] text-white" : status === "Draft Attached" ? "bg-[var(--color-secondary)] text-white" : "bg-[var(--color-accent-light)] text-[var(--color-text)]";
+  const className = status === "Final Attached" ? "bg-[var(--color-primary)] text-white" : status === "Draft Attached" ? "bg-[var(--color-secondary)] text-white" : status === "Needs Revision" ? "bg-[var(--color-important)] text-white" : "bg-[var(--color-accent-light)] text-[var(--color-text)]";
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{status || "-"}</span>;
 }
 
@@ -2911,12 +2903,62 @@ function toneClass(tone: string) {
 }
 
 function chartColor(row: ChartRow, index: number) {
+  const mappedColor = fieldValueColor(row.label);
+  if (mappedColor) return mappedColor;
   if (row.status === "good") return "var(--color-secondary)";
   if (row.status === "warning") return "var(--color-accent)";
   if (row.status === "critical") return "var(--color-important)";
   if (row.status === "muted") return "#9CA3AF";
-  const palette = ["var(--color-primary)", "var(--color-secondary)", "var(--color-accent)", "var(--color-important)", "#9CA3AF"];
+  const palette = ["#0B4F3A", "#2E7D5B", "#C9A227", "#7A1F2B", "#64748B", "#256D85", "#8A6F18", "#4B5563", "#A16207", "#166534", "#92400E", "#475569"];
   return palette[index % palette.length];
+}
+
+function fieldValueColor(label: string) {
+  const value = label.trim().toLowerCase();
+  const colors: Record<string, string> = {
+    "completed": "#0B4F3A",
+    "tested": "#2E7D5B",
+    "not required": "#64748B",
+    "ready for testing": "#256D85",
+    "in progress": "#C9A227",
+    "under review": "#8A6F18",
+    "info awaited": "#D4A72C",
+    "not started": "#9CA3AF",
+    "blocked": "#7A1F2B",
+    "blank": "#B08A1E",
+    "critical": "#7A1F2B",
+    "high": "#9F2D3A",
+    "medium": "#C9A227",
+    "low": "#2E7D5B",
+    "waaz critical": "#7A1F2B",
+    "operations critical": "#0B4F3A",
+    "department support": "#256D85",
+    "optional": "#64748B",
+    "final attached": "#0B4F3A",
+    "draft attached": "#2E7D5B",
+    "needs revision": "#7A1F2B",
+    "not attached": "#9CA3AF",
+    "approved": "#0B4F3A",
+    "paid": "#2E7D5B",
+    "approval pending": "#C9A227",
+    "quote received": "#256D85",
+    "quote pending": "#8A6F18",
+    "very high": "#7A1F2B"
+  };
+  return colors[value];
+}
+
+function statusBadgeClass(status: TrackerTask["status"]) {
+  if (status === "Completed") return "bg-[var(--color-primary)] text-white";
+  if (status === "Tested") return "bg-[var(--color-secondary)] text-white";
+  if (status === "Ready for Testing") return "bg-[#256D85] text-white";
+  if (status === "In Progress") return "bg-[var(--color-accent)] text-[var(--color-primary)]";
+  if (status === "Under Review") return "bg-[#8A6F18] text-white";
+  if (status === "Info Awaited") return "bg-[var(--color-accent-light)] text-[#8A6F18]";
+  if (status === "Blocked") return "bg-[var(--color-important)] text-white";
+  if (status === "Not Started") return "bg-[#F4F1EA] text-[var(--color-text-muted)]";
+  if (status === "Not Required") return "bg-[#64748B] text-white";
+  return "bg-[var(--color-accent-light)] text-[var(--color-text)]";
 }
 
 function formatChartLabel(row: ChartRow, suffix?: string) {
