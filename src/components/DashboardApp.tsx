@@ -1373,14 +1373,14 @@ function ChartCard({
 
   return (
     <article
-      className={`chart-card group motion-card min-w-0 overflow-visible rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft ${isDragging ? "chart-card-dragging" : ""}`}
+      className={`chart-card group motion-card min-w-0 overflow-visible rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft ${menuOpen || filterOpen ? "chart-card-popover-open" : ""} ${isDragging ? "chart-card-dragging" : ""}`}
       onDragOver={(event) => {
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
       }}
       onDrop={onDropChart}
     >
-      <div className="relative min-w-0 p-3 pr-28 sm:p-4 sm:pr-36 lg:pr-64">
+      <div className="relative z-40 min-w-0 p-3 pr-28 sm:p-4 sm:pr-36 lg:pr-64">
         <div className="flex min-w-0 items-center gap-2">
           <button className="drag-handle hidden flex-none sm:inline-flex" draggable onDragStart={onDragStart} onDragEnd={onDragEnd} aria-label={`Move ${dataset.title}`} title="Drag to reorder chart">
             <GripVertical size={16} />
@@ -1411,7 +1411,7 @@ function ChartCard({
               <MoreVertical size={15} />
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-9 z-30 w-48 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-1 shadow-2xl animate-fade-in">
+              <div className="absolute right-0 top-9 z-[80] w-48 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-1 shadow-2xl animate-fade-in">
                 <button className="export-menu-item" onClick={() => setShowLegend((value) => !value)}>{showLegend ? "Hide legend" : "Show legend"}</button>
                 <button className="export-menu-item" onClick={() => setShowDataLabels((value) => !value)}>{showDataLabels ? "Hide data labels" : "Show data labels"}</button>
                 <div className="border-t border-[var(--color-border)] py-1">
@@ -1430,7 +1430,7 @@ function ChartCard({
       </div>
       {bodyMounted && (
         <div
-          className={`grid overflow-hidden transition-all duration-300 ease-in-out ${collapsed ? "grid-rows-[0fr] px-3 pb-0 opacity-0 sm:px-4" : "grid-rows-[1fr] px-3 pb-3 opacity-100 sm:px-4 sm:pb-4"}`}
+          className={`relative z-0 grid overflow-hidden transition-all duration-300 ease-in-out ${collapsed ? "grid-rows-[0fr] px-3 pb-0 opacity-0 sm:px-4" : "grid-rows-[1fr] px-3 pb-3 opacity-100 sm:px-4 sm:pb-4"}`}
           onTransitionEnd={(event) => {
             if (event.currentTarget === event.target && collapsed) setBodyMounted(false);
           }}
@@ -1485,7 +1485,7 @@ function CardFilterPopover({
   const addRule = () => onChange([...visibleRules, createCardFilterRule()]);
 
   return (
-    <div className="absolute right-0 top-9 z-40 w-[min(92vw,620px)] rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-2xl animate-fade-in sm:p-4">
+    <div className="absolute right-0 top-9 z-[80] w-[min(92vw,620px)] rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-2xl animate-fade-in sm:p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-sm font-bold text-[var(--color-text)]">Card Filters</h3>
         <div className="flex items-center gap-2">

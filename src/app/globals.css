@@ -433,6 +433,12 @@ table {
 
   .chart-card {
     position: relative;
+    z-index: 0;
+  }
+
+  .chart-card-popover-open,
+  .chart-card:focus-within {
+    z-index: 70;
   }
 
   .chart-card-dragging {
