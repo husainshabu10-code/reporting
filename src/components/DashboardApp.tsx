@@ -2714,7 +2714,6 @@ function missingFields(task: TrackerTask) {
     ["Event Criticality", !isMissingValue(task.eventCriticality)],
     ["Status", !isMissingValue(task.status)],
     ["Progress %", task.progress !== null && task.progress !== undefined && PROGRESS_VALUES.some((value) => value === nearestProgress(task.progress))],
-    ["Due Date", isClosed(task) || !isMissingValue(task.dueDate)],
     ["Budget Status", !isMissingValue(task.budgetStatus)],
     ["Task weight", !isMissingValue(task.taskWeight)]
   ];
@@ -2746,7 +2745,7 @@ function isMissingTableField(task: TrackerTask, field: TableField) {
     case "riskLevel":
       return isMissingValue(task.riskLevel);
     case "dueDate":
-      return !isClosed(task) && isMissingValue(task.dueDate);
+      return false;
     case "documentStatus":
       return task.documentStatus === "Not Attached" || isMissingValue(task.documentStatus) || (!task.documentLinkAttachmentReference && !task.attachments.length);
     case "taskWeight":
