@@ -81,6 +81,7 @@ type CardFilterRule = {
   operator: CardFilterOperator;
   value: string;
 };
+type PopoverPlacement = "left" | "right";
 
 type Filters = {
   city: string;
@@ -1328,6 +1329,8 @@ function ChartCard({
   const [showLegend, setShowLegend] = useState(true);
   const [showDataLabels, setShowDataLabels] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [filterPlacement, setFilterPlacement] = useState<PopoverPlacement>("left");
+  const [menuPlacement, setMenuPlacement] = useState<PopoverPlacement>("left");
   const menuRef = useRef<HTMLDivElement | null>(null);
   const filterRef = useRef<HTMLDivElement | null>(null);
   const filteredDataset = useMemo(() => applyChartCardFilters(dataset, cardFilters), [cardFilters, dataset]);
@@ -1371,6 +1374,18 @@ function ChartCard({
     setCollapsed(true);
   };
 
+  const toggleFilter = () => {
+    if (!filterOpen) setFilterPlacement(preferredPopoverPlacement(filterRef.current, 620));
+    setMenuOpen(false);
+    setFilterOpen((value) => !value);
+  };
+
+  const toggleMenu = () => {
+    if (!menuOpen) setMenuPlacement(preferredPopoverPlacement(menuRef.current, 192));
+    setFilterOpen(false);
+    setMenuOpen((value) => !value);
+  };
+
   return (
     <article
       className={`chart-card group motion-card min-w-0 overflow-visible rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft ${menuOpen || filterOpen ? "chart-card-popover-open" : ""} ${isDragging ? "chart-card-dragging" : ""}`}
@@ -1392,7 +1407,7 @@ function ChartCard({
           <button className="mini-icon-btn" onClick={resetChart} aria-label="Refresh chart" title="Refresh"><RefreshCcw size={15} /></button>
           <button className="mini-icon-btn" onClick={() => setFullscreen(true)} aria-label="Expand chart" title="Expand"><Maximize2 size={15} /></button>
           <div ref={filterRef} className="relative">
-            <button className={`mini-icon-btn ${activeCardFilterCount ? "border-[var(--color-accent)] bg-[var(--color-accent-light)] text-[var(--color-primary)]" : ""}`} onClick={() => setFilterOpen((value) => !value)} aria-label="Filter chart data" aria-expanded={filterOpen} title="Filter chart data">
+            <button className={`mini-icon-btn ${activeCardFilterCount ? "border-[var(--color-accent)] bg-[var(--color-accent-light)] text-[var(--color-primary)]" : ""}`} onClick={toggleFilter} aria-label="Filter chart data" aria-expanded={filterOpen} title="Filter chart data">
               <Filter size={15} />
               {activeCardFilterCount > 0 && <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-[var(--color-primary)] px-1 text-[10px] leading-4 text-white">{activeCardFilterCount}</span>}
             </button>
@@ -1402,16 +1417,17 @@ function ChartCard({
                 sourceTasks={dataset.sourceTasks}
                 onChange={setCardFilters}
                 onClose={() => setFilterOpen(false)}
+                placement={filterPlacement}
               />
             )}
           </div>
           <button className="mini-icon-btn" onClick={resetChart} aria-label="Chart settings" title="Reset settings"><Settings size={15} /></button>
           <div ref={menuRef} className="relative">
-            <button className="mini-icon-btn" onClick={() => setMenuOpen((value) => !value)} aria-label="More chart options" aria-expanded={menuOpen} title="More options">
+            <button className="mini-icon-btn" onClick={toggleMenu} aria-label="More chart options" aria-expanded={menuOpen} title="More options">
               <MoreVertical size={15} />
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-9 z-[80] w-48 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-1 shadow-2xl animate-fade-in">
+              <div className={`absolute top-9 z-[80] w-48 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-1 shadow-2xl animate-fade-in ${menuPlacement === "right" ? "left-0" : "right-0"}`}>
                 <button className="export-menu-item" onClick={() => setShowLegend((value) => !value)}>{showLegend ? "Hide legend" : "Show legend"}</button>
                 <button className="export-menu-item" onClick={() => setShowDataLabels((value) => !value)}>{showDataLabels ? "Hide data labels" : "Show data labels"}</button>
                 <div className="border-t border-[var(--color-border)] py-1">
@@ -1470,12 +1486,14 @@ function CardFilterPopover({
   rules,
   sourceTasks,
   onChange,
-  onClose
+  onClose,
+  placement
 }: {
   rules: CardFilterRule[];
   sourceTasks: TrackerTask[];
   onChange: (rules: CardFilterRule[]) => void;
   onClose: () => void;
+  placement: PopoverPlacement;
 }) {
   const visibleRules = rules.length ? rules : [createCardFilterRule()];
   const updateRule = (id: string, patch: Partial<CardFilterRule>) => {
@@ -1485,7 +1503,7 @@ function CardFilterPopover({
   const addRule = () => onChange([...visibleRules, createCardFilterRule()]);
 
   return (
-    <div className="absolute right-0 top-9 z-[80] w-[min(92vw,620px)] rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-2xl animate-fade-in sm:p-4">
+    <div className={`absolute top-9 z-[80] w-[min(92vw,620px)] rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-2xl animate-fade-in sm:p-4 ${placement === "right" ? "left-0" : "right-0"}`}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-sm font-bold text-[var(--color-text)]">Card Filters</h3>
         <div className="flex items-center gap-2">
@@ -2533,6 +2551,29 @@ function moveChartId(sourceId: string, targetId: string, currentOrder: string[],
 
 function createCardFilterRule(): CardFilterRule {
   return { id: `card-filter-${Date.now()}-${Math.random().toString(36).slice(2)}`, field: "Status", operator: "Is", value: "" };
+}
+
+function preferredPopoverPlacement(anchor: HTMLElement | null, popoverWidth: number): PopoverPlacement {
+  if (!anchor || typeof window === "undefined") return "left";
+  const rect = anchor.getBoundingClientRect();
+  const viewportRight = window.innerWidth - 12;
+  const safeLeft = sidebarSafeLeft() + 12;
+  const width = Math.min(popoverWidth, window.innerWidth - 24);
+  const leftOpeningX = rect.right - width;
+  const rightOpeningX = rect.left;
+  const fitsLeft = leftOpeningX >= safeLeft;
+  const fitsRight = rightOpeningX + width <= viewportRight;
+  if (!fitsLeft && fitsRight) return "right";
+  if (fitsLeft && !fitsRight) return "left";
+  if (!fitsLeft && !fitsRight) return rect.left - safeLeft > viewportRight - rect.right ? "left" : "right";
+  return "left";
+}
+
+function sidebarSafeLeft() {
+  const sidebar = document.querySelector("main > aside");
+  const rect = sidebar?.getBoundingClientRect();
+  if (!rect || rect.right <= 0 || rect.right > window.innerWidth * 0.6) return 0;
+  return rect.right;
 }
 
 function isActiveCardFilter(rule: CardFilterRule) {
