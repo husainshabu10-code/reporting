@@ -73,7 +73,7 @@ type TabId = "Dashboard" | "Compare" | "Master List" | "Contacts" | "Area" | "Ac
 type ReportFormat = "Charts only" | "Tables only" | "Both charts and tables";
 type ExcelReportFormat = "Table only" | "Table with chart summaries";
 type SortKey = "city" | "workstream" | "taskName" | "zoneArea" | "taskOwner" | "status" | "progress" | "dueDate" | "riskLevel" | "taskWeight";
-type TableField = "city" | "workstream" | "taskName" | "zoneArea" | "taskOwner" | "vendors" | "status" | "progress" | "riskLevel" | "dueDate" | "documentStatus" | "taskWeight";
+type TableField = "city" | "workstream" | "taskName" | "zoneArea" | "taskOwner" | "vendors" | "ownershipType" | "priority" | "status" | "progress" | "riskLevel" | "dueDate" | "documentStatus" | "taskWeight";
 type CardFilterOperator = "Is" | "Is not" | "Contains" | "Is empty" | "Is not empty";
 type CardFilterRule = {
   id: string;
@@ -1719,7 +1719,7 @@ function GroupedTaskTable({ tasks, groupBy, subgroupBy, onOpenTask, highlightMis
 
 function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { tasks: TrackerTask[]; onOpenTask: (task: TrackerTask) => void; highlightMissing: boolean; compact?: boolean }) {
   const cellClass = (task: TrackerTask, field: TableField) => `cell-box ${highlightMissing && isMissingTableField(task, field) ? "missing-cell-box" : ""}`;
-  const headings = ["", "City", "Workstream", "Task", "Area", "Owner", "Vendors", "Status", "Progress", "Risk", "Due", "Docs", "Task weight"];
+  const headings = ["", "Task", "Status", "Task weight", "Priority", "Ownership Type"];
 
   return (
     <section className={`${compact ? "" : "motion-card rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-soft"}`}>
@@ -1732,21 +1732,14 @@ function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { t
         </div>
       )}
       <div className="hidden overflow-x-auto lg:block">
-        <table className="task-table w-full min-w-[1480px] table-fixed border-collapse text-left text-sm">
+        <table className="task-table w-full min-w-[860px] table-fixed border-collapse text-left text-sm">
           <colgroup>
             <col className="w-[0.75rem]" />
-            <col className="w-[8rem]" />
-            <col className="w-[15rem]" />
-            <col className="w-[21rem]" />
-            <col className="w-[9rem]" />
+            <col className="w-[26rem]" />
             <col className="w-[10rem]" />
+            <col className="w-[9rem]" />
+            <col className="w-[9rem]" />
             <col className="w-[12rem]" />
-            <col className="w-[9.5rem]" />
-            <col className="w-[9rem]" />
-            <col className="w-[7rem]" />
-            <col className="w-[8rem]" />
-            <col className="w-[9rem]" />
-            <col className="w-[8.5rem]" />
           </colgroup>
           <thead className="bg-[var(--color-accent-light)] text-xs uppercase text-[var(--color-primary)]">
             <tr>{headings.map((heading) => <th key={heading} className="border-b border-[var(--color-border)] px-3 py-3 font-semibold">{heading}</th>)}</tr>
@@ -1757,18 +1750,11 @@ function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { t
               return (
                 <tr key={task.id} className={`cursor-pointer border-b border-[var(--color-border)] transition hover:bg-[var(--color-bg)] ${dueRowClass(task)}`} onClick={() => onOpenTask(task)}>
                   <td className="px-0 py-2 align-stretch"><span className={`mx-auto block h-full min-h-10 w-1 rounded-full transition-opacity ${showMissingIndicator ? "bg-[var(--color-important)] opacity-100" : "opacity-0"}`} aria-hidden="true" /></td>
-                  <td className="px-3 py-3 font-medium text-[var(--color-primary)]"><div className={cellClass(task, "city")}>{task.city || "-"}</div></td>
-                  <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "workstream")}>{task.workstream || "-"}</div></td>
                   <td className="px-3 py-3 text-[var(--color-text)]"><div className={cellClass(task, "taskName")}>{taskDisplayName(task) || "-"}</div></td>
-                  <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "zoneArea")}>{task.zoneArea || "-"}</div></td>
-                  <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "taskOwner")}>{task.taskOwner || "-"}</div></td>
-                  <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "vendors")}>{vendorSummary(task) || "-"}</div></td>
                   <td className="px-3 py-3"><div className={cellClass(task, "status")}><StatusBadge status={task.status} /></div></td>
-                  <td className="px-3 py-3"><div className={`${cellClass(task, "progress")} min-w-28`}><ProgressBar value={task.progress} compact /><span className="text-xs text-[var(--color-text-muted)]">{task.progress}%</span></div></td>
-                  <td className="px-3 py-3"><div className={cellClass(task, "riskLevel")}><RiskBadge risk={task.riskLevel} /></div></td>
-                  <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "dueDate")}>{isClosed(task) ? "" : visibleDueDate(task) || "-"}</div></td>
-                  <td className="px-3 py-3"><div className={cellClass(task, "documentStatus")}><DocumentBadge status={task.documentStatus} /></div></td>
-                  <td className="px-3 py-3 text-[var(--color-text-muted)]"><div className={cellClass(task, "taskWeight")}>{task.taskWeight || "-"}</div></td>
+                  <td className="px-3 py-3"><div className={cellClass(task, "taskWeight")}><ValueBadge value={task.taskWeight} /></div></td>
+                  <td className="px-3 py-3"><div className={cellClass(task, "priority")}><ValueBadge value={task.priority} /></div></td>
+                  <td className="px-3 py-3"><div className={cellClass(task, "ownershipType")}><ValueBadge value={task.ownershipType} /></div></td>
                 </tr>
               );
             })}
@@ -1784,23 +1770,14 @@ function TaskTable({ tasks, onOpenTask, highlightMissing, compact = false }: { t
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className={`${cellClass(task, "taskName")} break-words font-semibold text-[var(--color-text)]`}>{taskDisplayName(task) || "-"}</p>
-                  <div className="mt-2 grid gap-2 text-sm text-[var(--color-text-muted)] sm:grid-cols-2">
-                    <span className={cellClass(task, "city")}>City: {task.city || "-"}</span>
-                    <span className={cellClass(task, "zoneArea")}>Area: {task.zoneArea || "-"}</span>
-                    <span className={`${cellClass(task, "workstream")} sm:col-span-2`}>Workstream: {task.workstream || "-"}</span>
-                  </div>
                 </div>
                 <div className={`${cellClass(task, "status")} w-fit`}><StatusBadge status={task.status} /></div>
               </div>
               <div className="mt-3 grid gap-2 text-sm text-[var(--color-text-muted)] sm:grid-cols-2">
-                <span className={`${cellClass(task, "taskOwner")} break-words`}>Owner: {task.taskOwner || "-"}</span>
-                <span className={`${cellClass(task, "vendors")} break-words`}>Vendors: {vendorSummary(task) || "-"}</span>
-                {!isClosed(task) && <span className={`${cellClass(task, "dueDate")} break-words`}>Due: {visibleDueDate(task) || "-"}</span>}
-                <span className={cellClass(task, "riskLevel")}>Risk: {task.riskLevel || "-"}</span>
-                <span className={cellClass(task, "documentStatus")}>Docs: {task.documentStatus || "-"}</span>
                 <span className={cellClass(task, "taskWeight")}>Task weight: {task.taskWeight || "-"}</span>
+                <span className={cellClass(task, "priority")}>Priority: {task.priority || "-"}</span>
+                <span className={`${cellClass(task, "ownershipType")} sm:col-span-2`}>Ownership Type: {task.ownershipType || "-"}</span>
               </div>
-              <div className={`mt-3 ${cellClass(task, "progress")}`}><ProgressBar value={task.progress} /><span className="mt-1 block text-xs text-[var(--color-text-muted)]">{task.progress}%</span></div>
             </button>
           );
         })}
@@ -2297,6 +2274,13 @@ function StatusBadge({ status }: { status: TrackerTask["status"] }) {
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{status || "-"}</span>;
 }
 
+function ValueBadge({ value }: { value: string }) {
+  const color = fieldValueColor(value);
+  const style = color ? { background: color, color: contrastText(color) } : undefined;
+  const className = color ? "" : "bg-[#F4F1EA] text-[var(--color-text-muted)]";
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`} style={style}>{value || "-"}</span>;
+}
+
 function RiskBadge({ risk }: { risk: TrackerTask["riskLevel"] }) {
   const className = risk === "High" ? "bg-[var(--color-important)] text-white" : risk === "Medium" ? "bg-[var(--color-accent)] text-[var(--color-primary)]" : risk === "Low" ? "bg-[var(--color-secondary)] text-white" : "bg-[#F4F1EA] text-[var(--color-text-muted)]";
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{risk || "-"}</span>;
@@ -2738,6 +2722,10 @@ function isMissingTableField(task: TrackerTask, field: TableField) {
       return false;
     case "vendors":
       return false;
+    case "ownershipType":
+      return isMissingValue(task.ownershipType);
+    case "priority":
+      return isMissingValue(task.priority);
     case "status":
       return isMissingValue(task.status);
     case "progress":
@@ -3173,6 +3161,10 @@ function cssColor(value: string) {
     "var(--color-important)": "#7A1F2B"
   };
   return colors[value] || value;
+}
+
+function contrastText(color: string) {
+  return ["#C9A227", "#D4A72C", "#F3E7C3", "#9CA3AF"].includes(color.toUpperCase()) ? "#1F2933" : "#FFFFFF";
 }
 
 function conicGradient(rows: ChartRow[]) {
