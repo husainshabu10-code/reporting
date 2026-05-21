@@ -279,6 +279,8 @@ export default function DashboardApp() {
   const [sharedDbEnabled] = useState(() => isSharedDatabaseConfigured());
   const [syncStatus, setSyncStatus] = useState(() => isSharedDatabaseConfigured() ? "Connecting to Supabase" : "Local fallback mode");
   const [syncError, setSyncError] = useState("");
+  const chartConfigLoadedRef = useRef(false);
+  const chartConfigSaveTimerRef = useRef<number | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -308,7 +310,7 @@ export default function DashboardApp() {
         if (cancelled) return;
         applySharedState(fallback);
         setSyncStatus("Using local fallback");
-        setSyncError(error instanceof Error ? error.message : "Unable to load Supabase data.");
+        setSyncError(readErrorMessage(error, "Unable to load Supabase data."));
       } finally {
         if (!cancelled) setHydrated(true);
       }
@@ -330,7 +332,7 @@ export default function DashboardApp() {
         setSyncError("");
       } catch (error) {
         setSyncStatus("Sync issue");
-        setSyncError(error instanceof Error ? error.message : "Unable to refresh shared data.");
+        setSyncError(readErrorMessage(error, "Unable to refresh shared data."));
       }
     };
     const unsubscribe = subscribeToSharedTrackerChanges(refreshSharedData);
@@ -355,11 +357,17 @@ export default function DashboardApp() {
   }, [activity, cities, contacts, hydrated, sharedDbEnabled, tasks]);
 
   useEffect(() => {
-    if (!hydrated || !sharedDbEnabled) return;
-    saveSharedChartConfig({ hiddenChartIds, chartOrder, customCharts }).catch((error) => {
-      setSyncStatus("Chart settings not saved");
-      setSyncError(error instanceof Error ? error.message : "Unable to save chart settings.");
-    });
+    if (!hydrated || !sharedDbEnabled || !chartConfigLoadedRef.current) return;
+    if (chartConfigSaveTimerRef.current) window.clearTimeout(chartConfigSaveTimerRef.current);
+    chartConfigSaveTimerRef.current = window.setTimeout(() => {
+      saveSharedChartConfig({ hiddenChartIds, chartOrder, customCharts }).catch((error) => {
+        setSyncStatus("Chart settings local only");
+        setSyncError(readErrorMessage(error, "Chart settings were not saved to Supabase."));
+      });
+    }, 500);
+    return () => {
+      if (chartConfigSaveTimerRef.current) window.clearTimeout(chartConfigSaveTimerRef.current);
+    };
   }, [chartOrder, customCharts, hiddenChartIds, hydrated, sharedDbEnabled]);
 
   const applySharedState = (state: SharedTrackerState<Contact, ActivityEntry>) => {
@@ -372,6 +380,9 @@ export default function DashboardApp() {
     setHiddenChartIds(state.chartConfig.hiddenChartIds || {});
     setChartOrder(state.chartConfig.chartOrder || {});
     setCustomCharts((state.chartConfig.customCharts as Record<string, CustomChartDefinition[]>) || {});
+    window.setTimeout(() => {
+      chartConfigLoadedRef.current = true;
+    }, 0);
   };
 
   const filteredTasks = useMemo(() => applyFilters(tasks, filters), [filters, tasks]);
@@ -439,7 +450,7 @@ export default function DashboardApp() {
     if (sharedDbEnabled) {
       upsertSharedActivity([entry]).catch((error) => {
         setSyncStatus("Activity not saved");
-        setSyncError(error instanceof Error ? error.message : "Unable to save activity.");
+        setSyncError(readErrorMessage(error, "Unable to save activity."));
       });
     }
   };
@@ -457,7 +468,7 @@ export default function DashboardApp() {
         .then(() => setSyncStatus("Task saved to Supabase"))
         .catch((error) => {
           setSyncStatus("Task not saved");
-          setSyncError(error instanceof Error ? error.message : "Unable to save task.");
+          setSyncError(readErrorMessage(error, "Unable to save task."));
         });
     }
     if (!existing) {
@@ -488,7 +499,7 @@ export default function DashboardApp() {
     if (sharedDbEnabled) {
       deleteSharedTask(taskId).catch((error) => {
         setSyncStatus("Delete not saved");
-        setSyncError(error instanceof Error ? error.message : "Unable to delete task.");
+        setSyncError(readErrorMessage(error, "Unable to delete task."));
       });
     }
     if (task) logActivity("Task deleted", task.taskName, `${task.city} / ${task.workstream}`);
@@ -505,7 +516,7 @@ export default function DashboardApp() {
     const generatedTasks = generateTasks ? normalizeTasks(generateDefaultTasksForCity(city)) : [];
     setCities((current) => {
       const next = [...current, city];
-      if (sharedDbEnabled) upsertSharedCities(next).catch((error) => setSyncError(error instanceof Error ? error.message : "Unable to save city."));
+      if (sharedDbEnabled) upsertSharedCities(next).catch((error) => setSyncError(readErrorMessage(error, "Unable to save city.")));
       return next;
     });
     setContacts((current) => [...current, nextContact]);
@@ -513,7 +524,7 @@ export default function DashboardApp() {
     if (sharedDbEnabled) {
       Promise.all([upsertSharedContact(nextContact), upsertSharedTasks(generatedTasks)]).catch((error) => {
         setSyncStatus("City not fully saved");
-        setSyncError(error instanceof Error ? error.message : "Unable to save city records.");
+        setSyncError(readErrorMessage(error, "Unable to save city records."));
       });
     }
     logActivity("City added", city, generateTasks ? "Default tasks generated." : "City shell created.");
@@ -533,7 +544,7 @@ export default function DashboardApp() {
     if (sharedDbEnabled) {
       Promise.all([replaceSharedTasks(resetTasks), upsertSharedCities(INITIAL_CITIES), upsertSharedContacts(resetContacts), upsertSharedActivity(resetActivity)]).catch((error) => {
         setSyncStatus("Reset not fully saved");
-        setSyncError(error instanceof Error ? error.message : "Unable to reset shared records.");
+        setSyncError(readErrorMessage(error, "Unable to reset shared records."));
       });
     }
   };
@@ -558,7 +569,7 @@ export default function DashboardApp() {
     const importedCities = Array.from(new Set(imported.map((task) => task.city)));
     setCities((current) => {
       const next = Array.from(new Set([...current, ...importedCities]));
-      if (sharedDbEnabled) upsertSharedCities(next).catch((error) => setSyncError(error instanceof Error ? error.message : "Unable to save imported cities."));
+      if (sharedDbEnabled) upsertSharedCities(next).catch((error) => setSyncError(readErrorMessage(error, "Unable to save imported cities.")));
       return next;
     });
     if (sharedDbEnabled) {
@@ -566,7 +577,7 @@ export default function DashboardApp() {
         .then(() => setSyncStatus("CSV import saved to Supabase"))
         .catch((error) => {
           setSyncStatus("CSV import not saved");
-          setSyncError(error instanceof Error ? error.message : "Unable to save imported tasks.");
+          setSyncError(readErrorMessage(error, "Unable to save imported tasks."));
         });
     }
     logActivity("Tasks imported", file.name, `${imported.length} row(s) imported or updated.`);
@@ -582,7 +593,7 @@ export default function DashboardApp() {
     if (sharedDbEnabled) {
       upsertSharedContact(saved).catch((error) => {
         setSyncStatus("Contact not saved");
-        setSyncError(error instanceof Error ? error.message : "Unable to save contact.");
+        setSyncError(readErrorMessage(error, "Unable to save contact."));
       });
     }
     logActivity("Contact added or updated", saved.name || "Unnamed contact", `${saved.city} / ${saved.workstreamHandled}`);
@@ -2702,6 +2713,17 @@ function mergeImportedTasks(current: TrackerTask[], imported: TrackerTask[]) {
 
 function taskMergeKey(task: TrackerTask) {
   return [task.city, task.workstream, task.zoneArea, task.taskName].map((part) => String(part || "").trim().toLowerCase()).join("|");
+}
+
+function readErrorMessage(error: unknown, fallback: string) {
+  if (!error) return fallback;
+  if (error instanceof Error) return error.message || fallback;
+  if (typeof error === "string") return error;
+  if (typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    return String(record.message || record.details || record.hint || record.code || fallback);
+  }
+  return fallback;
 }
 
 function tasksToRows(rows: TrackerTask[]): Array<Record<string, string | number>> {

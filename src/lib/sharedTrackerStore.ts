@@ -187,7 +187,7 @@ export async function saveSharedChartConfig(config: SharedChartConfig) {
     { id: CHART_CONFIG_ID, data: config, updated_at: new Date().toISOString() },
     { onConflict: "id" }
   );
-  if (error) throw error;
+  if (error) throw new Error(formatSupabaseError(error, "Unable to save chart settings."));
 }
 
 export function subscribeToSharedTrackerChanges(onChange: () => void) {
@@ -213,16 +213,20 @@ async function loadPayloadTable<T>(db: SupabaseClient, table: string, orderColum
   let query = db.from(table).select("id,data").order(orderColumn, { ascending });
   if (limit) query = query.limit(limit);
   const { data, error } = await query;
-  if (error) throw error;
+  if (error) throw new Error(formatSupabaseError(error, `Unable to load ${table}.`));
   return ((data || []) as Array<PayloadRow<T>>).map((row) => row.data).filter(Boolean);
 }
 
 async function loadSinglePayload<T>(db: SupabaseClient, table: string, id: string) {
   const { data, error } = await db.from(table).select("id,data").eq("id", id).maybeSingle();
-  if (error) throw error;
+  if (error) throw new Error(formatSupabaseError(error, `Unable to load ${table}.`));
   return (data as PayloadRow<T> | null)?.data || null;
 }
 
 function slugId(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || `item-${Date.now()}`;
+}
+
+function formatSupabaseError(error: { message?: string; details?: string; hint?: string; code?: string }, fallback: string) {
+  return [error.message, error.details, error.hint, error.code].filter(Boolean).join(" ") || fallback;
 }
