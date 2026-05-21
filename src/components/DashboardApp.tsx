@@ -2738,7 +2738,7 @@ function isMissingTableField(task: TrackerTask, field: TableField) {
     case "taskOwner":
       return false;
     case "vendors":
-      return !task.vendors?.some((vendor) => !isMissingValue(vendor.name) || !isMissingValue(vendor.contact));
+      return false;
     case "status":
       return isMissingValue(task.status);
     case "progress":
