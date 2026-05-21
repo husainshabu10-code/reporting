@@ -51,6 +51,7 @@ import {
 } from "@/lib/asharaTrackerData";
 import type { AttachmentReference, TrackerTask, VendorEntry } from "@/lib/asharaTrackerData";
 import {
+  deleteSharedContact,
   currentSharedUser,
   deleteSharedTask,
   isSharedDatabaseConfigured,
@@ -600,6 +601,19 @@ export default function DashboardApp() {
     setContactDraft(blankContact(saved.city));
   };
 
+  const deleteContact = (contact: Contact) => {
+    if (!window.confirm(`Delete contact "${contact.name || "Unnamed contact"}"?`)) return;
+    setContacts((current) => current.filter((item) => item.id !== contact.id));
+    if (contactDraft.id === contact.id) setContactDraft(blankContact(contact.city || cities[0] || "Nairobi"));
+    if (sharedDbEnabled) {
+      deleteSharedContact(contact.id).catch((error) => {
+        setSyncStatus("Contact not deleted");
+        setSyncError(readErrorMessage(error, "Unable to delete contact."));
+      });
+    }
+    logActivity("Contact deleted", contact.name || "Unnamed contact", `${contact.city} / ${contact.workstreamHandled}`);
+  };
+
   const exportTaskCsv = (rows: TrackerTask[], label: string) => {
     downloadCsv(tasksToRows(rows), `ashara-it-${label}.csv`);
     logActivity("Report exported", label, `${rows.length} task row(s) exported as CSV.`);
@@ -742,7 +756,7 @@ export default function DashboardApp() {
         )}
 
         {activeTab === "Contacts" && (
-          <ContactsPage contacts={contacts} cities={cities} setContactDraft={setContactDraft} contactDraft={contactDraft} saveContact={saveContact} />
+          <ContactsPage contacts={contacts} cities={cities} setContactDraft={setContactDraft} contactDraft={contactDraft} saveContact={saveContact} deleteContact={deleteContact} />
         )}
 
         {activeTab === "Area" && (
@@ -944,13 +958,15 @@ function ContactsPage({
   cities,
   contactDraft,
   setContactDraft,
-  saveContact
+  saveContact,
+  deleteContact
 }: {
   contacts: Contact[];
   cities: string[];
   contactDraft: Contact;
   setContactDraft: (contact: Contact) => void;
   saveContact: () => void;
+  deleteContact: (contact: Contact) => void;
 }) {
   const grouped = groupByValue(contacts, "city");
   return (
@@ -975,16 +991,24 @@ function ContactsPage({
             <h3 className="section-title">{city}</h3>
             <div className="mt-3 space-y-3">
               {rows.map((contact) => (
-                <button key={contact.id} className="motion-card w-full rounded-lg border border-[var(--color-border)] p-3 text-left transition hover:bg-[var(--color-bg)]" onClick={() => setContactDraft(contact)}>
+                <article key={contact.id} className="motion-card w-full rounded-lg border border-[var(--color-border)] p-3 text-left transition hover:bg-[var(--color-bg)]">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <p className="font-semibold text-[var(--color-primary)]">{contact.name || "Unnamed POC"}</p>
                       <p className="break-words text-sm text-[var(--color-text-muted)]">{contact.role || "Role pending"} / {contact.workstreamHandled}</p>
                     </div>
-                    <span className="badge-gold w-fit max-w-full break-all">{contact.phone || "Phone pending"}</span>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="badge-gold w-fit max-w-full break-all">{contact.phone || "Phone pending"}</span>
+                      <button className="icon-btn" onClick={() => setContactDraft(contact)} aria-label={`Edit ${contact.name || "contact"}`} title="Edit contact">
+                        <Settings size={15} />
+                      </button>
+                      <button className="icon-btn text-[var(--color-important)] hover:bg-[#7A1F2B]/10" onClick={() => deleteContact(contact)} aria-label={`Delete ${contact.name || "contact"}`} title="Delete contact">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
                   <p className="mt-2 break-words text-sm text-[var(--color-text-muted)]">{contact.email || "Email pending"} {contact.notes ? `- ${contact.notes}` : ""}</p>
-                </button>
+                </article>
               ))}
             </div>
           </Panel>

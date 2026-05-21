@@ -18,6 +18,7 @@ type TrackerAction =
   | { action: "upsertTasks"; tasks: TrackerTask[] }
   | { action: "replaceTasks"; tasks: TrackerTask[] }
   | { action: "deleteTask"; taskId: string }
+  | { action: "deleteContact"; contactId: string }
   | { action: "upsertCities"; cities: string[] }
   | { action: "upsertContacts"; contacts: SharedTrackerContact[] }
   | { action: "upsertActivity"; activity: SharedTrackerActivity[] }
@@ -55,6 +56,9 @@ export async function POST(request: Request) {
         break;
       case "deleteTask":
         await deleteTask(db, body.taskId);
+        break;
+      case "deleteContact":
+        await deleteContact(db, body.contactId);
         break;
       case "upsertCities":
         await upsertCities(db, body.cities);
@@ -136,6 +140,11 @@ async function replaceTasks(db: TrackerDbClient, tasks: TrackerTask[]) {
 async function deleteTask(db: TrackerDbClient, taskId: string) {
   const { error } = await db.from("ashara_tasks").delete().eq("id", taskId);
   if (error) throw new Error(formatSupabaseError(error, "Unable to delete task."));
+}
+
+async function deleteContact(db: TrackerDbClient, contactId: string) {
+  const { error } = await db.from("ashara_contacts").delete().eq("id", contactId);
+  if (error) throw new Error(formatSupabaseError(error, "Unable to delete contact."));
 }
 
 async function upsertCities(db: TrackerDbClient, cities: string[]) {

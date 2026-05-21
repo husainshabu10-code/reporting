@@ -139,6 +139,14 @@ export async function deleteSharedTask(taskId: string) {
   if (error) throw error;
 }
 
+export async function deleteSharedContact(contactId: string) {
+  if (await trackerApiMutation({ action: "deleteContact", contactId })) return;
+  const db = supabase();
+  if (!db) throw new Error("Shared database is not configured.");
+  const { error } = await db.from("ashara_contacts").delete().eq("id", contactId);
+  if (error) throw error;
+}
+
 export async function upsertSharedCities(cities: string[]) {
   if (!cities.length) return;
   if (await trackerApiMutation({ action: "upsertCities", cities })) return;
