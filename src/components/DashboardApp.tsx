@@ -663,12 +663,6 @@ export default function DashboardApp() {
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase text-[var(--color-accent)]">{activeTab}</p>
                 <h2 className="truncate text-lg font-semibold text-[var(--color-primary)] sm:text-2xl">IT / Event Preparation Dashboard</h2>
-                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                  <span className={`inline-flex rounded-full px-2 py-0.5 font-semibold ${sharedDbEnabled ? "bg-[var(--color-accent-light)] text-[var(--color-primary)]" : "bg-[#F4F1EA] text-[var(--color-text-muted)]"}`}>
-                    {syncStatus}
-                  </span>
-                  {syncError && <span className="max-w-md truncate text-[var(--color-important)]" title={syncError}>{syncError}</span>}
-                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
