@@ -1,8 +1,29 @@
-# ASHARA MUBARAKAH IT Readiness Master Tracker
+# ASHARA MUBARAKAH IT Event Preparation Dashboard
 
-Internal React/Next.js dashboard for tracking ASHARA MUBARAKAH IT preparation across cities, workstreams, owners, risks, documents, and readiness status.
+Standalone Phase 1 dashboard for event IT preparation reporting.
 
-## Run locally
+## Phase 1 Scope Built
+
+- Supabase-ready schema for auth, roles, areas, task templates, live tasks, daily reports, uploads, verification, requests, notifications, and future exports/logs.
+- Email magic-link login shell using Supabase Auth.
+- Role and area access foundation for Super Admin, Admin, Area Admin, Verifier, Report User, and Viewer.
+- Fixed zone types: CMZ, Central Office, Relay Zone.
+- Admin area management.
+- Task Template import from the Day Plan sheet of `.xlsx` files, with `.csv` fallback.
+- Apply selected templates to areas as Live Tasks.
+- User daily report screen with draft/submission, status, remarks, quantity fields, uploads, escalation points, and supporting personnel.
+- Basic verification queue and reject/needs-correction flow.
+- Basic requests tab.
+- Email notification foundation through queued `notification_logs`.
+- Basic admin dashboard where completion counts only `Verified Completed` tasks.
+
+## Later Phases Not Built Yet
+
+- Phase 2: area admin approval flow, advanced request forwarding, multi-level verification, configurable reminders, form builder editing, global field editing, activity log settings.
+- Phase 3: PDF exports, Excel exports, viewer customization, presentation mode, advanced charts and filters.
+- Phase 4: WhatsApp integration, optional merge with existing AM IT dashboard, advanced analytics.
+
+## Run Locally
 
 ```bash
 npm install
@@ -11,42 +32,23 @@ npm run dev
 
 Open the local URL shown by Next.js, usually `http://localhost:3000`.
 
-## Shared Supabase database
+If Supabase variables are not configured, the app runs in local browser storage mode with demo users.
 
-Task, city, contact, activity, equipment, and chart configuration data can now be shared through Supabase instead of being kept only in one browser.
+## Supabase Setup
 
 1. Create a Supabase project.
 2. Run `docs/supabase-schema.sql` in the Supabase SQL editor.
-3. Add these environment variables locally and in Vercel:
+3. Add these variables locally and in deployment:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
-NEXT_PUBLIC_TRACKER_USER_NAME=Unknown user
 ```
 
-`NEXT_PUBLIC_SUPABASE_ANON_KEY` also works as a fallback if your Supabase project still labels the browser key as `anon`. The server API also accepts `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, or the `VITE_SUPABASE_*` names. When the variables are present, the dashboard loads from Supabase, writes edits/imports to Supabase through the shared API, listens for realtime changes when browser keys are available, and falls back to polling every 3 seconds. If the variables are missing or Supabase is unavailable, the app uses local browser storage only as a temporary fallback.
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` also works as a fallback.
 
-## Build check
+## Important Notes
 
-```bash
-npm run build
-```
-
-## City names
-
-Placeholder city names are defined in `src/lib/asharaTrackerData.ts`:
-
-```ts
-export const INITIAL_CITIES = ["Nairobi", "Mombasa", "Daresalam", "Mumbai", "Surat", "Pune", "Nagpur", "Colombo"];
-```
-
-Replace those values with the actual city names before first use, or add cities from the dashboard using **Add City + Default Tasks**. Existing shared data is loaded from Supabase when configured. Use **Add City + Default Tasks** for runtime changes, or update the constants before first seeding a fresh database.
-
-## Export for Asana or Excel
-
-Use **Export Visible CSV** for the current filtered view or **Export Full CSV** for the complete task list. The CSV includes all custom fields and can be opened in Excel or mapped into Asana custom fields.
-
-## Backend / Asana API path
-
-The app keeps a clean `TrackerTask` data model in `src/lib/asharaTrackerData.ts` and syncs it through `src/lib/sharedTrackerStore.ts`. For Asana, map each exported field to a project custom field and sync `id`, `status`, `owner`, dates, document reference, and remarks through the Asana API.
+- The UI is intentionally separate from the existing AM IT website, but keeps the same visual language: green/gold palette, rounded cards, compact tabs, filters, badges, progress cards, and responsive dashboards.
+- City is not part of the Phase 1 workflow. The database keeps a nullable `city` column on `areas` so it can be added later without rebuilding.
+- Excel import needs the `xlsx` package. It reads the `Day Plan` sheet when present and imports only the active template fields. Dependencies and risk are stored only as hidden reference.

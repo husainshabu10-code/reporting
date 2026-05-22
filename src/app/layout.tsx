@@ -3,8 +3,8 @@ import type React from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ASHARA MUBARAKAH IT Readiness Master Tracker",
-  description: "Internal operations dashboard for ASHARA MUBARAKAH IT readiness tracking"
+  title: "ASHARA MUBARAKAH IT Event Preparation",
+  description: "Standalone IT event preparation reporting dashboard for ASHARA MUBARAKAH"
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
