@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ChangeEvent, DragEvent, ReactNode } from "react";
+import type { ChangeEvent, DragEvent, ReactNode, RefObject } from "react";
 import {
   Activity,
   BarChart3,
@@ -279,6 +279,7 @@ export default function DashboardApp() {
   const [selectedTask, setSelectedTask] = useState<TrackerTask | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [cityDraft, setCityDraft] = useState("");
+  const [cityMenuOpen, setCityMenuOpen] = useState(false);
   const [highlightMissing, setHighlightMissing] = useState(true);
   const [chartData, setChartData] = useState<ChartDataset | null>(null);
   const [chartSettingsTab, setChartSettingsTab] = useState<TabId | null>(null);
@@ -302,6 +303,7 @@ export default function DashboardApp() {
   const chartConfigLoadedRef = useRef(false);
   const chartConfigSaveTimerRef = useRef<number | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const cityMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -366,6 +368,15 @@ export default function DashboardApp() {
   useEffect(() => {
     setSidebarOpen(window.innerWidth >= 1024);
   }, []);
+
+  useEffect(() => {
+    if (!cityMenuOpen) return;
+    const closeCityMenu = (event: MouseEvent) => {
+      if (!cityMenuRef.current?.contains(event.target as Node)) setCityMenuOpen(false);
+    };
+    document.addEventListener("mousedown", closeCityMenu);
+    return () => document.removeEventListener("mousedown", closeCityMenu);
+  }, [cityMenuOpen]);
 
   useEffect(() => {
     if (!hydrated || sharedDbEnabled) return;
@@ -549,6 +560,7 @@ export default function DashboardApp() {
     }
     logActivity("City added", city, generateTasks ? "Default tasks generated." : "City shell created.");
     setCityDraft("");
+    setCityMenuOpen(false);
   };
 
   const resetDemoData = () => {
@@ -705,6 +717,7 @@ export default function DashboardApp() {
               {chartsForActiveTab.length > 0 && (
                 <button className="btn-secondary justify-center max-[380px]:col-span-2" onClick={() => setAddChartTab(activeTab)}><Plus size={16} /> Add Chart</button>
               )}
+              <CityManager cityDraft={cityDraft} setCityDraft={setCityDraft} onAddCity={addCity} open={cityMenuOpen} setOpen={setCityMenuOpen} menuRef={cityMenuRef} />
               <button className="btn-primary justify-center" onClick={() => setSelectedTask(createBlankTask(cities[0] ?? "Nairobi"))}><Plus size={16} /> Add Task</button>
               <button className="btn-secondary justify-center" onClick={() => exportTaskCsv(filteredTasks, "visible-tasks")}><Download size={16} /> Export CSV</button>
               <button className="btn-secondary justify-center" onClick={() => importInputRef.current?.click()}><Upload size={16} /> Import CSV</button>
@@ -722,8 +735,6 @@ export default function DashboardApp() {
         </header>
 
       <div className="mx-auto max-w-[1800px] space-y-4 px-3 py-4 sm:space-y-5 sm:px-6 sm:py-5 lg:px-8">
-        <CityManager cityDraft={cityDraft} setCityDraft={setCityDraft} onAddCity={addCity} />
-
         {activeTab === "Dashboard" && (
           <DashboardPage
             filters={filters}
@@ -1194,15 +1205,36 @@ function TimelinePage({ cityStats, tasks, onOpenTask }: { cityStats: ReturnType<
   );
 }
 
-function CityManager({ cityDraft, setCityDraft, onAddCity }: { cityDraft: string; setCityDraft: (value: string) => void; onAddCity: (generateTasks: boolean) => void }) {
+function CityManager({
+  cityDraft,
+  setCityDraft,
+  onAddCity,
+  open,
+  setOpen,
+  menuRef
+}: {
+  cityDraft: string;
+  setCityDraft: (value: string) => void;
+  onAddCity: (generateTasks: boolean) => void;
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  menuRef: RefObject<HTMLDivElement>;
+}) {
   return (
-    <Panel>
-      <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto] lg:items-end">
-        <InputField label="Add new city" value={cityDraft} onChange={setCityDraft} placeholder="Enter city name" />
-        <button className="btn-secondary justify-center" onClick={() => onAddCity(false)}><Plus size={16} /> Add City Only</button>
-        <button className="btn-primary justify-center" onClick={() => onAddCity(true)}><Plus size={16} /> Add City + Default Tasks</button>
+    <div ref={menuRef} className="relative">
+      <button className="btn-secondary w-full justify-center sm:w-auto" onClick={() => setOpen(!open)} aria-expanded={open} aria-label="Add city">
+        <Plus size={16} /> Add City
+      </button>
+      <div className={`absolute right-0 top-12 z-40 w-[min(92vw,34rem)] rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-3 shadow-2xl transition-all duration-200 ease-out sm:p-4 ${open ? "pointer-events-auto translate-y-0 scale-100 opacity-100" : "pointer-events-none -translate-y-2 scale-[0.98] opacity-0"}`}>
+        <div className="grid gap-3">
+          <InputField label="Add new city" value={cityDraft} onChange={setCityDraft} placeholder="Enter city name" />
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button className="btn-secondary justify-center" onClick={() => onAddCity(false)}><Plus size={16} /> Add City Only</button>
+            <button className="btn-primary justify-center" onClick={() => onAddCity(true)}><Plus size={16} /> Add City + Default Tasks</button>
+          </div>
+        </div>
       </div>
-    </Panel>
+    </div>
   );
 }
 
