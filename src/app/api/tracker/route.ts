@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { TrackerTask } from "@/lib/asharaTrackerData";
-import type { SharedChartConfig, SharedTrackerActivity, SharedTrackerContact, SharedTrackerState } from "@/lib/sharedTrackerStore";
+import type { SharedChartConfig, SharedTrackerActivity, SharedTrackerContact, SharedTrackerEquipment, SharedTrackerState } from "@/lib/sharedTrackerStore";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +19,8 @@ type TrackerAction =
   | { action: "replaceTasks"; tasks: TrackerTask[] }
   | { action: "deleteTask"; taskId: string }
   | { action: "deleteContact"; contactId: string }
+  | { action: "upsertEquipment"; equipment: SharedTrackerEquipment[] }
+  | { action: "deleteEquipment"; equipmentId: string }
   | { action: "upsertCities"; cities: string[] }
   | { action: "upsertContacts"; contacts: SharedTrackerContact[] }
   | { action: "upsertActivity"; activity: SharedTrackerActivity[] }
@@ -45,7 +47,8 @@ export async function POST(request: Request) {
           upsertCities(db, body.state.cities),
           upsertContacts(db, body.state.contacts),
           upsertActivity(db, body.state.activity),
-          saveChartConfig(db, body.state.chartConfig)
+          saveChartConfig(db, body.state.chartConfig),
+          upsertEquipment(db, body.state.equipment)
         ]);
         break;
       case "upsertTasks":
@@ -59,6 +62,12 @@ export async function POST(request: Request) {
         break;
       case "deleteContact":
         await deleteContact(db, body.contactId);
+        break;
+      case "upsertEquipment":
+        await upsertEquipment(db, body.equipment);
+        break;
+      case "deleteEquipment":
+        await deleteEquipment(db, body.equipmentId);
         break;
       case "upsertCities":
         await upsertCities(db, body.cities);
@@ -102,7 +111,7 @@ async function loadState(db: TrackerDbClient): Promise<SharedTrackerState<Shared
     loadPayloadTable<SharedTrackerContact>(db, "ashara_contacts", "city", true),
     loadPayloadTable<SharedTrackerActivity>(db, "ashara_activity", "occurred_at", false, 500),
     loadSinglePayload<SharedChartConfig>(db, "ashara_chart_configs", CHART_CONFIG_ID),
-    loadPayloadTable<Record<string, unknown>>(db, "ashara_equipment", "updated_at", false)
+    loadPayloadTable<SharedTrackerEquipment>(db, "ashara_equipment", "updated_at", false)
   ]);
   return {
     tasks,
@@ -145,6 +154,27 @@ async function deleteTask(db: TrackerDbClient, taskId: string) {
 async function deleteContact(db: TrackerDbClient, contactId: string) {
   const { error } = await db.from("ashara_contacts").delete().eq("id", contactId);
   if (error) throw new Error(formatSupabaseError(error, "Unable to delete contact."));
+}
+
+async function upsertEquipment(db: TrackerDbClient, equipment: SharedTrackerEquipment[]) {
+  if (!equipment.length) return;
+  const { error } = await db.from("ashara_equipment").upsert(
+    equipment.map((item) => ({
+      id: String(item.id || `equipment-${Date.now()}`),
+      workstream: String(item.workstream || ""),
+      category: String(item.category || ""),
+      equipment_name: String(item.name || item.equipmentName || ""),
+      data: item,
+      updated_at: new Date().toISOString()
+    })),
+    { onConflict: "id" }
+  );
+  if (error) throw new Error(formatSupabaseError(error, "Unable to save equipment."));
+}
+
+async function deleteEquipment(db: TrackerDbClient, equipmentId: string) {
+  const { error } = await db.from("ashara_equipment").delete().eq("id", equipmentId);
+  if (error) throw new Error(formatSupabaseError(error, "Unable to delete equipment."));
 }
 
 async function upsertCities(db: TrackerDbClient, cities: string[]) {

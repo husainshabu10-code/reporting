@@ -17,6 +17,7 @@ import {
   Menu,
   Minus,
   MoreVertical,
+  Package,
   Plus,
   RefreshCcw,
   Search,
@@ -52,6 +53,7 @@ import {
 import type { AttachmentReference, TrackerTask, VendorEntry } from "@/lib/asharaTrackerData";
 import {
   deleteSharedContact,
+  deleteSharedEquipment,
   currentSharedUser,
   deleteSharedTask,
   isSharedDatabaseConfigured,
@@ -60,16 +62,18 @@ import {
   saveSharedChartConfig,
   seedSharedTrackerState,
   subscribeToSharedTrackerChanges,
+  uploadEquipmentPhoto,
   upsertSharedActivity,
   upsertSharedCities,
   upsertSharedContact,
   upsertSharedContacts,
+  upsertSharedEquipment,
   upsertSharedTask,
   upsertSharedTasks
 } from "@/lib/sharedTrackerStore";
 import type { SharedChartConfig, SharedTrackerState } from "@/lib/sharedTrackerStore";
 
-type TabId = "Dashboard" | "Compare" | "Master List" | "Contacts" | "Area" | "Activity" | "Report" | "Timeline";
+type TabId = "Dashboard" | "Compare" | "Master List" | "Contacts" | "Equipments" | "Area" | "Activity" | "Report" | "Timeline";
 type ReportFormat = "Charts only" | "Tables only" | "Both charts and tables";
 type ExcelReportFormat = "Table only" | "Table with chart summaries";
 type SortKey = "city" | "workstream" | "taskName" | "zoneArea" | "taskOwner" | "status" | "progress" | "dueDate" | "riskLevel" | "taskWeight";
@@ -110,6 +114,33 @@ type Contact = {
   workstreamHandled: string;
   customResponsibility: string;
   notes: string;
+};
+
+type EquipmentRecommendation = {
+  id: string;
+  brandName: string;
+  modelName: string;
+  averageInrPrice: string;
+  priceRange: string;
+  photoUrl: string;
+  photoPath: string;
+  vendorNotes: string;
+};
+
+type EquipmentItem = {
+  id: string;
+  name: string;
+  workstream: string;
+  category: string;
+  description: string;
+  suggestedFor: string[];
+  suggestedQuantity: string;
+  quantityRange: string;
+  vendorNotes: string;
+  importance: "Essential" | "Recommended" | "";
+  recommendations: EquipmentRecommendation[];
+  createdAt: string;
+  updatedAt: string;
 };
 
 type ActivityEntry = {
@@ -191,6 +222,7 @@ const TABS: Array<{ id: TabId; icon: LucideIcon }> = [
   { id: "Compare", icon: Layers3 },
   { id: "Master List", icon: FileSpreadsheet },
   { id: "Contacts", icon: Users },
+  { id: "Equipments", icon: Package },
   { id: "Area", icon: Filter },
   { id: "Activity", icon: Activity },
   { id: "Report", icon: FileText },
@@ -270,6 +302,7 @@ export default function DashboardApp() {
   const [tasks, setTasks] = useState<TrackerTask[]>(() => normalizeTasks(generateDefaultTasksForCities(INITIAL_CITIES)));
   const [cities, setCities] = useState<string[]>(INITIAL_CITIES);
   const [contacts, setContacts] = useState<Contact[]>(() => createDefaultContacts(INITIAL_CITIES));
+  const [equipment, setEquipment] = useState<EquipmentItem[]>([]);
   const [activity, setActivity] = useState<ActivityEntry[]>(() => [
     createActivity("Dashboard created", "ASHARA MUBARAKAH tracker", "Initial local tracker data generated.")
   ]);
@@ -277,6 +310,7 @@ export default function DashboardApp() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [reportFilters, setReportFilters] = useState<Filters>(EMPTY_FILTERS);
   const [selectedTask, setSelectedTask] = useState<TrackerTask | null>(null);
+  const [selectedEquipment, setSelectedEquipment] = useState<EquipmentItem | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [cityDraft, setCityDraft] = useState("");
   const [cityMenuOpen, setCityMenuOpen] = useState(false);
@@ -296,6 +330,9 @@ export default function DashboardApp() {
   const [contactDraft, setContactDraft] = useState<Contact>(() => blankContact(INITIAL_CITIES[0]));
   const [reportFormat, setReportFormat] = useState<ReportFormat>("Both charts and tables");
   const [excelReportFormat, setExcelReportFormat] = useState<ExcelReportFormat>("Table only");
+  const [equipmentSearch, setEquipmentSearch] = useState("");
+  const [equipmentWorkstreamFilter, setEquipmentWorkstreamFilter] = useState("All");
+  const [equipmentCategoryFilter, setEquipmentCategoryFilter] = useState("All");
   const [hydrated, setHydrated] = useState(false);
   const [sharedDbEnabled] = useState(() => isSharedDatabaseConfigured());
   const [syncStatus, setSyncStatus] = useState(() => isSharedDatabaseConfigured() ? "Connecting to Supabase" : "Local fallback mode");
@@ -407,6 +444,7 @@ export default function DashboardApp() {
     setTasks(nextTasks);
     setCities(nextCities.length ? nextCities : INITIAL_CITIES);
     setContacts(state.contacts.length ? state.contacts : createDefaultContacts(nextCities.length ? nextCities : INITIAL_CITIES));
+    setEquipment(normalizeEquipment(state.equipment as EquipmentItem[]));
     setActivity(state.activity.length ? state.activity.slice(0, 250) : [createActivity("Dashboard connected", "ASHARA MUBARAKAH tracker", sharedDbEnabled ? "Shared database initialized." : "Local fallback initialized.")]);
     setHiddenChartIds(state.chartConfig.hiddenChartIds || {});
     setChartOrder(state.chartConfig.chartOrder || {});
@@ -417,6 +455,7 @@ export default function DashboardApp() {
   };
 
   const filteredTasks = useMemo(() => applyFilters(tasks, filters), [filters, tasks]);
+  const filteredEquipment = useMemo(() => filterEquipment(equipment, equipmentSearch, equipmentWorkstreamFilter, equipmentCategoryFilter), [equipment, equipmentCategoryFilter, equipmentSearch, equipmentWorkstreamFilter]);
   const reportTasks = useMemo(() => applyFilters(tasks, reportFilters), [reportFilters, tasks]);
   const cityStats = useMemo(() => getCityStats(tasks, cities), [cities, tasks]);
   const filteredCityStats = useMemo(() => getCityStats(filteredTasks, cities), [cities, filteredTasks]);
@@ -645,9 +684,53 @@ export default function DashboardApp() {
     logActivity("Contact deleted", contact.name || "Unnamed contact", `${contact.city} / ${contact.workstreamHandled}`);
   };
 
+  const saveEquipment = (item: EquipmentItem, events: ActivityEntry[] = []) => {
+    const normalized = normalizeEquipmentItem(item);
+    const existing = equipment.find((row) => row.id === normalized.id);
+    setEquipment((current) => current.some((row) => row.id === normalized.id)
+      ? current.map((row) => (row.id === normalized.id ? normalized : row))
+      : [normalized, ...current]);
+    if (sharedDbEnabled) {
+      upsertSharedEquipment([normalized]).catch((error) => {
+        setSyncStatus("Equipment not saved");
+        setSyncError(readErrorMessage(error, "Unable to save equipment."));
+      });
+    }
+    const allEvents = [
+      createActivity(existing ? "Equipment edited" : "Equipment added", normalized.name || "Unnamed equipment", `${normalized.workstream || "Workstream pending"} / ${normalized.category || "Category pending"}`),
+      ...equipmentChangeEvents(existing, normalized),
+      ...events
+    ];
+    setActivity((current) => [...allEvents, ...current].slice(0, 250));
+    if (sharedDbEnabled) {
+      upsertSharedActivity(allEvents).catch((error) => {
+        setSyncStatus("Activity not saved");
+        setSyncError(readErrorMessage(error, "Unable to save equipment activity."));
+      });
+    }
+    setSelectedEquipment(null);
+  };
+
+  const deleteEquipment = (item: EquipmentItem) => {
+    if (!window.confirm(`Delete equipment "${item.name || "Unnamed equipment"}"?`)) return;
+    setEquipment((current) => current.filter((row) => row.id !== item.id));
+    if (sharedDbEnabled) {
+      deleteSharedEquipment(item.id).catch((error) => {
+        setSyncStatus("Equipment not deleted");
+        setSyncError(readErrorMessage(error, "Unable to delete equipment."));
+      });
+    }
+    logActivity("Equipment deleted", item.name || "Unnamed equipment", `${item.workstream || "Workstream pending"} / ${item.category || "Category pending"}`);
+  };
+
   const exportTaskCsv = (rows: TrackerTask[], label: string) => {
     downloadCsv(tasksToRows(rows), `ashara-it-${label}.csv`);
     logActivity("Report exported", label, `${rows.length} task row(s) exported as CSV.`);
+  };
+
+  const exportEquipmentCsv = () => {
+    downloadCsv(equipmentToRows(filteredEquipment), "ashara-equipment-catalog.csv");
+    logActivity("Report exported", "Equipment catalog", `${filteredEquipment.length} equipment item(s) exported as CSV.`);
   };
 
   const exportExcelReport = (rows: TrackerTask[]) => {
@@ -719,8 +802,8 @@ export default function DashboardApp() {
               )}
               <CityManager cityDraft={cityDraft} setCityDraft={setCityDraft} onAddCity={addCity} open={cityMenuOpen} setOpen={setCityMenuOpen} menuRef={cityMenuRef} />
               <button className="btn-primary justify-center" onClick={() => setSelectedTask(createBlankTask(cities[0] ?? "Nairobi"))}><Plus size={16} /> Add Task</button>
-              <button className="btn-secondary justify-center" onClick={() => exportTaskCsv(filteredTasks, "visible-tasks")}><Download size={16} /> Export CSV</button>
-              <button className="btn-secondary justify-center" onClick={() => importInputRef.current?.click()}><Upload size={16} /> Import CSV</button>
+              <button className="btn-secondary justify-center" onClick={() => activeTab === "Equipments" ? exportEquipmentCsv() : exportTaskCsv(filteredTasks, "visible-tasks")}><Download size={16} /> Export CSV</button>
+              {activeTab !== "Equipments" && <button className="btn-secondary justify-center" onClick={() => importInputRef.current?.click()}><Upload size={16} /> Import CSV</button>}
               <input ref={importInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={importCsv} />
             </div>
             <div className="lg:hidden">
@@ -788,6 +871,22 @@ export default function DashboardApp() {
           <ContactsPage contacts={contacts} cities={cities} setContactDraft={setContactDraft} contactDraft={contactDraft} saveContact={saveContact} deleteContact={deleteContact} />
         )}
 
+        {activeTab === "Equipments" && (
+          <EquipmentsPage
+            equipment={filteredEquipment}
+            allEquipment={equipment}
+            search={equipmentSearch}
+            setSearch={setEquipmentSearch}
+            workstreamFilter={equipmentWorkstreamFilter}
+            setWorkstreamFilter={setEquipmentWorkstreamFilter}
+            categoryFilter={equipmentCategoryFilter}
+            setCategoryFilter={setEquipmentCategoryFilter}
+            onAdd={() => setSelectedEquipment(blankEquipment())}
+            onEdit={setSelectedEquipment}
+            onDelete={deleteEquipment}
+          />
+        )}
+
         {activeTab === "Area" && (
           <AreaPage cities={cities} selectedCity={areaCity} setSelectedCity={setAreaCity} areaRows={areaRows} charts={visibleChartsFor("Area", pageCharts.Area || [])} onShowData={setChartData} onDeleteChart={(chartId) => hideChart("Area", chartId)} onReorderChart={(sourceId, targetId) => reorderChart("Area", sourceId, targetId)} />
         )}
@@ -826,6 +925,9 @@ export default function DashboardApp() {
 
       {selectedTask && (
         <TaskEditor task={selectedTask} cities={cities} onSave={upsertTask} onClose={() => setSelectedTask(null)} onDelete={deleteTask} />
+      )}
+      {selectedEquipment && (
+        <EquipmentEditor equipment={selectedEquipment} onSave={saveEquipment} onClose={() => setSelectedEquipment(null)} />
       )}
       {chartData && <DataModal dataset={chartData} onClose={() => setChartData(null)} />}
       {chartSettingsTab && (
@@ -1044,6 +1146,128 @@ function ContactsPage({
         ))}
       </div>
     </section>
+  );
+}
+
+function EquipmentsPage({
+  equipment,
+  allEquipment,
+  search,
+  setSearch,
+  workstreamFilter,
+  setWorkstreamFilter,
+  categoryFilter,
+  setCategoryFilter,
+  onAdd,
+  onEdit,
+  onDelete
+}: {
+  equipment: EquipmentItem[];
+  allEquipment: EquipmentItem[];
+  search: string;
+  setSearch: (value: string) => void;
+  workstreamFilter: string;
+  setWorkstreamFilter: (value: string) => void;
+  categoryFilter: string;
+  setCategoryFilter: (value: string) => void;
+  onAdd: () => void;
+  onEdit: (item: EquipmentItem) => void;
+  onDelete: (item: EquipmentItem) => void;
+}) {
+  const categories = unique(allEquipment.map((item) => item.category).filter(Boolean));
+  const grouped = groupEquipment(equipment);
+  return (
+    <section className="animate-fade-in space-y-5">
+      <Panel>
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+          <div>
+            <h2 className="section-title">Preferred equipment catalog</h2>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">Global IT equipment recommendations grouped by workstream and category.</p>
+          </div>
+          <button className="btn-primary justify-center" onClick={onAdd}><Plus size={16} /> Add Equipment</button>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <label className="space-y-1">
+            <span className="field-label">Search</span>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" size={16} />
+              <input className="field pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search equipment, category, brand" />
+            </div>
+          </label>
+          <SelectField label="Workstream" value={workstreamFilter} options={WORKSTREAMS.map((item) => item.name)} includeAll onChange={setWorkstreamFilter} />
+          <SelectField label="Category" value={categoryFilter} options={categories} includeAll onChange={setCategoryFilter} />
+        </div>
+      </Panel>
+
+      {equipment.length === 0 ? (
+        <Panel>
+          <div className="py-10 text-center">
+            <Package className="mx-auto text-[var(--color-accent)]" size={34} />
+            <h3 className="mt-3 text-lg font-semibold text-[var(--color-primary)]">No equipment added yet</h3>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">Use Add Equipment to build the shared preferred catalog.</p>
+          </div>
+        </Panel>
+      ) : (
+        <div className="space-y-6">
+          {Object.entries(grouped).map(([workstream, categoryMap]) => (
+            <section key={workstream} className="space-y-3">
+              <h2 className="section-title">{workstream || "Workstream pending"}</h2>
+              {Object.entries(categoryMap).map(([category, rows]) => (
+                <div key={`${workstream}-${category}`} className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-sm font-bold uppercase tracking-wide text-[var(--color-text-muted)]">{category || "Uncategorized"}</h3>
+                    <div className="h-px flex-1 bg-[var(--color-border)]" />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+                    {rows.map((item) => <EquipmentCard key={item.id} item={item} onEdit={onEdit} onDelete={onDelete} />)}
+                  </div>
+                </div>
+              ))}
+            </section>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function EquipmentCard({ item, onEdit, onDelete }: { item: EquipmentItem; onEdit: (item: EquipmentItem) => void; onDelete: (item: EquipmentItem) => void }) {
+  return (
+    <article className="motion-card rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] p-4 shadow-soft">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="break-words text-base font-semibold text-[var(--color-primary)]">{item.name || "Unnamed equipment"}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <ValueBadge value={item.importance || "-"} />
+            {item.category && <span className="badge-gold">{item.category}</span>}
+          </div>
+        </div>
+        <div className="flex gap-1">
+          <button className="icon-btn" onClick={() => onEdit(item)} aria-label={`Edit ${item.name || "equipment"}`} title="Edit equipment"><Settings size={15} /></button>
+          <button className="icon-btn text-[var(--color-important)] hover:bg-[#7A1F2B]/10" onClick={() => onDelete(item)} aria-label={`Delete ${item.name || "equipment"}`} title="Delete equipment"><Trash2 size={15} /></button>
+        </div>
+      </div>
+      {item.description && <p className="mt-3 text-sm text-[var(--color-text-muted)]">{item.description}</p>}
+      <div className="mt-3 grid gap-2 text-sm text-[var(--color-text-muted)] sm:grid-cols-2">
+        <span className="task-face-field cell-box">Suggested quantity: {item.suggestedQuantity || "-"}</span>
+        <span className="task-face-field cell-box">Quantity range: {item.quantityRange || "-"}</span>
+        <span className="task-face-field cell-box sm:col-span-2">Suggested for: {item.suggestedFor.length ? item.suggestedFor.join(", ") : "-"}</span>
+        {item.vendorNotes && <span className="task-face-field cell-box sm:col-span-2">Vendor notes: {item.vendorNotes}</span>}
+      </div>
+      <div className="mt-4 space-y-3">
+        <p className="text-xs font-bold uppercase text-[var(--color-text-muted)]">Recommended brand/model options</p>
+        {item.recommendations.length ? item.recommendations.map((rec) => (
+          <div key={rec.id} className="grid gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3 sm:grid-cols-[5.5rem_1fr]">
+            {rec.photoUrl ? <img src={rec.photoUrl} alt={`${rec.brandName} ${rec.modelName}`} className="h-20 w-full rounded-md border border-[var(--color-border)] object-cover sm:w-20" /> : <div className="flex h-20 items-center justify-center rounded-md border border-dashed border-[var(--color-border)] text-xs font-semibold text-[var(--color-text-muted)]">No photo</div>}
+            <div className="min-w-0 text-sm">
+              <p className="break-words font-semibold text-[var(--color-primary)]">{[rec.brandName, rec.modelName].filter(Boolean).join(" ") || "Brand/model pending"}</p>
+              <p className="text-[var(--color-text-muted)]">Average INR price: {rec.averageInrPrice || "-"} / Range: {rec.priceRange || "-"}</p>
+              {rec.vendorNotes && <p className="mt-1 text-[var(--color-text-muted)]">{rec.vendorNotes}</p>}
+            </div>
+          </div>
+        )) : <p className="rounded-lg border border-dashed border-[var(--color-border)] p-3 text-sm text-[var(--color-text-muted)]">No brand/model options added.</p>}
+      </div>
+    </article>
   );
 }
 
@@ -1951,6 +2175,125 @@ function TaskEditor({ task, cities, onSave, onClose, onDelete }: { task: Tracker
   );
 }
 
+function EquipmentEditor({ equipment, onSave, onClose }: { equipment: EquipmentItem; onSave: (item: EquipmentItem, events?: ActivityEntry[]) => void; onClose: () => void }) {
+  const [draft, setDraft] = useState<EquipmentItem>(() => normalizeEquipmentItem(equipment));
+  const [events, setEvents] = useState<ActivityEntry[]>([]);
+  const [uploadingId, setUploadingId] = useState("");
+  const { closing, close } = useAnimatedClose(onClose);
+
+  const update = (key: keyof EquipmentItem, value: string | string[] | EquipmentRecommendation[]) => {
+    setDraft((current) => ({ ...current, [key]: value, updatedAt: new Date().toISOString() }));
+  };
+  const toggleSuggestedFor = (area: string) => {
+    const next = draft.suggestedFor.includes(area) ? draft.suggestedFor.filter((item) => item !== area) : [...draft.suggestedFor, area];
+    update("suggestedFor", next);
+  };
+  const addRecommendation = () => {
+    const recommendation = blankEquipmentRecommendation();
+    update("recommendations", [...draft.recommendations, recommendation]);
+    setEvents((current) => [createActivity("Brand/model recommendation added", draft.name || "Unnamed equipment", "Recommendation option added."), ...current]);
+  };
+  const updateRecommendation = (id: string, patch: Partial<EquipmentRecommendation>) => {
+    update("recommendations", draft.recommendations.map((item) => (item.id === id ? { ...item, ...patch } : item)));
+  };
+  const removeRecommendation = (id: string) => {
+    update("recommendations", draft.recommendations.filter((item) => item.id !== id));
+    setEvents((current) => [createActivity("Brand/model recommendation deleted", draft.name || "Unnamed equipment", "Recommendation option removed."), ...current]);
+  };
+  const uploadPhoto = async (id: string, file?: File) => {
+    if (!file) return;
+    setUploadingId(id);
+    try {
+      const path = `equipment/${draft.id}/${id}-${safeFileName(file.name)}`;
+      const photoUrl = await uploadEquipmentPhoto(file, path);
+      updateRecommendation(id, { photoUrl, photoPath: path });
+      setEvents((current) => [createActivity("Equipment photo uploaded", draft.name || "Unnamed equipment", file.name, { changedField: "Photo", newValue: photoUrl }), ...current]);
+    } catch (error) {
+      window.alert(readErrorMessage(error, "Unable to upload photo."));
+    } finally {
+      setUploadingId("");
+    }
+  };
+  const save = () => {
+    const recommendationEditEvents = draft.recommendations.length
+      ? [createActivity("Brand/model recommendation edited", draft.name || "Unnamed equipment", `${draft.recommendations.length} recommendation option(s) saved.`)]
+      : [];
+    onSave(draft, [...recommendationEditEvents, ...events]);
+  };
+
+  return (
+    <div className={`motion-overlay blur-overlay fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 ${closing ? "motion-overlay-exit" : ""}`}>
+      <div className={`motion-modal max-h-[94vh] w-full max-w-5xl overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] shadow-2xl ${closing ? "motion-modal-exit" : ""}`}>
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--color-border)] p-3 sm:p-4">
+          <div>
+            <p className="text-xs font-semibold uppercase text-[var(--color-accent)]">Equipment catalog</p>
+            <h2 className="section-title">{draft.name || "Add equipment"}</h2>
+          </div>
+          <button className="icon-btn" onClick={close} aria-label="Close equipment editor"><X size={18} /></button>
+        </div>
+        <div className="max-h-[76vh] space-y-4 overflow-auto p-3 sm:p-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <InputField label="Equipment name" value={draft.name} onChange={(value) => update("name", value)} />
+            <SelectField label="Workstream" value={draft.workstream} options={WORKSTREAMS.map((item) => item.name)} onChange={(value) => update("workstream", value)} />
+            <InputField label="Category" value={draft.category} onChange={(value) => update("category", value)} placeholder="Create or enter category" />
+            <SelectField label="Importance" value={draft.importance} options={["Essential", "Recommended"]} onChange={(value) => update("importance", value as EquipmentItem["importance"])} />
+            <InputField label="Suggested quantity" value={draft.suggestedQuantity} onChange={(value) => update("suggestedQuantity", value)} placeholder="10 units" />
+            <InputField label="Quantity range" value={draft.quantityRange} onChange={(value) => update("quantityRange", value)} placeholder="10-15 units" />
+          </div>
+          <TextAreaField label="Short description" value={draft.description} onChange={(value) => update("description", value)} />
+          <TextAreaField label="Vendor notes" value={draft.vendorNotes} onChange={(value) => update("vendorNotes", value)} />
+          <div className="rounded-lg border border-[var(--color-border)] p-3">
+            <p className="field-label">Suggested for</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {ZONES.map((area) => (
+                <label key={area} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm font-semibold text-[var(--color-text-muted)]">
+                  <input type="checkbox" checked={draft.suggestedFor.includes(area)} onChange={() => toggleSuggestedFor(area)} />
+                  {area}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="rounded-lg border border-[var(--color-border)] p-3">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="field-label">Recommended brand/model options</p>
+              <button className="btn-secondary justify-center" onClick={addRecommendation}><Plus size={16} /> Add Option</button>
+            </div>
+            <div className="space-y-3">
+              {draft.recommendations.map((rec) => (
+                <div key={rec.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <InputField label="Brand name" value={rec.brandName} onChange={(value) => updateRecommendation(rec.id, { brandName: value })} />
+                    <InputField label="Model name" value={rec.modelName} onChange={(value) => updateRecommendation(rec.id, { modelName: value })} />
+                    <InputField label="Average INR price" value={rec.averageInrPrice} onChange={(value) => updateRecommendation(rec.id, { averageInrPrice: value })} placeholder="₹12,000" />
+                    <InputField label="Price range" value={rec.priceRange} onChange={(value) => updateRecommendation(rec.id, { priceRange: value })} placeholder="₹10,000-₹15,000" />
+                  </div>
+                  <TextAreaField label="Vendor notes" value={rec.vendorNotes} onChange={(value) => updateRecommendation(rec.id, { vendorNotes: value })} />
+                  <div className="mt-3 grid gap-3 md:grid-cols-[8rem_1fr_auto] md:items-end">
+                    {rec.photoUrl ? <img src={rec.photoUrl} alt={`${rec.brandName} ${rec.modelName}`} className="h-28 w-full rounded-lg border border-[var(--color-border)] object-cover" /> : <div className="flex h-28 items-center justify-center rounded-lg border border-dashed border-[var(--color-border)] text-sm text-[var(--color-text-muted)]">No photo</div>}
+                    <label className="space-y-1">
+                      <span className="field-label">Photo</span>
+                      <input className="field" type="file" onChange={(event) => uploadPhoto(rec.id, event.target.files?.[0])} />
+                    </label>
+                    <button className="icon-btn text-[var(--color-important)] hover:bg-[#7A1F2B]/10" onClick={() => removeRecommendation(rec.id)} aria-label="Remove recommendation">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  {uploadingId === rec.id && <p className="mt-2 text-sm font-semibold text-[var(--color-primary)]">Uploading photo...</p>}
+                </div>
+              ))}
+              {!draft.recommendations.length && <p className="rounded-lg border border-dashed border-[var(--color-border)] p-3 text-sm text-[var(--color-text-muted)]">No recommendations added.</p>}
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 border-t border-[var(--color-border)] p-3 sm:flex-row sm:justify-end sm:p-4">
+          <button className="btn-secondary justify-center" onClick={close}>Cancel</button>
+          <button className="btn-primary justify-center" onClick={save}>Save Equipment</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DataModal({ dataset, onClose }: { dataset: ChartDataset; onClose: () => void }) {
   const summaryRows = dataset.rows.map((row) => ({ Label: row.label, Value: row.value, Percent: `${row.percent}%`, Status: row.status || "" }));
   const sourceRows = dataset.sourceRows;
@@ -2332,6 +2675,140 @@ function DocumentBadge({ status }: { status: TrackerTask["documentStatus"] }) {
 }
 
 const MASTER_FIELDS: SortKey[] = ["city", "workstream", "taskName", "zoneArea", "taskOwner", "status", "progress", "dueDate", "riskLevel", "taskWeight"];
+
+function blankEquipment(): EquipmentItem {
+  const now = new Date().toISOString();
+  return {
+    id: `equipment-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    name: "",
+    workstream: WORKSTREAMS[0]?.name || "",
+    category: "",
+    description: "",
+    suggestedFor: [],
+    suggestedQuantity: "",
+    quantityRange: "",
+    vendorNotes: "",
+    importance: "",
+    recommendations: [],
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+function blankEquipmentRecommendation(): EquipmentRecommendation {
+  return {
+    id: `rec-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    brandName: "",
+    modelName: "",
+    averageInrPrice: "",
+    priceRange: "",
+    photoUrl: "",
+    photoPath: "",
+    vendorNotes: ""
+  };
+}
+
+function normalizeEquipment(rows: EquipmentItem[]) {
+  return rows.map(normalizeEquipmentItem);
+}
+
+function normalizeEquipmentItem(item: Partial<EquipmentItem>): EquipmentItem {
+  const now = new Date().toISOString();
+  return {
+    id: item.id || `equipment-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    name: item.name || "",
+    workstream: item.workstream || "",
+    category: item.category || "",
+    description: item.description || "",
+    suggestedFor: Array.isArray(item.suggestedFor) ? item.suggestedFor : [],
+    suggestedQuantity: item.suggestedQuantity || "",
+    quantityRange: item.quantityRange || "",
+    vendorNotes: item.vendorNotes || "",
+    importance: item.importance || "",
+    recommendations: Array.isArray(item.recommendations) ? item.recommendations.map((rec) => ({
+      ...blankEquipmentRecommendation(),
+      ...rec,
+      id: rec.id || `rec-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    })) : [],
+    createdAt: item.createdAt || now,
+    updatedAt: item.updatedAt || now
+  };
+}
+
+function filterEquipment(rows: EquipmentItem[], search: string, workstream: string, category: string) {
+  const query = search.trim().toLowerCase();
+  return rows.filter((item) => {
+    const text = [
+      item.name,
+      item.workstream,
+      item.category,
+      item.description,
+      item.suggestedFor.join(" "),
+      item.vendorNotes,
+      item.importance,
+      ...item.recommendations.flatMap((rec) => [rec.brandName, rec.modelName, rec.averageInrPrice, rec.priceRange, rec.vendorNotes])
+    ].join(" ").toLowerCase();
+    return (!query || text.includes(query)) &&
+      (workstream === "All" || item.workstream === workstream) &&
+      (category === "All" || item.category === category);
+  });
+}
+
+function groupEquipment(rows: EquipmentItem[]) {
+  return rows.reduce<Record<string, Record<string, EquipmentItem[]>>>((acc, item) => {
+    const workstream = item.workstream || "Workstream pending";
+    const category = item.category || "Uncategorized";
+    acc[workstream] = acc[workstream] || {};
+    acc[workstream][category] = acc[workstream][category] || [];
+    acc[workstream][category].push(item);
+    return acc;
+  }, {});
+}
+
+function equipmentToRows(rows: EquipmentItem[]): Array<Record<string, string | number>> {
+  return rows.flatMap((item) => {
+    const recommendations = item.recommendations.length ? item.recommendations : [blankEquipmentRecommendation()];
+    return recommendations.map((rec) => ({
+      "Equipment Name": item.name,
+      Workstream: item.workstream,
+      Category: item.category,
+      Description: item.description,
+      "Suggested For": item.suggestedFor.join("; "),
+      "Suggested Quantity": item.suggestedQuantity,
+      "Quantity Range": item.quantityRange,
+      "Vendor Notes": item.vendorNotes,
+      Importance: item.importance,
+      "Brand Name": rec.brandName,
+      "Model Name": rec.modelName,
+      "Average INR Price": rec.averageInrPrice,
+      "Price Range": rec.priceRange,
+      "Recommendation Vendor Notes": rec.vendorNotes,
+      "Photo URL": rec.photoUrl
+    }));
+  });
+}
+
+function equipmentChangeEvents(oldItem: EquipmentItem | undefined, nextItem: EquipmentItem) {
+  if (!oldItem) return [];
+  const fields: Array<[string, string, string]> = [
+    ["Equipment name", oldItem.name, nextItem.name],
+    ["Workstream", oldItem.workstream, nextItem.workstream],
+    ["Category", oldItem.category, nextItem.category],
+    ["Description", oldItem.description, nextItem.description],
+    ["Suggested for", oldItem.suggestedFor.join(", "), nextItem.suggestedFor.join(", ")],
+    ["Suggested quantity", oldItem.suggestedQuantity, nextItem.suggestedQuantity],
+    ["Quantity range", oldItem.quantityRange, nextItem.quantityRange],
+    ["Vendor notes", oldItem.vendorNotes, nextItem.vendorNotes],
+    ["Importance", oldItem.importance, nextItem.importance]
+  ];
+  return fields
+    .filter(([, oldValue, newValue]) => oldValue !== newValue)
+    .map(([field, oldValue, newValue]) => createActivity("Equipment edited", nextItem.name || "Unnamed equipment", `${field}: ${oldValue || "-"} to ${newValue || "-"}`, {
+      changedField: field,
+      oldValue,
+      newValue
+    }));
+}
 
 function normalizeTasks(rows: TrackerTask[]) {
   return rows.map(normalizeTask);
@@ -3274,6 +3751,10 @@ function escapeCsv(value: string) {
 
 function slug(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "chart";
+}
+
+function safeFileName(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9.]+/g, "-").replace(/(^-|-$)/g, "") || `photo-${Date.now()}`;
 }
 
 function escapeHtml(value: string) {

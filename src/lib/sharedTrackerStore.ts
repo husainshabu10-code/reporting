@@ -21,13 +21,21 @@ export type SharedTrackerActivity = {
   user?: string;
 };
 
+export type SharedTrackerEquipment = {
+  id: string;
+  workstream?: string;
+  category?: string;
+  name?: string;
+  equipmentName?: string;
+};
+
 export type SharedTrackerState<Contact extends SharedTrackerContact, ActivityEntry extends SharedTrackerActivity> = {
   tasks: TrackerTask[];
   cities: string[];
   contacts: Contact[];
   activity: ActivityEntry[];
   chartConfig: SharedChartConfig;
-  equipment: Array<Record<string, unknown>>;
+  equipment: SharedTrackerEquipment[];
 };
 
 type PayloadRow<T> = {
@@ -74,7 +82,7 @@ export async function loadSharedTrackerState<Contact extends SharedTrackerContac
     loadPayloadTable<Contact>(db, "ashara_contacts", "city", true),
     loadPayloadTable<ActivityEntry>(db, "ashara_activity", "occurred_at", false, 500),
     loadSinglePayload<SharedChartConfig>(db, "ashara_chart_configs", CHART_CONFIG_ID),
-    loadPayloadTable<Record<string, unknown>>(db, "ashara_equipment", "updated_at", false)
+    loadPayloadTable<SharedTrackerEquipment>(db, "ashara_equipment", "updated_at", false)
   ]);
 
   return {
@@ -94,6 +102,7 @@ export async function seedSharedTrackerState<Contact extends SharedTrackerContac
     upsertSharedCities(state.cities),
     upsertSharedContacts(state.contacts),
     upsertSharedActivity(state.activity),
+    upsertSharedEquipment(state.equipment),
     saveSharedChartConfig(state.chartConfig)
   ]);
 }
@@ -145,6 +154,45 @@ export async function deleteSharedContact(contactId: string) {
   if (!db) throw new Error("Shared database is not configured.");
   const { error } = await db.from("ashara_contacts").delete().eq("id", contactId);
   if (error) throw error;
+}
+
+export async function upsertSharedEquipment<Equipment extends SharedTrackerEquipment>(equipment: Equipment[]) {
+  if (!equipment.length) return;
+  if (await trackerApiMutation({ action: "upsertEquipment", equipment })) return;
+  const db = supabase();
+  if (!db) throw new Error("Shared database is not configured.");
+  const { error } = await db.from("ashara_equipment").upsert(
+    equipment.map((item) => ({
+      id: String(item.id || `equipment-${Date.now()}`),
+      workstream: String(item.workstream || ""),
+      category: String(item.category || ""),
+      equipment_name: String(item.name || item.equipmentName || ""),
+      data: item,
+      updated_at: new Date().toISOString()
+    })),
+    { onConflict: "id" }
+  );
+  if (error) throw error;
+}
+
+export async function deleteSharedEquipment(equipmentId: string) {
+  if (await trackerApiMutation({ action: "deleteEquipment", equipmentId })) return;
+  const db = supabase();
+  if (!db) throw new Error("Shared database is not configured.");
+  const { error } = await db.from("ashara_equipment").delete().eq("id", equipmentId);
+  if (error) throw error;
+}
+
+export async function uploadEquipmentPhoto(file: File, path: string) {
+  const db = supabase();
+  if (!db) throw new Error("Shared database is not configured.");
+  const { error } = await db.storage.from("equipment-photos").upload(path, file, {
+    cacheControl: "3600",
+    upsert: true
+  });
+  if (error) throw error;
+  const { data } = db.storage.from("equipment-photos").getPublicUrl(path);
+  return data.publicUrl;
 }
 
 export async function upsertSharedCities(cities: string[]) {
