@@ -58,7 +58,7 @@ SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
 
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` also works as a fallback.
 
-The service role key is required only on the server for admin-created users, password resets, approvals, and forced password changes. Never expose it in frontend code.
+The service role key is required only on the server for admin-created users, Super Admin password resets, approvals, and forced password changes. Never expose it in frontend code.
 
 In Supabase Auth settings, disable email confirmation so admin-created password users can sign in without receiving any email. Do not configure SMTP for this app.
 
@@ -68,3 +68,4 @@ In Supabase Auth settings, disable email confirmation so admin-created password 
 - City is not part of the Phase 1 or Phase 2 workflow. The database keeps a nullable `city` column on `areas` so it can be added later without rebuilding.
 - Excel import needs the `xlsx` package. It reads the `Day Plan` sheet when present and imports only the active template fields. Dependencies and risk are stored only as hidden reference.
 - User onboarding is no-email: Admin or Area Admin creates credentials, copies the temporary password once, and the user must change that password on first login.
+- After first-login setup, passwords can be changed only by the signed-in user from Profile / Access or reset by Super Admin. A Super Admin reset sets the new password directly and does not force another change on next login.

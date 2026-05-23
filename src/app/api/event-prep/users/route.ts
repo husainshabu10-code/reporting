@@ -84,16 +84,16 @@ async function approveUser(db: ServerDb, actor: Profile & { authUserId?: string 
 }
 
 async function resetPassword(db: ServerDb, actor: Profile & { authUserId?: string }, profileId: string) {
-  if (!["super_admin", "admin"].includes(actor.role)) throw new Error("Only Admin can reset passwords.");
+  if (actor.role !== "super_admin") throw new Error("Only Super Admin can reset passwords.");
   const target = await getProfile(db, profileId);
   if (!target) throw new Error("Profile not found.");
   const temporaryPassword = generateTemporaryPassword();
   const authUserId = await resolveAuthUserId(db, target);
   const { error } = await db.auth.admin.updateUserById(authUserId, { password: temporaryPassword });
   if (error) throw new Error(error.message);
-  const profile = { ...target, mustChangePassword: true };
+  const profile = { ...target, mustChangePassword: false };
   await upsertProfile(db, profile);
-  await createInAppNotification(db, profile.id, undefined, "Access request approved/rejected", "Password reset", "An admin generated a new temporary password for your account.");
+  await createInAppNotification(db, profile.id, undefined, "Access request approved/rejected", "Password reset", "Super Admin reset your password.");
   return { profile, temporaryPassword };
 }
 
@@ -101,7 +101,8 @@ async function changePassword(db: ServerDb, actor: Profile & { authUserId?: stri
   if (!password || password.length < 8) throw new Error("Password must be at least 8 characters.");
   const { error } = await db.auth.admin.updateUserById(actor.authUserId || actor.id, { password });
   if (error) throw new Error(error.message);
-  const profile = { ...actor, mustChangePassword: false };
+  const { authUserId, ...actorProfile } = actor;
+  const profile = { ...actorProfile, mustChangePassword: false };
   await upsertProfile(db, profile);
   return { profile };
 }

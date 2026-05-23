@@ -328,7 +328,7 @@ export default function EventPrepDashboard() {
             {activeTab === "Users & Access" ? <UsersAccessTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
             {activeTab === "Daily Report" ? <DailyReportTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
             {activeTab === "My Area" ? <MyAreaTab state={state} currentProfile={currentProfile} /> : null}
-            {activeTab === "Profile / Access" ? <ProfileTab state={state} currentProfile={currentProfile} /> : null}
+            {activeTab === "Profile / Access" ? <ProfileTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
             {["Forms", "Global Fields", "Reports", "Activity Log"].includes(activeTab) ? <FoundationTab state={state} tab={activeTab} currentProfile={currentProfile} updateState={updateState} /> : null}
           </div>
         </section>
@@ -1442,14 +1442,14 @@ function UsersAccessTab({ state, currentProfile, updateState }: { state: EventPr
   const resetPassword = async (profile: Profile) => {
     try {
       setAccessMessage("Resetting password...");
-      const result = isEventPrepSupabaseConfigured() ? await resetCredentialPassword(profile.id) : { profile: { ...profile, mustChangePassword: true }, temporaryPassword: generateTemporaryPassword() };
+      const result = isEventPrepSupabaseConfigured() ? await resetCredentialPassword(profile.id) : { profile: { ...profile, mustChangePassword: false }, temporaryPassword: generateTemporaryPassword() };
       updateState((current) => withActivity({
         ...current,
         profiles: current.profiles.map((item) => (item.id === profile.id ? result.profile : item)),
-        notifications: [createInAppNotification(profile.id, "Access request approved/rejected", "Password reset", "An admin generated a new temporary password. Change it on next login.", {}), ...current.notifications]
+        notifications: [createInAppNotification(profile.id, "Access request approved/rejected", "Password reset", "Super Admin reset your password.", {}), ...current.notifications]
       }, currentProfile, "Access changes", `Reset password for ${profile.fullName}`, "profile", profile.id, { passwordReset: true }));
       setTemporaryPassword(result.temporaryPassword);
-      setAccessMessage("Temporary password generated. It is shown below once.");
+      setAccessMessage("Password reset. The new password is shown below once.");
     } catch (error) {
       setAccessMessage(readError(error, "Unable to reset password."));
     }
@@ -1481,8 +1481,8 @@ function UsersAccessTab({ state, currentProfile, updateState }: { state: EventPr
             state.areaAccess.filter((access) => access.profileId === profile.id).map((access) => areaName(state, access.areaId)).join(", ") || "All / not restricted",
             <div key="actions" className="flex flex-col gap-2">
               {profile.status === "pending_approval" && canApprove(profile) ? <button className="btn-compact" onClick={() => approve(profile)}>Approve</button> : null}
-              {isAdmin ? <button className="btn-compact" onClick={() => resetPassword(profile)}>Reset Password</button> : null}
-              {profile.status !== "pending_approval" && !isAdmin ? "-" : null}
+              {currentProfile.role === "super_admin" ? <button className="btn-compact" onClick={() => resetPassword(profile)}>Reset Password</button> : null}
+              {profile.status !== "pending_approval" && currentProfile.role !== "super_admin" ? "-" : null}
             </div>
           ])}
         />
@@ -1508,17 +1508,47 @@ function MyAreaTab({ state, currentProfile }: { state: EventPrepState; currentPr
   );
 }
 
-function ProfileTab({ state, currentProfile }: { state: EventPrepState; currentProfile: Profile }) {
+function ProfileTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [message, setMessage] = useState("");
+  const submit = async () => {
+    try {
+      if (password !== confirm) throw new Error("Passwords do not match.");
+      setMessage("Changing password...");
+      const result = isEventPrepSupabaseConfigured() ? await changeCurrentPassword(password) : { profile: { ...currentProfile, mustChangePassword: false } };
+      updateState((current) => ({
+        ...current,
+        profiles: current.profiles.map((profile) => (profile.id === currentProfile.id ? result.profile : profile))
+      }));
+      setPassword("");
+      setConfirm("");
+      setMessage("Password changed.");
+    } catch (error) {
+      setMessage(readError(error, "Unable to change password."));
+    }
+  };
   return (
-    <Panel title="Profile / Access">
-      <div className="grid gap-3 sm:grid-cols-2">
-        <MiniStat label="Name" value={currentProfile.fullName} />
-        <MiniStat label="Login ID" value={currentProfile.email} />
-        <MiniStat label="Role" value={roleLabel(currentProfile.role)} />
-        <MiniStat label="Status" value={currentProfile.status.replace("_", " ")} />
-      </div>
-      <p className="mt-4 text-sm text-[var(--color-text-muted)]">Authorized areas: {getAllowedAreas(state, currentProfile).map((area) => area.name).join(", ") || "All areas for admin roles"}</p>
-    </Panel>
+    <div className="space-y-4">
+      <Panel title="Profile / Access">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <MiniStat label="Name" value={currentProfile.fullName} />
+          <MiniStat label="Login ID" value={currentProfile.email} />
+          <MiniStat label="Role" value={roleLabel(currentProfile.role)} />
+          <MiniStat label="Status" value={currentProfile.status.replace("_", " ")} />
+        </div>
+        <p className="mt-4 text-sm text-[var(--color-text-muted)]">Authorized areas: {getAllowedAreas(state, currentProfile).map((area) => area.name).join(", ") || "All areas for admin roles"}</p>
+      </Panel>
+      <Panel title="Change My Password">
+        <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+          <Input label="New password" value={password} onChange={setPassword} type="password" />
+          <Input label="Confirm password" value={confirm} onChange={setConfirm} type="password" />
+          <button className="btn-primary" onClick={submit}>Change Password</button>
+        </div>
+        <p className="mt-3 text-xs text-[var(--color-text-muted)]">After credentials are created, only you or the Super Admin can change this password.</p>
+        {message ? <p className="mt-3 text-sm font-bold text-[var(--color-primary)]">{message}</p> : null}
+      </Panel>
+    </div>
   );
 }
 
