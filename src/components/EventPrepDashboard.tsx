@@ -79,7 +79,7 @@ type AdminTab =
   | "Activity Log";
 type UserTab = "Daily Report" | "My Area" | "Requests" | "Profile / Access";
 type AnyTab = AdminTab | UserTab;
-type TaskView = "today" | "pending" | "issue" | "correction" | "all";
+type TaskView = "all" | "today" | "pending" | "issue" | "correction" | "overdue";
 type ToastTone = "success" | "info" | "warning" | "error";
 type ToastMessage = { id: string; title: string; message?: string; tone: ToastTone };
 type ShowToast = (title: string, message?: string, tone?: ToastTone) => void;
@@ -404,9 +404,8 @@ function DashboardTab({ state }: { state: EventPrepState; currentProfile: Profil
         </Panel>
         <Panel title="Workstream Progress">
           <div className="space-y-3">
-            {unique(state.taskTemplates.map((template) => template.workstream)).map((workstream) => {
-              const templateIds = state.taskTemplates.filter((template) => template.workstream === workstream).map((template) => template.id);
-              const tasks = state.liveTasks.filter((task) => templateIds.includes(task.templateId) && task.active && !task.notApplicable);
+            {unique(state.liveTasks.map((task) => taskDetails(state, task).workstream)).map((workstream) => {
+              const tasks = state.liveTasks.filter((task) => taskDetails(state, task).workstream === workstream && task.active && !task.notApplicable);
               const latest = latestUpdateMap(state.taskUpdates);
               const verified = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
               return <ProgressRow key={workstream} label={workstream} value={percent(verified, tasks.length)} helper={`${tasks.length} live tasks`} />;
@@ -648,10 +647,25 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
   const [taskType, setTaskType] = useState<(typeof TASK_TYPES)[number]>("Simple Task");
   const [requiredQuantity, setRequiredQuantity] = useState("1");
   const [unit, setUnit] = useState("Item");
+  const [selectedTaskId, setSelectedTaskId] = useState("");
+  const [customTitle, setCustomTitle] = useState("");
+  const [customWorkstream, setCustomWorkstream] = useState("General");
+  const [customResponsibleTeam, setCustomResponsibleTeam] = useState("");
+  const [customExpectedOutput, setCustomExpectedOutput] = useState("");
+  const [customRequiredEquipment, setCustomRequiredEquipment] = useState("");
+  const [customPrepDay, setCustomPrepDay] = useState("1");
+  const [customStartDate, setCustomStartDate] = useState(state.settings.preparationStartDate);
+  const [customDueDate, setCustomDueDate] = useState(state.settings.preparationStartDate);
+  const [customPriority, setCustomPriority] = useState<(typeof PRIORITY_OPTIONS)[number]>("Medium");
+  const [customTaskType, setCustomTaskType] = useState<(typeof TASK_TYPES)[number]>("Simple Task");
+  const [customQuantity, setCustomQuantity] = useState("1");
+  const [customUnit, setCustomUnit] = useState("Item");
   const unitOptions = activeOptions(state, "Units", UNIT_OPTIONS);
   const priorityOptions = activeOptions(state, "Priority options", PRIORITY_OPTIONS);
+  const referenceTemplates = state.taskTemplates.filter((template) => template.source !== "custom");
+  const selectedTask = state.liveTasks.find((task) => task.id === selectedTaskId);
 
-  const filteredTemplates = state.taskTemplates.filter((template) => {
+  const filteredTemplates = referenceTemplates.filter((template) => {
     const matchesDay = dayFilter === "All" || String(template.day) === dayFilter;
     const matchesWorkstream = workstreamFilter === "All" || template.workstream === workstreamFilter;
     return matchesDay && matchesWorkstream;
@@ -699,6 +713,37 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
     );
   };
 
+  const addCustomTask = () => {
+    if (!applyAreaId || !customTitle.trim()) {
+      showToast("Task title required", "Choose an area and enter a custom task title.", "warning");
+      return;
+    }
+    const prepDay = Math.min(20, Math.max(1, Number(customPrepDay || 1)));
+    const template = createCustomTaskTemplate({
+      title: customTitle,
+      workstream: customWorkstream,
+      responsibleTeam: customResponsibleTeam,
+      expectedOutput: customExpectedOutput,
+      requiredEquipment: customRequiredEquipment,
+      prepDay,
+      priority: customPriority
+    });
+    updateState((current) => {
+      const liveTask = createLiveTask(template, applyAreaId, customTaskType, Number(customQuantity || 0), customUnit, current, current.settings.preparationStartDate);
+      if (!liveTask) return current;
+      const nextTask = { ...liveTask, startDate: customStartDate || liveTask.startDate, dueDate: customDueDate || liveTask.dueDate };
+      return withActivity({
+        ...current,
+        taskTemplates: [template, ...current.taskTemplates],
+        liveTasks: [nextTask, ...current.liveTasks]
+      }, currentProfile, "Template changes", `Added custom task ${template.taskDetails}`, "live_task", nextTask.id, { custom: true });
+    });
+    setCustomTitle("");
+    setCustomExpectedOutput("");
+    setCustomRequiredEquipment("");
+    showToast("Custom task added", `${template.taskDetails} was added to ${areaName(state, applyAreaId)}.`);
+  };
+
   const updateLiveTask = (taskId: string, patch: Partial<LiveTask>) => {
     updateState((current) => ({
       ...current,
@@ -725,21 +770,44 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
         {importMessage ? <p className="mt-3 rounded-lg bg-[var(--color-accent-light)] p-3 text-sm font-bold text-[var(--color-primary)]">{importMessage}</p> : null}
       </Panel>
 
-      <Panel title="Apply Templates To Area" action={<Badge>{selectedIds.length} selected</Badge>}>
+      <Panel title="Add Custom Live Task" action={<Badge>No template required</Badge>}>
+        <div className="grid gap-3 lg:grid-cols-4">
+          <Select label="Area" value={applyAreaId} onChange={setApplyAreaId} options={state.areas.map((area) => ({ label: area.name, value: area.id }))} />
+          <Input label="Task title" value={customTitle} onChange={setCustomTitle} placeholder="Install backup router" />
+          <Input label="Workstream" value={customWorkstream} onChange={setCustomWorkstream} placeholder="Network" />
+          <Select label="Task Type" value={customTaskType} onChange={(value) => setCustomTaskType(value as typeof customTaskType)} options={[...TASK_TYPES]} />
+          <Input label="Prep Day" value={customPrepDay} onChange={setCustomPrepDay} type="number" />
+          <Input label="Start date" value={customStartDate} onChange={setCustomStartDate} type="date" />
+          <Input label="Due date" value={customDueDate} onChange={setCustomDueDate} type="date" />
+          <Select label="Priority" value={customPriority} onChange={(value) => setCustomPriority(value as typeof customPriority)} options={priorityOptions} />
+          {customTaskType === "Quantity-Based Task" ? <Input label="Required quantity" value={customQuantity} onChange={setCustomQuantity} type="number" /> : null}
+          {customTaskType === "Quantity-Based Task" ? <Select label="Unit" value={customUnit} onChange={setCustomUnit} options={unitOptions} /> : null}
+        </div>
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
+          <Input label="Responsible team" value={customResponsibleTeam} onChange={setCustomResponsibleTeam} placeholder="Local IT Team" />
+          <Input label="Expected output" value={customExpectedOutput} onChange={setCustomExpectedOutput} placeholder="Task completion criteria" />
+          <Input label="Required equipment" value={customRequiredEquipment} onChange={setCustomRequiredEquipment} placeholder="Routers, cables, tools" />
+        </div>
+        <button className="btn-primary mt-3" onClick={addCustomTask}>
+          <Plus size={17} /> Add Custom Task
+        </button>
+      </Panel>
+
+      <Panel title="Apply Reference Templates To Area" action={<Badge>{selectedIds.length} selected</Badge>}>
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-          <Select label="Day" value={dayFilter} onChange={setDayFilter} options={["All", ...unique(state.taskTemplates.map((template) => String(template.day)))]} />
-          <Select label="Workstream" value={workstreamFilter} onChange={setWorkstreamFilter} options={["All", ...unique(state.taskTemplates.map((template) => template.workstream))]} />
+          <Select label="Day" value={dayFilter} onChange={setDayFilter} options={["All", ...unique(referenceTemplates.map((template) => String(template.day)))]} />
+          <Select label="Workstream" value={workstreamFilter} onChange={setWorkstreamFilter} options={["All", ...unique(referenceTemplates.map((template) => template.workstream))]} />
           <Select label="Area" value={applyAreaId} onChange={setApplyAreaId} options={state.areas.map((area) => ({ label: area.name, value: area.id }))} />
           <Select label="Task Type" value={taskType} onChange={(value) => setTaskType(value as typeof taskType)} options={[...TASK_TYPES]} />
           <Input label="Required Qty" value={requiredQuantity} onChange={setRequiredQuantity} type="number" />
           <Select label="Unit" value={unit} onChange={setUnit} options={unitOptions} />
         </div>
         <button className="btn-primary mt-3" onClick={applyTemplates}>
-          <Plus size={17} /> Apply Selected Templates
+          <Plus size={17} /> Apply Selected Reference Templates
         </button>
       </Panel>
 
-      <Panel title="Task Templates">
+      <Panel title="Reference Task Templates" action={<Badge>Optional reference only</Badge>}>
         <div className="grid gap-3">
           {filteredTemplates.map((template) => (
             <label key={template.id} className="flex gap-3 rounded-lg border border-[var(--color-border)] bg-white p-3">
@@ -763,16 +831,19 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
 
       <Panel title="Live Tasks Area Configuration" action={<Badge>{state.liveTasks.length} live tasks</Badge>}>
         <ResponsiveTable
-          headers={["Area", "Task", "Type", "Qty", "Unit", "Start", "Due", "Priority", "Verifier", "Rule", "Active"]}
+          headers={["Area", "Task", "Type", "Qty", "Unit", "Start", "Due", "Priority", "Verifier", "Rule", "Active", "Details"]}
           rows={state.liveTasks.map((task) => {
-            const template = state.taskTemplates.find((item) => item.id === task.templateId);
+            const details = taskDetails(state, task);
             const areaVerifierOptions = state.areaAccess
               .filter((access) => access.areaId === task.areaId && access.role === "verifier")
               .map((access) => state.profiles.find((profile) => profile.id === access.profileId))
               .filter(Boolean) as Profile[];
             return [
               areaName(state, task.areaId),
-              template?.taskDetails || "Task",
+              <button key="task" className="block max-w-72 text-left hover:underline" onClick={() => setSelectedTaskId(task.id)}>
+                <span className="block font-black text-[var(--color-primary)]">{details.taskDetails}</span>
+                <span className="mt-1 block text-xs font-bold text-[var(--color-text-muted)]">{[details.workstream, details.expectedOutput].filter(Boolean).join(" / ") || "Open to edit details"}</span>
+              </button>,
               <select key="type" className="field" value={task.taskType} onChange={(event) => updateLiveTask(task.id, { taskType: event.target.value as LiveTask["taskType"] })}>
                 {TASK_TYPES.map((type) => <option key={type}>{type}</option>)}
               </select>,
@@ -803,11 +874,158 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
                 <option value="all_verifiers">All verifiers required</option>
                 <option value="sequential">Sequential</option>
               </select>,
-              <input key="active" type="checkbox" checked={task.active} onChange={(event) => updateLiveTask(task.id, { active: event.target.checked })} />
+              <input key="active" type="checkbox" checked={task.active} onChange={(event) => updateLiveTask(task.id, { active: event.target.checked })} />,
+              <button key="open" className="btn-compact" onClick={() => setSelectedTaskId(task.id)}>Open</button>
             ];
           })}
         />
       </Panel>
+      {selectedTask ? <LiveTaskEditorModal state={state} task={selectedTask} updateState={updateState} close={() => setSelectedTaskId("")} showToast={showToast} /> : null}
+    </div>
+  );
+}
+
+function LiveTaskEditorModal({
+  state,
+  task,
+  updateState,
+  close,
+  showToast
+}: {
+  state: EventPrepState;
+  task: LiveTask;
+  updateState: (updater: (current: EventPrepState) => EventPrepState) => void;
+  close: () => void;
+  showToast: ShowToast;
+}) {
+  const details = taskDetails(state, task);
+  const priorityOptions = activeOptions(state, "Priority options", PRIORITY_OPTIONS);
+  const unitOptions = activeOptions(state, "Units", UNIT_OPTIONS);
+  const areaUsers = state.areaAccess
+    .filter((access) => access.areaId === task.areaId && access.role === "report_user")
+    .map((access) => state.profiles.find((profile) => profile.id === access.profileId))
+    .filter(Boolean) as Profile[];
+  const areaVerifiers = state.areaAccess
+    .filter((access) => access.areaId === task.areaId && access.role === "verifier")
+    .map((access) => state.profiles.find((profile) => profile.id === access.profileId))
+    .filter(Boolean) as Profile[];
+
+  const updateTask = (patch: Partial<LiveTask>) => {
+    updateState((current) => ({
+      ...current,
+      liveTasks: current.liveTasks.map((item) => (item.id === task.id ? { ...item, ...patch } : item))
+    }));
+  };
+  const toggleProfile = (field: "assignedProfileIds" | "assignedVerifierIds", profileId: string, checked: boolean) => {
+    const current = task[field];
+    updateTask({ [field]: checked ? unique([...current, profileId]) : current.filter((idValue) => idValue !== profileId) } as Partial<LiveTask>);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/30 p-3 sm:items-center">
+      <section className="motion-modal max-h-[92vh] w-full max-w-5xl overflow-auto rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-2xl">
+        <div className="flex flex-col gap-3 border-b border-[var(--color-border)] pb-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase text-[var(--color-accent)]">Live Task Details</p>
+            <h2 className="mt-1 text-xl font-black text-[var(--color-primary)]">{details.taskDetails}</h2>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">{areaName(state, task.areaId)} / Day {task.prepDay} / {task.taskType}</p>
+          </div>
+          <button className="btn-secondary" onClick={() => {
+            showToast("Task details saved", "The live task details are updated.");
+            close();
+          }}>Done</button>
+        </div>
+
+        <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-4">
+            <Panel title="Task Description">
+              <div className="grid gap-3">
+                <Input label="Task title" value={details.taskDetails} onChange={(value) => updateTask({ taskDetails: value })} />
+                <Input label="Main objective" value={details.mainObjective} onChange={(value) => updateTask({ mainObjective: value })} />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Input label="Workstream" value={details.workstream} onChange={(value) => updateTask({ workstream: value })} />
+                  <Input label="Responsible team" value={details.responsibleTeam} onChange={(value) => updateTask({ responsibleTeam: value })} />
+                  <Input label="Required equipment" value={details.requiredEquipment} onChange={(value) => updateTask({ requiredEquipment: value })} />
+                  <Input label="Testing required" value={details.testingRequired} onChange={(value) => updateTask({ testingRequired: value })} />
+                </div>
+                <label className="block">
+                  <span className="field-label">Expected output</span>
+                  <textarea className="field mt-2 min-h-20" value={details.expectedOutput} onChange={(event) => updateTask({ expectedOutput: event.target.value })} />
+                </label>
+                <label className="block">
+                  <span className="field-label">Local follow-up questions</span>
+                  <textarea className="field mt-2 min-h-20" value={details.followUpQuestions} onChange={(event) => updateTask({ followUpQuestions: event.target.value })} />
+                </label>
+              </div>
+            </Panel>
+
+            <Panel title="Assignments">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <p className="field-label">Report users</p>
+                  <div className="mt-2 grid gap-2">
+                    {areaUsers.map((profile) => (
+                      <label key={profile.id} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-2 text-sm font-bold text-[var(--color-primary)]">
+                        <input type="checkbox" checked={task.assignedProfileIds.includes(profile.id)} onChange={(event) => toggleProfile("assignedProfileIds", profile.id, event.target.checked)} />
+                        {profile.fullName}
+                      </label>
+                    ))}
+                    {!areaUsers.length ? <p className="text-sm text-[var(--color-text-muted)]">No report users assigned to this area yet.</p> : null}
+                  </div>
+                </div>
+                <div>
+                  <p className="field-label">Verifiers</p>
+                  <div className="mt-2 grid gap-2">
+                    {areaVerifiers.map((profile) => (
+                      <label key={profile.id} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-2 text-sm font-bold text-[var(--color-primary)]">
+                        <input type="checkbox" checked={task.assignedVerifierIds.includes(profile.id)} onChange={(event) => toggleProfile("assignedVerifierIds", profile.id, event.target.checked)} />
+                        {profile.fullName}
+                      </label>
+                    ))}
+                    {!areaVerifiers.length ? <p className="text-sm text-[var(--color-text-muted)]">No verifiers assigned to this area yet.</p> : null}
+                  </div>
+                </div>
+              </div>
+            </Panel>
+          </div>
+
+          <div className="space-y-4">
+            <Panel title="Live Settings">
+              <div className="grid gap-3">
+                <Select label="Area" value={task.areaId} onChange={(value) => updateTask({ areaId: value })} options={state.areas.map((area) => ({ label: area.name, value: area.id }))} />
+                <Select label="Task type" value={task.taskType} onChange={(value) => updateTask({ taskType: value as LiveTask["taskType"] })} options={[...TASK_TYPES]} />
+                <Input label="Prep day" value={String(task.prepDay)} onChange={(value) => {
+                  const prepDay = Math.min(20, Math.max(1, Number(value || 1)));
+                  updateTask({ prepDay });
+                }} type="number" />
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Input label="Start date" value={task.startDate} onChange={(value) => updateTask({ startDate: value })} type="date" />
+                  <Input label="Due date" value={task.dueDate} onChange={(value) => updateTask({ dueDate: value })} type="date" />
+                </div>
+                <Select label="Priority" value={task.priority} onChange={(value) => {
+                  updateTask({ priority: value as LiveTask["priority"] });
+                }} options={priorityOptions} />
+                {task.taskType === "Quantity-Based Task" ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Input label="Required quantity" value={String(task.requiredQuantity || "")} onChange={(value) => updateTask({ requiredQuantity: Number(value || 0) })} type="number" />
+                    <Select label="Unit" value={task.unit || "Item"} onChange={(value) => updateTask({ unit: value })} options={unitOptions} />
+                  </div>
+                ) : null}
+                <Input label="Evidence note" value={task.evidenceNote || ""} onChange={(value) => updateTask({ evidenceNote: value })} />
+                <Select label="Verification rule" value={task.verificationRule} onChange={(value) => updateTask({ verificationRule: value as LiveTask["verificationRule"] })} options={[{ label: "One verifier enough", value: "one_verifier" }, { label: "All verifiers required", value: "all_verifiers" }, { label: "Sequential", value: "sequential" }]} />
+                <label className="flex items-center gap-2 text-sm font-bold text-[var(--color-primary)]">
+                  <input type="checkbox" checked={task.verificationRequired} onChange={(event) => updateTask({ verificationRequired: event.target.checked })} />
+                  Verification required
+                </label>
+                <label className="flex items-center gap-2 text-sm font-bold text-[var(--color-primary)]">
+                  <input type="checkbox" checked={task.active} onChange={(event) => updateTask({ active: event.target.checked })} />
+                  Active
+                </label>
+              </div>
+            </Panel>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
@@ -915,7 +1133,12 @@ function ZonesAreasTab({ state, updateState, showToast }: { state: EventPrepStat
 function DailyReportTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const allowedAreas = getAllowedAreas(state, currentProfile);
   const [areaId, setAreaId] = useState(allowedAreas[0]?.id || "");
-  const [taskView, setTaskView] = useState<TaskView>("today");
+  const [taskView, setTaskView] = useState<TaskView>("all");
+  const [dayFilter, setDayFilter] = useState("All");
+  const [workstreamFilter, setWorkstreamFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [verificationFilter, setVerificationFilter] = useState("All");
+  const [priorityFilter, setPriorityFilter] = useState("All");
   const [generalRemark, setGeneralRemark] = useState("");
   const [missingIds, setMissingIds] = useState<string[]>([]);
   const currentDay = prepDayForDate(state.settings.preparationStartDate, todayIso());
@@ -928,13 +1151,21 @@ function DailyReportTab({ state, currentProfile, updateState, showToast }: { sta
     .filter((task) => task.assignedProfileIds.includes(currentProfile.id) || currentProfile.role !== "report_user");
   const corrections = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Rejected / Needs Correction");
   const visibleTasks = tasks.filter((task) => {
+    const details = taskDetails(state, task);
     const update = latest.get(task.id);
     if (taskView === "today") return task.prepDay === currentDay;
     if (taskView === "pending") return !update || ["Pending", "In Progress"].includes(update.status);
     if (taskView === "issue") return update?.status === "Issue Found";
     if (taskView === "correction") return update?.verificationStatus === "Rejected / Needs Correction";
-    return true;
+    if (taskView === "overdue") return new Date(`${task.dueDate}T00:00:00`) < new Date(`${todayIso()}T00:00:00`) && update?.verificationStatus !== "Verified Completed";
+    const matchesDay = dayFilter === "All" || String(task.prepDay) === dayFilter;
+    const matchesWorkstream = workstreamFilter === "All" || details.workstream === workstreamFilter;
+    const matchesStatus = statusFilter === "All" || (update?.status || "Pending") === statusFilter;
+    const matchesVerification = verificationFilter === "All" || (update?.verificationStatus || "Not Submitted") === verificationFilter;
+    const matchesPriority = priorityFilter === "All" || task.priority === priorityFilter;
+    return matchesDay && matchesWorkstream && matchesStatus && matchesVerification && matchesPriority;
   });
+  const workstreamOptions = unique(tasks.map((task) => taskDetails(state, task).workstream));
 
   useEffect(() => {
     setAreaId((current) => current || allowedAreas[0]?.id || "");
@@ -982,8 +1213,17 @@ function DailyReportTab({ state, currentProfile, updateState, showToast }: { sta
           <Select label="Zone Type" value={zone} onChange={() => undefined} options={ZONE_TYPES.map((name) => String(name))} disabled />
           <Select label="Area / Zone" value={areaId} onChange={setAreaId} options={allowedAreas.map((item) => ({ label: item.name, value: item.id }))} />
           <Input label="Current date" value={todayIso()} onChange={() => undefined} disabled />
-          <Select label="Task view" value={taskView} onChange={(value) => setTaskView(value as TaskView)} options={[{ label: "Today's assigned tasks", value: "today" }, { label: "All Pending Tasks", value: "pending" }, { label: "Issue Found Tasks", value: "issue" }, { label: "Needs Correction Tasks", value: "correction" }, { label: "All Tasks", value: "all" }]} />
+          <Select label="Task view" value={taskView} onChange={(value) => setTaskView(value as TaskView)} options={[{ label: "All Tasks", value: "all" }, { label: "Today's assigned tasks", value: "today" }, { label: "All Pending Tasks", value: "pending" }, { label: "Issue Found Tasks", value: "issue" }, { label: "Needs Correction Tasks", value: "correction" }, { label: "Overdue Tasks", value: "overdue" }]} />
         </div>
+        {taskView === "all" ? (
+          <div className="mt-3 grid gap-3 lg:grid-cols-5">
+            <Select label="Day" value={dayFilter} onChange={setDayFilter} options={["All", ...unique(tasks.map((task) => String(task.prepDay)))]} />
+            <Select label="Workstream" value={workstreamFilter} onChange={setWorkstreamFilter} options={["All", ...workstreamOptions]} />
+            <Select label="Task Status" value={statusFilter} onChange={setStatusFilter} options={["All", ...USER_TASK_STATUSES]} />
+            <Select label="Verification" value={verificationFilter} onChange={setVerificationFilter} options={["All", ...VERIFICATION_STATUSES]} />
+            <Select label="Priority" value={priorityFilter} onChange={setPriorityFilter} options={["All", ...PRIORITY_OPTIONS]} />
+          </div>
+        ) : null}
         <label className="mt-3 block">
           <span className="field-label">General area-level daily remark</span>
           <textarea className="field mt-2 min-h-24" value={generalRemark} onChange={(event) => setGeneralRemark(event.target.value)} placeholder="Today cabling team visited the site. ISP vendor confirmation is pending." />
@@ -1051,7 +1291,7 @@ function TaskCard({
   missing: boolean;
   showToast: ShowToast;
 }) {
-  const template = state.taskTemplates.find((item) => item.id === task.templateId);
+  const details = taskDetails(state, task);
   const existing = state.taskUpdates.find((update) => update.liveTaskId === task.id && update.dailyReportId === report.id);
   const latest = latestUpdateMap(state.taskUpdates).get(task.id);
   const [draft, setDraft] = useState<TaskUpdate>(() => existing || createTaskUpdate(task, report, currentProfile.id, latest));
@@ -1077,9 +1317,9 @@ function TaskCard({
       const without = current.taskUpdates.filter((update) => update.id !== next.id);
       const nextReport = current.dailyReports.some((item) => item.id === report.id) ? current.dailyReports : [report, ...current.dailyReports];
       const verifierNotifications = next.verificationStatus === "Needs Verification"
-        ? task.assignedVerifierIds.map((verifierId) => createInAppNotification(verifierId, "Task needs verification", "Task needs verification", template?.taskDetails || "A task is ready for verification.", { areaId: task.areaId, relatedTaskId: task.id, relatedDailyReportId: report.id }))
+        ? task.assignedVerifierIds.map((verifierId) => createInAppNotification(verifierId, "Task needs verification", "Task needs verification", details.taskDetails || "A task is ready for verification.", { areaId: task.areaId, relatedTaskId: task.id, relatedDailyReportId: report.id }))
         : [];
-      return withActivity({ ...current, dailyReports: nextReport, taskUpdates: [next, ...without], notifications: [...verifierNotifications, ...current.notifications] }, currentProfile, "Task updates", `Updated task: ${template?.taskDetails || task.id}`, "task_update", next.id, { status: next.status });
+      return withActivity({ ...current, dailyReports: nextReport, taskUpdates: [next, ...without], notifications: [...verifierNotifications, ...current.notifications] }, currentProfile, "Task updates", `Updated task: ${details.taskDetails}`, "task_update", next.id, { status: next.status });
     });
     showToast(
       nextVerification === "Needs Verification" ? "Task sent for verification" : "Task update saved",
@@ -1089,7 +1329,7 @@ function TaskCard({
   };
 
   const requestNotApplicable = () => {
-    const title = `Not applicable request: ${template?.taskDetails || "Task"}`;
+    const title = `Not applicable request: ${details.taskDetails}`;
     updateState((current) => {
       const request = {
         id: id("request"),
@@ -1152,8 +1392,8 @@ function TaskCard({
             <StatusBadge value={task.taskType} />
             <StatusBadge value={draft.verificationStatus} />
           </div>
-          <h3 className="mt-2 text-base font-black text-[var(--color-primary)]">{template?.taskDetails || "Task"}</h3>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">{template?.workstream} | {template?.expectedOutput}</p>
+          <h3 className="mt-2 text-base font-black text-[var(--color-primary)]">{details.taskDetails}</h3>
+          <p className="mt-1 text-sm text-[var(--color-text-muted)]">{[details.workstream, details.expectedOutput].filter(Boolean).join(" | ")}</p>
           {draft.correctionComment ? <p className="mt-2 rounded-lg bg-[#7A1F2B]/10 p-2 text-sm font-bold text-[var(--color-important)]">Correction: {draft.correctionComment}</p> : null}
         </div>
         <div className="text-sm text-[var(--color-text-muted)]">
@@ -1161,6 +1401,23 @@ function TaskCard({
           <p>Priority: <strong>{task.priority}</strong></p>
         </div>
       </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <MiniStat label="Workstream" value={details.workstream || "General"} />
+        <MiniStat label="Responsible" value={details.responsibleTeam || "Not assigned"} />
+        <MiniStat label="Expected Output" value={details.expectedOutput || "Not specified"} />
+        <MiniStat label="Equipment" value={details.requiredEquipment || "Not specified"} />
+      </div>
+
+      <details className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+        <summary className="cursor-pointer text-sm font-black text-[var(--color-primary)]">View task details</summary>
+        <div className="mt-3 grid gap-3 text-sm text-[var(--color-text-muted)] md:grid-cols-2">
+          <p><strong className="text-[var(--color-primary)]">Objective:</strong> {details.mainObjective || "Not specified"}</p>
+          <p><strong className="text-[var(--color-primary)]">Testing:</strong> {details.testingRequired || "Not specified"}</p>
+          <p><strong className="text-[var(--color-primary)]">Follow-up:</strong> {details.followUpQuestions || "None"}</p>
+          <p><strong className="text-[var(--color-primary)]">Evidence:</strong> {task.evidenceNote || "Optional in Phase 1"}</p>
+        </div>
+      </details>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-3">
         {showStatus ? <Select label="Status" value={draft.status} onChange={(value) => setDraft({ ...draft, status: value as TaskUpdate["status"] })} options={[...USER_TASK_STATUSES]} /> : null}
@@ -1257,7 +1514,7 @@ function VerificationTab({ state, currentProfile, updateState, showToast }: { st
     <Panel title="Verification Queue" action={<Badge>{queue.length} assigned</Badge>}>
       <div className="grid gap-3">
         {queue.map((task) => {
-          const template = state.taskTemplates.find((item) => item.id === task.templateId);
+          const details = taskDetails(state, task);
           const update = latest.get(task.id);
           const canAct = update ? canActOnVerification(task, update, currentProfile, state.verificationLogs) : false;
           return (
@@ -1270,7 +1527,7 @@ function VerificationTab({ state, currentProfile, updateState, showToast }: { st
                     <Badge>{verificationRuleLabel(task.verificationRule)}</Badge>
                     {!canAct ? <StatusBadge value="Waiting for verifier turn" /> : null}
                   </div>
-                  <h3 className="mt-2 font-black text-[var(--color-primary)]">{template?.taskDetails}</h3>
+                  <h3 className="mt-2 font-black text-[var(--color-primary)]">{details.taskDetails}</h3>
                   <p className="mt-1 text-sm text-[var(--color-text-muted)]">{update?.remarks || "No remarks"}</p>
                   {task.taskType === "Quantity-Based Task" ? <p className="mt-1 text-sm font-bold">Quantity: {update?.completedQuantity || 0}/{task.requiredQuantity || 0}</p> : null}
                   <p className="mt-1 text-xs text-[var(--color-text-muted)]">Verifiers: {task.assignedVerifierIds.map((profileId) => state.profiles.find((profile) => profile.id === profileId)?.fullName || profileId).join(", ") || "None"}</p>
@@ -1527,6 +1784,26 @@ function UsersAccessTab({ state, currentProfile, updateState, showToast }: { sta
       showToast("Password reset failed", readError(error, "Please try again."), "error");
     }
   };
+  const saveUserAccess = (profile: Profile, nextRole: UserRole, nextStatus: Profile["status"], nextAreaIds: string[]) => {
+    if (profile.id === currentProfile.id) {
+      showToast("Own access protected", "Edit another Super Admin if you need to change your own access.", "warning");
+      return;
+    }
+    updateState((current) => {
+      const areaAccess = ["super_admin", "admin"].includes(nextRole)
+        ? current.areaAccess.filter((access) => access.profileId !== profile.id)
+        : [
+          ...current.areaAccess.filter((access) => access.profileId !== profile.id),
+          ...nextAreaIds.map((nextAreaId) => ({ id: `access-${profile.id}-${nextAreaId}-${nextRole}`, profileId: profile.id, areaId: nextAreaId, role: nextRole }))
+        ];
+      return withActivity({
+        ...current,
+        profiles: current.profiles.map((item) => (item.id === profile.id ? { ...item, role: nextRole, status: nextStatus } : item)),
+        areaAccess
+      }, currentProfile, "Access changes", `Updated access for ${profile.fullName}`, "profile", profile.id, { role: nextRole, status: nextStatus });
+    });
+    showToast("Access updated", `${profile.fullName}'s role and area access were updated.`);
+  };
 
   return (
     <div className="space-y-4">
@@ -1543,6 +1820,22 @@ function UsersAccessTab({ state, currentProfile, updateState, showToast }: { sta
         {temporaryPassword ? <p className="mt-3 rounded-lg bg-[var(--color-accent-light)] p-3 text-sm font-black text-[var(--color-primary)]">Temporary password shown once: {temporaryPassword}</p> : null}
         {accessMessage ? <p className="mt-3 text-sm font-bold text-[var(--color-primary)]">{accessMessage}</p> : null}
       </Panel> : null}
+      {currentProfile.role === "super_admin" ? (
+        <Panel title="Manage Active User Access" action={<Badge>Super Admin only</Badge>}>
+          <div className="grid gap-3">
+            {state.profiles.filter((profile) => profile.status === "active" && profile.id !== currentProfile.id).map((profile) => (
+              <AccessEditor
+                key={profile.id}
+                profile={profile}
+                areas={state.areas}
+                currentAreaIds={state.areaAccess.filter((access) => access.profileId === profile.id).map((access) => access.areaId)}
+                onSave={saveUserAccess}
+              />
+            ))}
+            {!state.profiles.some((profile) => profile.status === "active" && profile.id !== currentProfile.id) ? <EmptyState title="No active users to edit" body="Create or approve users first, then their access controls will appear here." /> : null}
+          </div>
+        </Panel>
+      ) : null}
       <Panel title="Users & Access">
         <ResponsiveTable
           headers={["Name", "Login ID", "Role", "Status", "Areas", "Action"]}
@@ -1561,6 +1854,62 @@ function UsersAccessTab({ state, currentProfile, updateState, showToast }: { sta
         />
       </Panel>
     </div>
+  );
+}
+
+function AccessEditor({
+  profile,
+  areas,
+  currentAreaIds,
+  onSave
+}: {
+  profile: Profile;
+  areas: EventPrepState["areas"];
+  currentAreaIds: string[];
+  onSave: (profile: Profile, nextRole: UserRole, nextStatus: Profile["status"], nextAreaIds: string[]) => void;
+}) {
+  const [role, setRole] = useState<UserRole>(profile.role);
+  const [status, setStatus] = useState<Profile["status"]>(profile.status);
+  const [areaIds, setAreaIds] = useState<string[]>(currentAreaIds);
+  useEffect(() => {
+    setRole(profile.role);
+    setStatus(profile.status);
+    setAreaIds(currentAreaIds);
+  }, [profile.id, profile.role, profile.status, currentAreaIds.join("|")]);
+  const allAreasRole = ["super_admin", "admin"].includes(role);
+  return (
+    <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h3 className="font-black text-[var(--color-primary)]">{profile.fullName}</h3>
+          <p className="text-sm text-[var(--color-text-muted)]">{profile.email}</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-[12rem_12rem_auto] md:items-end">
+          <Select label="Role" value={role} onChange={(value) => setRole(value as UserRole)} options={["super_admin", "admin", "area_admin", "verifier", "report_user", "viewer"].map((value) => ({ label: roleLabel(value as UserRole), value }))} />
+          <Select label="Status" value={status} onChange={(value) => setStatus(value as Profile["status"])} options={[{ label: "Active", value: "active" }, { label: "Pending Approval", value: "pending_approval" }, { label: "Disabled", value: "disabled" }]} />
+          <button className="btn-primary" onClick={() => onSave(profile, role, status, areaIds)}>Save Access</button>
+        </div>
+      </div>
+      <div className="mt-3">
+        <p className="field-label">Area access</p>
+        {allAreasRole ? (
+          <p className="mt-2 rounded-lg bg-white p-3 text-sm font-bold text-[var(--color-primary)]">This role can access all areas.</p>
+        ) : (
+          <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {areas.map((area) => (
+              <label key={area.id} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white p-2 text-sm font-bold text-[var(--color-primary)]">
+                <input
+                  type="checkbox"
+                  checked={areaIds.includes(area.id)}
+                  onChange={(event) => setAreaIds((current) => event.target.checked ? [...current, area.id] : current.filter((idValue) => idValue !== area.id))}
+                />
+                {area.name}
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+    </article>
   );
 }
 
@@ -1871,7 +2220,7 @@ function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
       <p className="text-xs font-bold uppercase text-[var(--color-text-muted)]">{label}</p>
-      <p className="mt-1 font-black text-[var(--color-primary)]">{value}</p>
+      <p className="mt-1 break-words font-black text-[var(--color-primary)]">{value}</p>
     </div>
   );
 }
@@ -2156,9 +2505,9 @@ function buildUserAlerts(state: EventPrepState, profile: Profile): InAppNotifica
   const assignedTasks = state.liveTasks.filter((task) => allowedAreaIds.includes(task.areaId) && (profile.role !== "report_user" || task.assignedProfileIds.includes(profile.id)));
   assignedTasks.forEach((task) => {
     const update = latest.get(task.id);
-    const template = state.taskTemplates.find((item) => item.id === task.templateId);
-    if (update?.verificationStatus === "Rejected / Needs Correction") push("Task needs correction", "Task needs correction", template?.taskDetails || "A task needs correction.", { areaId: task.areaId, relatedTaskId: task.id });
-    if (task.dueDate < today && update?.verificationStatus !== "Verified Completed") push("Overdue task", "Overdue assigned task", template?.taskDetails || "An assigned task is overdue.", { areaId: task.areaId, relatedTaskId: task.id });
+    const details = taskDetails(state, task);
+    if (update?.verificationStatus === "Rejected / Needs Correction") push("Task needs correction", "Task needs correction", details.taskDetails || "A task needs correction.", { areaId: task.areaId, relatedTaskId: task.id });
+    if (task.dueDate < today && update?.verificationStatus !== "Verified Completed") push("Overdue task", "Overdue assigned task", details.taskDetails || "An assigned task is overdue.", { areaId: task.areaId, relatedTaskId: task.id });
   });
 
   state.requests
@@ -2249,6 +2598,20 @@ function latestUpdateMap(updates: TaskUpdate[]) {
   return map;
 }
 
+function taskDetails(state: EventPrepState, task: LiveTask) {
+  const template = state.taskTemplates.find((item) => item.id === task.templateId);
+  return {
+    taskDetails: task.taskDetails || template?.taskDetails || "Task",
+    mainObjective: task.mainObjective || template?.mainObjective || "",
+    workstream: task.workstream || template?.workstream || "General",
+    responsibleTeam: task.responsibleTeam || template?.responsibleTeam || "",
+    followUpQuestions: task.followUpQuestions || template?.followUpQuestions || "",
+    requiredEquipment: task.requiredEquipment || template?.requiredEquipment || "",
+    expectedOutput: task.expectedOutput || template?.expectedOutput || "",
+    testingRequired: task.testingRequired || template?.testingRequired || ""
+  };
+}
+
 function getAllowedAreas(state: EventPrepState, profile: Profile) {
   if (["super_admin", "admin"].includes(profile.role)) return state.areas;
   const accessAreaIds = state.areaAccess.filter((access) => access.profileId === profile.id).map((access) => access.areaId);
@@ -2319,6 +2682,7 @@ function rowsToTemplates(rows: Array<Record<string, unknown>>): TaskTemplate[] {
       const priority = normalizePriority(get("Priority Level"));
       return {
         id: `template-${slug(`${get("Day")}-${get("Workstream")}-${taskDetails}`)}`,
+        source: "imported",
         day: Math.min(20, Math.max(1, Number(get("Day").replace(/[^0-9]/g, "")) || 1)),
         priorityLevel: priority,
         mainObjective: get("Main Objective"),
@@ -2334,6 +2698,41 @@ function rowsToTemplates(rows: Array<Record<string, unknown>>): TaskTemplate[] {
       } satisfies TaskTemplate;
     })
     .filter(Boolean) as TaskTemplate[];
+}
+
+function createCustomTaskTemplate({
+  title,
+  workstream,
+  responsibleTeam,
+  expectedOutput,
+  requiredEquipment,
+  prepDay,
+  priority
+}: {
+  title: string;
+  workstream: string;
+  responsibleTeam: string;
+  expectedOutput: string;
+  requiredEquipment: string;
+  prepDay: number;
+  priority: TaskTemplate["priorityLevel"];
+}): TaskTemplate {
+  return {
+    id: `template-custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    source: "custom",
+    day: prepDay,
+    priorityLevel: priority,
+    mainObjective: "",
+    workstream: workstream.trim() || "General",
+    taskDetails: title.trim(),
+    responsibleTeam: responsibleTeam.trim(),
+    followUpQuestions: "",
+    requiredEquipment: requiredEquipment.trim(),
+    expectedOutput: expectedOutput.trim(),
+    testingRequired: "",
+    hiddenReference: {},
+    importedAt: new Date().toISOString()
+  };
 }
 
 function parseCsv(text: string) {
@@ -2372,6 +2771,14 @@ function createLiveTask(template: TaskTemplate | undefined, areaId: string, task
     id: `live-${areaId}-${template.id}`,
     templateId: template.id,
     areaId,
+    taskDetails: template.taskDetails,
+    mainObjective: template.mainObjective,
+    workstream: template.workstream,
+    responsibleTeam: template.responsibleTeam,
+    followUpQuestions: template.followUpQuestions,
+    requiredEquipment: template.requiredEquipment,
+    expectedOutput: template.expectedOutput,
+    testingRequired: template.testingRequired,
     taskType,
     prepDay: template.day,
     startDate: addDays(preparationStartDate, template.day - 1),

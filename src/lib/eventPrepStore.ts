@@ -343,9 +343,11 @@ function fromDbRow<T>(row: Record<string, unknown>, table: string) {
       } as T;
     case "area_access":
       return { id: String(row.id || ""), profileId: String(row.profile_id || ""), areaId: String(row.area_id || ""), role: row.role } as T;
-    case "task_templates":
+    case "task_templates": {
+      const templateData = row.data && typeof row.data === "object" ? row.data as Partial<TaskTemplate> : {};
       return {
         id: String(row.id || ""),
+        source: templateData.source,
         day: Number(row.prep_day || 1),
         priorityLevel: row.priority_level || "Medium",
         mainObjective: String(row.main_objective || ""),
@@ -359,11 +361,21 @@ function fromDbRow<T>(row: Record<string, unknown>, table: string) {
         hiddenReference: row.hidden_reference && typeof row.hidden_reference === "object" ? row.hidden_reference : {},
         importedAt: String(row.created_at || new Date().toISOString())
       } as T;
-    case "live_tasks":
+    }
+    case "live_tasks": {
+      const liveTaskData = row.data && typeof row.data === "object" ? row.data as Partial<LiveTask> : {};
       return {
         id: String(row.id || ""),
         templateId: String(row.template_id || ""),
         areaId: String(row.area_id || ""),
+        taskDetails: liveTaskData.taskDetails,
+        mainObjective: liveTaskData.mainObjective,
+        workstream: liveTaskData.workstream,
+        responsibleTeam: liveTaskData.responsibleTeam,
+        followUpQuestions: liveTaskData.followUpQuestions,
+        requiredEquipment: liveTaskData.requiredEquipment,
+        expectedOutput: liveTaskData.expectedOutput,
+        testingRequired: liveTaskData.testingRequired,
         taskType: row.task_type,
         prepDay: Number(row.prep_day || 1),
         startDate: String(row.start_date || ""),
@@ -382,6 +394,7 @@ function fromDbRow<T>(row: Record<string, unknown>, table: string) {
         delayReason: row.delay_reason ? String(row.delay_reason) : undefined,
         revisedDueDate: row.revised_due_date ? String(row.revised_due_date) : undefined
       } as T;
+    }
     case "daily_reports":
       return {
         id: String(row.id || ""),
@@ -554,8 +567,15 @@ function templateToDb(item: TaskTemplate) {
     id: item.id,
     prep_day: item.day,
     priority_level: item.priorityLevel,
+    main_objective: item.mainObjective,
     workstream: item.workstream,
     task_details: item.taskDetails,
+    responsible_team: item.responsibleTeam,
+    follow_up_questions: item.followUpQuestions,
+    required_equipment: item.requiredEquipment,
+    expected_output: item.expectedOutput,
+    testing_required: item.testingRequired,
+    hidden_reference: item.hiddenReference || {},
     data: item,
     updated_at: new Date().toISOString()
   };

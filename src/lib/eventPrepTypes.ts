@@ -75,6 +75,7 @@ export type AreaAccess = {
 
 export type TaskTemplate = {
   id: string;
+  source?: "imported" | "custom";
   day: number;
   priorityLevel: Priority;
   mainObjective: string;
@@ -96,6 +97,14 @@ export type LiveTask = {
   id: string;
   templateId: string;
   areaId: string;
+  taskDetails?: string;
+  mainObjective?: string;
+  workstream?: string;
+  responsibleTeam?: string;
+  followUpQuestions?: string;
+  requiredEquipment?: string;
+  expectedOutput?: string;
+  testingRequired?: string;
   taskType: TaskTypeName;
   prepDay: number;
   startDate: string;
