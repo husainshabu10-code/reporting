@@ -764,7 +764,7 @@ export default function DashboardApp() {
               <button
                 key={tab.id}
                 className={`flex w-full min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition-all duration-200 ${
-                  activeTab === tab.id ? "bg-[var(--color-accent)] text-[var(--color-primary)] shadow-sm" : "text-white/90 hover:bg-white/10 hover:text-white"
+                  activeTab === tab.id ? "bg-[var(--color-secondary)] text-white shadow-sm" : "text-white/90 hover:bg-white/10 hover:text-white"
                 }`}
                 onClick={() => {
                   setActiveTab(tab.id);
@@ -2561,7 +2561,7 @@ function Table({ rows }: { rows: Array<Record<string, string | number>> }) {
 }
 
 function ProgressBar({ value, compact = false, tone }: { value: number; compact?: boolean; tone?: ChartRow["status"] }) {
-  const color = tone === "critical" ? "bg-[var(--color-important)]" : tone === "warning" ? "bg-[var(--color-accent)]" : tone === "muted" ? "bg-[#9CA3AF]" : "bg-[var(--color-secondary)]";
+  const color = tone === "critical" ? "bg-[var(--color-important)]" : tone === "warning" ? "bg-[var(--color-accent)]" : tone === "muted" ? "bg-[var(--color-text-muted)]" : "bg-[var(--color-secondary)]";
   return <div className={`overflow-hidden rounded-full bg-[var(--color-accent-light)] ${compact ? "h-2" : "h-2.5"}`}><div className={`h-full rounded-full ${color}`} style={{ width: `${clamp(value, 0, 100)}%` }} /></div>;
 }
 
@@ -2660,12 +2660,12 @@ function StatusBadge({ status }: { status: TrackerTask["status"] }) {
 function ValueBadge({ value }: { value: string }) {
   const color = fieldValueColor(value);
   const style = color ? { background: color, color: contrastText(color) } : undefined;
-  const className = color ? "" : "bg-[#F4F1EA] text-[var(--color-text-muted)]";
+  const className = color ? "" : "bg-[var(--color-accent-light)] text-[var(--color-text-muted)]";
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`} style={style}>{value || "-"}</span>;
 }
 
 function RiskBadge({ risk }: { risk: TrackerTask["riskLevel"] }) {
-  const className = risk === "High" ? "bg-[var(--color-important)] text-white" : risk === "Medium" ? "bg-[var(--color-accent)] text-[var(--color-primary)]" : risk === "Low" ? "bg-[var(--color-secondary)] text-white" : "bg-[#F4F1EA] text-[var(--color-text-muted)]";
+  const className = risk === "High" ? "bg-[var(--color-important)] text-white" : risk === "Medium" ? "bg-[var(--color-accent)] text-[var(--color-primary)]" : risk === "Low" ? "bg-[var(--color-secondary)] text-white" : "bg-[var(--color-accent-light)] text-[var(--color-text-muted)]";
   return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{risk || "-"}</span>;
 }
 
@@ -3581,7 +3581,7 @@ function toneClass(tone: string) {
   if (tone === "good") return "bg-[var(--color-primary)] text-white";
   if (tone === "warning") return "bg-[var(--color-accent)] text-[var(--color-primary)]";
   if (tone === "critical") return "bg-[var(--color-important)] text-white";
-  return "bg-[#F4F1EA] text-[var(--color-text-muted)]";
+  return "bg-[var(--color-accent-light)] text-[var(--color-text-muted)]";
 }
 
 function chartColor(row: ChartRow, index: number) {
@@ -3590,8 +3590,8 @@ function chartColor(row: ChartRow, index: number) {
   if (row.status === "good") return "var(--color-secondary)";
   if (row.status === "warning") return "var(--color-accent)";
   if (row.status === "critical") return "var(--color-important)";
-  if (row.status === "muted") return "#9CA3AF";
-  const palette = ["#0B4F3A", "#2E7D5B", "#C9A227", "#7A1F2B", "#64748B", "#256D85", "#8A6F18", "#4B5563", "#A16207", "#166534", "#92400E", "#475569"];
+  if (row.status === "muted") return "#6B7280";
+  const palette = ["#0B4F3A", "#2E7D5B", "#C9A227", "#F3E7C3", "#7A1F2B", "#6B7280", "#1F2933", "#E8DDC5"];
   return palette[index % palette.length];
 }
 
@@ -3600,31 +3600,31 @@ function fieldValueColor(label: string) {
   const colors: Record<string, string> = {
     "completed": "#0B4F3A",
     "tested": "#2E7D5B",
-    "not required": "#64748B",
-    "ready for testing": "#256D85",
-    "in progress": "#C9A227",
-    "under review": "#8A6F18",
-    "info awaited": "#D4A72C",
-    "not started": "#9CA3AF",
+    "not required": "#6B7280",
+    "ready for testing": "#2E7D5B",
+    "in progress": "#2E7D5B",
+    "under review": "#C9A227",
+    "info awaited": "#F3E7C3",
+    "not started": "#F3E7C3",
     "blocked": "#7A1F2B",
-    "blank": "#B08A1E",
+    "blank": "#E8DDC5",
     "critical": "#7A1F2B",
-    "high": "#9F2D3A",
+    "high": "#7A1F2B",
     "medium": "#C9A227",
     "low": "#2E7D5B",
     "waaz critical": "#7A1F2B",
     "operations critical": "#0B4F3A",
-    "department support": "#256D85",
-    "optional": "#64748B",
+    "department support": "#2E7D5B",
+    "optional": "#6B7280",
     "final attached": "#0B4F3A",
     "draft attached": "#2E7D5B",
     "needs revision": "#7A1F2B",
-    "not attached": "#9CA3AF",
+    "not attached": "#E8DDC5",
     "approved": "#0B4F3A",
     "paid": "#2E7D5B",
     "approval pending": "#C9A227",
-    "quote received": "#256D85",
-    "quote pending": "#8A6F18",
+    "quote received": "#2E7D5B",
+    "quote pending": "#C9A227",
     "very high": "#7A1F2B"
   };
   return colors[value];
@@ -3633,13 +3633,13 @@ function fieldValueColor(label: string) {
 function statusBadgeClass(status: TrackerTask["status"]) {
   if (status === "Completed") return "bg-[var(--color-primary)] text-white";
   if (status === "Tested") return "bg-[var(--color-secondary)] text-white";
-  if (status === "Ready for Testing") return "bg-[#256D85] text-white";
-  if (status === "In Progress") return "bg-[var(--color-accent)] text-[var(--color-primary)]";
-  if (status === "Under Review") return "bg-[#8A6F18] text-white";
-  if (status === "Info Awaited") return "bg-[var(--color-accent-light)] text-[#8A6F18]";
+  if (status === "Ready for Testing") return "bg-[var(--color-secondary)] text-white";
+  if (status === "In Progress") return "bg-[rgba(46,125,91,0.12)] text-[var(--color-secondary)]";
+  if (status === "Under Review") return "bg-[var(--color-accent)] text-[var(--color-primary)]";
+  if (status === "Info Awaited") return "bg-[var(--color-accent-light)] text-[var(--color-text)]";
   if (status === "Blocked") return "bg-[var(--color-important)] text-white";
-  if (status === "Not Started") return "bg-[#F4F1EA] text-[var(--color-text-muted)]";
-  if (status === "Not Required") return "bg-[#64748B] text-white";
+  if (status === "Not Started") return "bg-[var(--color-accent-light)] text-[var(--color-text)]";
+  if (status === "Not Required") return "bg-[var(--color-text-muted)] text-white";
   return "bg-[var(--color-accent-light)] text-[var(--color-text)]";
 }
 
@@ -3669,7 +3669,7 @@ function stackedBarSvg(row: ChartRow, y: number, width: number) {
 
 function pieSlicesSvg(rows: ChartRow[], cx: number, cy: number, radius: number) {
   const total = rows.reduce((sum, row) => sum + Math.max(0, row.value || row.percent), 0);
-  if (!rows.length || total <= 0) return `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="#9CA3AF"/>`;
+  if (!rows.length || total <= 0) return `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="#6B7280"/>`;
   if (rows.length === 1) return `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="${cssColor(chartColor(rows[0], 0))}"><title>${escapeHtml(`${rows[0].label}: ${rows[0].value} (${rows[0].percent}%)`)}</title></circle>`;
   let startAngle = -90;
   return rows.map((row, index) => {
@@ -3698,18 +3698,22 @@ function cssColor(value: string) {
     "var(--color-primary)": "#0B4F3A",
     "var(--color-secondary)": "#2E7D5B",
     "var(--color-accent)": "#C9A227",
+    "var(--color-accent-light)": "#F3E7C3",
+    "var(--color-text)": "#1F2933",
+    "var(--color-text-muted)": "#6B7280",
+    "var(--color-border)": "#E8DDC5",
     "var(--color-important)": "#7A1F2B"
   };
   return colors[value] || value;
 }
 
 function contrastText(color: string) {
-  return ["#C9A227", "#D4A72C", "#F3E7C3", "#9CA3AF"].includes(color.toUpperCase()) ? "#1F2933" : "#FFFFFF";
+  return ["#C9A227", "#F3E7C3", "#E8DDC5"].includes(color.toUpperCase()) ? "#1F2933" : "#FFFFFF";
 }
 
 function conicGradient(rows: ChartRow[]) {
   const total = rows.reduce((sum, row) => sum + Math.max(0, row.value || row.percent), 0);
-  if (!rows.length || total <= 0) return "conic-gradient(#9CA3AF 0deg 360deg)";
+  if (!rows.length || total <= 0) return "conic-gradient(#6B7280 0deg 360deg)";
   let cursor = 0;
   const stops = rows.map((row, index) => {
     const amount = Math.max(0, row.value || row.percent);

@@ -20,7 +20,7 @@ export type ChartRow = {
   [key: string]: string | number | null | undefined;
 };
 
-export const palette = ["#79a7d8", "#f2a6a6", "#8fc9a8", "#f6c66f", "#b9a7e8", "#8fd3d0", "#f0a7c5", "#a9c6a3"];
+export const palette = ["#0B4F3A", "#2E7D5B", "#C9A227", "#F3E7C3", "#7A1F2B", "#6B7280", "#1F2933", "#E8DDC5"];
 
 export function formatINR(value: number | null | undefined, short = false) {
   if (value === null || value === undefined) return "TBD";

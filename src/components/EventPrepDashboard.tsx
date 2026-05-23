@@ -1812,13 +1812,13 @@ function ToastStack({ toasts, dismissToast }: { toasts: ToastMessage[]; dismissT
   const toneClass: Record<ToastTone, string> = {
     success: "border-[var(--color-primary)] bg-white",
     info: "border-[var(--color-accent)] bg-white",
-    warning: "border-[#C9A227] bg-[#FFF8E1]",
+    warning: "border-[var(--color-accent)] bg-[var(--color-accent-light)]",
     error: "border-[var(--color-important)] bg-white"
   };
   const dotClass: Record<ToastTone, string> = {
     success: "bg-[var(--color-primary)]",
     info: "bg-[var(--color-accent)]",
-    warning: "bg-[#C9A227]",
+    warning: "bg-[var(--color-accent)]",
     error: "bg-[var(--color-important)]"
   };
   return (
@@ -1842,7 +1842,7 @@ function ToastStack({ toasts, dismissToast }: { toasts: ToastMessage[]; dismissT
 }
 
 function MetricCard({ title, value, helper, tone }: { title: string; value: string; helper: string; tone?: "good" | "warning" | "critical" }) {
-  const color = tone === "critical" ? "text-[var(--color-important)]" : tone === "warning" ? "text-[#8A6F18]" : "text-[var(--color-primary)]";
+  const color = tone === "critical" ? "text-[var(--color-important)]" : tone === "warning" ? "text-[var(--color-accent)]" : "text-[var(--color-primary)]";
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm">
       <p className="text-xs font-bold uppercase text-[var(--color-text-muted)]">{title}</p>
@@ -1860,7 +1860,7 @@ function ProgressRow({ label, value, helper }: { label: string; value: number; h
         <p className="text-[var(--color-text-muted)]">{value}%</p>
       </div>
       <div className="mt-2 h-2 rounded-full bg-[var(--color-accent-light)]">
-        <div className="h-2 rounded-full bg-[var(--color-primary)]" style={{ width: `${value}%` }} />
+        <div className="h-2 rounded-full bg-[var(--color-secondary)]" style={{ width: `${value}%` }} />
       </div>
       <p className="mt-1 text-xs text-[var(--color-text-muted)]">{helper}</p>
     </div>
@@ -1943,13 +1943,17 @@ function Badge({ children }: { children: ReactNode }) {
 
 function StatusBadge({ value }: { value: string }) {
   const lower = value.toLowerCase();
-  const cls = lower.includes("verified completed") || lower.includes("approved") || lower === "critical"
+  const cls = lower.includes("needs correction")
+    ? "bg-[rgba(122,31,43,0.10)] text-[var(--color-important)]"
+    : lower.includes("verified completed") || lower === "completed" || lower.includes("approved")
     ? "bg-[var(--color-primary)] text-white"
-    : lower.includes("issue") || lower.includes("rejected") || lower.includes("late")
+    : lower.includes("issue") || lower.includes("rejected") || lower.includes("late") || lower.includes("overdue") || lower === "critical"
       ? "bg-[var(--color-important)] text-white"
-      : lower.includes("needs") || lower.includes("progress") || lower.includes("partial")
+      : lower.includes("needs verification") || lower.includes("partially verified")
         ? "bg-[var(--color-accent)] text-[var(--color-primary)]"
-        : "bg-[var(--color-accent-light)] text-[var(--color-primary)]";
+        : lower.includes("progress")
+          ? "bg-[rgba(46,125,91,0.12)] text-[var(--color-secondary)]"
+          : "bg-[var(--color-accent-light)] text-[var(--color-text)]";
   return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-black ${cls}`}>{value}</span>;
 }
 
