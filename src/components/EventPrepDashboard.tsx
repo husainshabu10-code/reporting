@@ -8,6 +8,7 @@ import {
   CalendarClock,
   CheckCircle2,
   ClipboardCheck,
+  Download,
   FileSpreadsheet,
   FileText,
   Filter,
@@ -15,7 +16,9 @@ import {
   LogOut,
   Menu,
   Plus,
+  Settings2,
   ShieldCheck,
+  Upload,
   Users,
   X
 } from "lucide-react";
@@ -108,6 +111,7 @@ export default function EventPrepDashboard() {
   const [currentProfileId, setCurrentProfileId] = useState("profile-super-admin");
   const [activeTab, setActiveTab] = useState<AnyTab>("Dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [syncStatus, setSyncStatus] = useState("Loading");
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
@@ -247,26 +251,44 @@ export default function EventPrepDashboard() {
   }
 
   const updateState = (updater: (current: EventPrepState) => EventPrepState) => setState((current) => (current ? updater(current) : current));
+  const openWorkspace = (tab: AnyTab, title: string, message: string) => {
+    setActiveTab(tab);
+    setSidebarOpen(false);
+    showToast(title, message, "info");
+  };
+  const toggleMenu = () => {
+    if (window.innerWidth >= 1024) {
+      setSidebarCollapsed((current) => !current);
+      return;
+    }
+    setSidebarOpen(true);
+  };
+  const exportCsv = () => {
+    exportLiveTasksCsv(state);
+    showToast("CSV exported", "Live task summary downloaded from the dashboard.", "success");
+  };
 
   return (
     <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
       <div className="flex min-h-screen">
-        <aside className={`fixed inset-y-0 left-0 z-40 w-72 border-r border-[var(--color-border)] bg-white p-4 transition-transform lg:sticky lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--color-accent)]">ASHARA MUBARAKAH</p>
-              <h1 className="mt-1 text-xl font-black leading-tight text-[var(--color-primary)]">IT Event Preparation</h1>
-              <p className="mt-1 text-xs text-[var(--color-text-muted)]">Phase 2 reporting dashboard</p>
+        <aside className={`app-sidebar fixed inset-y-0 left-0 z-40 flex w-80 flex-col border-r border-white/10 bg-[var(--color-primary)] text-white shadow-2xl transition-[transform,width] duration-200 lg:sticky lg:translate-x-0 ${sidebarCollapsed ? "lg:w-20" : "lg:w-80"} ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+          <div className="flex items-start justify-between gap-3 px-5 py-6">
+            <div className={sidebarCollapsed ? "lg:hidden" : ""}>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-white/85">ASHARA MUBARAKAH</p>
+              <h1 className="mt-2 text-2xl font-black leading-tight text-white">IT / Event Preparation</h1>
             </div>
-            <button className="icon-btn lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close navigation">
+            <div className={`hidden h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-accent)] text-[var(--color-primary)] lg:flex ${sidebarCollapsed ? "" : "lg:hidden"}`}>
+              <BarChart3 size={19} />
+            </div>
+            <button className="mini-icon-btn border-white/20 bg-white/10 text-white hover:bg-white/20 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close navigation">
               <X size={18} />
             </button>
           </div>
 
-          <div className="mt-5 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+          <div className={`mx-5 rounded-lg border border-white/10 bg-white/10 p-3 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
             {!isEventPrepSupabaseConfigured() ? (
               <>
-                <label className="field-label">Demo profile</label>
+                <label className="text-xs font-black uppercase text-white/70">Demo profile</label>
                 <select className="field mt-2" value={currentProfileId} onChange={(event) => setCurrentProfileId(event.target.value)}>
                   {state.profiles.map((profile) => (
                     <option key={profile.id} value={profile.id}>
@@ -277,60 +299,68 @@ export default function EventPrepDashboard() {
               </>
             ) : (
               <>
-                <p className="field-label">Signed in as</p>
-                <p className="mt-2 text-sm font-bold text-[var(--color-primary)]">{currentProfile.email}</p>
+                <p className="text-xs font-black uppercase text-white/70">Signed in as</p>
+                <p className="mt-2 text-sm font-bold text-white">{currentProfile.email}</p>
               </>
             )}
-            <p className="mt-2 text-xs text-[var(--color-text-muted)]">{syncStatus}</p>
+            <p className="mt-2 text-xs text-white/70">{syncStatus}</p>
           </div>
 
-          <nav className="mt-5 space-y-1">
+          <nav className="mt-5 flex-1 space-y-2 px-4">
             {tabs.map((tab) => (
               <button
                 key={tab}
-                className={`flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-bold transition ${activeTab === tab ? "bg-[var(--color-primary)] text-white" : "text-[var(--color-primary)] hover:bg-[var(--color-accent-light)]"}`}
+                className={`sidebar-nav-item group flex min-h-12 w-full items-center gap-3 rounded-lg px-4 text-left text-sm font-black transition ${activeTab === tab ? "bg-[var(--color-accent)] text-[var(--color-primary)] shadow-lg shadow-black/10" : "text-white/90 hover:bg-white/10 hover:text-white"} ${sidebarCollapsed ? "lg:justify-center lg:px-2" : ""}`}
                 onClick={() => {
                   setActiveTab(tab);
                   setSidebarOpen(false);
                 }}
+                title={tab}
               >
-                {tabIcon(tab)}
-                {tab}
+                <span className="flex-none">{tabIcon(tab)}</span>
+                <span className={sidebarCollapsed ? "lg:hidden" : ""}>{tab}</span>
               </button>
             ))}
           </nav>
 
-          {!isEventPrepSupabaseConfigured() ? null : <div className="mt-5 rounded-lg border border-[var(--color-border)] p-3">
-            <p className="text-xs font-bold uppercase text-[var(--color-text-muted)]">Password session</p>
+          {!isEventPrepSupabaseConfigured() ? null : <div className={`m-5 rounded-lg border border-white/10 bg-white/10 p-3 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
+            <p className="text-xs font-bold uppercase text-white/70">Password session</p>
             <button className="btn-secondary mt-2 w-full justify-center" onClick={handleSignOut}>
               <LogOut size={16} /> Sign out
             </button>
           </div>}
+
+          <div className={`border-t border-white/10 px-5 py-4 text-xs font-bold leading-relaxed text-white/75 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
+            Area-wise readiness, requests, reports, and timeline tracking.
+          </div>
         </aside>
 
         {sidebarOpen ? <button className="fixed inset-0 z-30 bg-black/20 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close menu" /> : null}
 
         <section className="min-w-0 flex-1">
-          <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-[rgba(250,247,239,0.92)] px-4 py-3 backdrop-blur">
-            <div className="mx-auto flex max-w-7xl items-center justify-between gap-3">
+          <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-[rgba(250,247,239,0.96)] px-4 py-4 backdrop-blur">
+            <div className="mx-auto flex max-w-[96rem] flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex items-center gap-3">
-                <button className="icon-btn lg:hidden" onClick={() => setSidebarOpen(true)} aria-label="Open navigation">
+                <button className="icon-btn" onClick={toggleMenu} aria-label={sidebarCollapsed ? "Expand navigation" : "Open or collapse navigation"} title="Menu">
                   <Menu size={18} />
                 </button>
                 <div>
-                  <p className="text-xs font-bold uppercase text-[var(--color-text-muted)]">{roleLabel(currentProfile.role)}</p>
-                  <h2 className="text-lg font-black text-[var(--color-primary)]">{activeTab}</h2>
+                  <p className="text-xs font-black uppercase tracking-[0.08em] text-[var(--color-accent)]">{activeTab}</p>
+                  <h2 className="text-2xl font-black leading-tight text-[var(--color-primary)]">IT / Event Preparation Dashboard</h2>
                 </div>
               </div>
-              <div className="hidden items-center gap-2 sm:flex">
+              <div className="flex flex-wrap items-center gap-2">
+                {activeTab === "Dashboard" ? <button className="top-action-btn" onClick={() => showToast("Dashboard settings", "Dashboard cards are using verified-completion data only.", "info")}><Settings2 size={16} /> Chart Settings</button> : null}
+                {isAdmin ? <button className="top-action-btn" onClick={() => openWorkspace("Zones / Areas", "Area setup opened", "Create or update event areas from this tab.")}><Plus size={16} /> Add Area</button> : null}
+                {isAdmin ? <button className="top-action-btn top-action-primary" onClick={() => openWorkspace("Master Tasks", "Task setup opened", "Add a custom live task or apply reference templates.")}><Plus size={16} /> Add Task</button> : null}
+                {isAdmin ? <button className="top-action-btn" onClick={exportCsv}><Download size={16} /> Export CSV</button> : null}
+                {isAdmin ? <button className="top-action-btn" onClick={() => openWorkspace("Master Tasks", "Import panel opened", "Use the upload control to import Excel or CSV task templates.")}><Upload size={16} /> Import CSV</button> : null}
                 <Badge>{unreadNotificationsFor(state, currentProfile).length + buildUserAlerts(state, currentProfile).length} alert(s)</Badge>
-                <Badge>{currentProfile.status.replace("_", " ")}</Badge>
-                <Badge>{isEventPrepSupabaseConfigured() ? "Supabase configured" : "Local mode"}</Badge>
               </div>
             </div>
           </header>
 
-          <div className="mx-auto max-w-7xl p-4 lg:p-6">
+          <div className="mx-auto max-w-[96rem] p-4 lg:p-6">
             <NotificationCenter state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} />
             {activeTab === "Dashboard" ? <DashboardTab state={state} currentProfile={currentProfile} /> : null}
             {activeTab === "Daily Reports" ? <DailyReportsTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
@@ -353,10 +383,26 @@ export default function EventPrepDashboard() {
 
 function DashboardTab({ state }: { state: EventPrepState; currentProfile: Profile }) {
   const metrics = useMemo(() => buildMetrics(state), [state]);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [zoneFilter, setZoneFilter] = useState("All");
+  const [areaFilter, setAreaFilter] = useState("All");
+  const [workstreamFilter, setWorkstreamFilter] = useState("All");
+  const latest = latestUpdateMap(state.taskUpdates);
+  const workstreamOptions = unique(state.liveTasks.map((task) => taskDetails(state, task).workstream).filter(Boolean));
+  const filteredAreas = state.areas.filter((area) => zoneFilter === "All" || area.zoneTypeId === zoneFilter);
+  const scopedTasks = state.liveTasks.filter((task) => {
+    const area = state.areas.find((item) => item.id === task.areaId);
+    const details = taskDetails(state, task);
+    if (!task.active || task.notApplicable) return false;
+    if (zoneFilter !== "All" && area?.zoneTypeId !== zoneFilter) return false;
+    if (areaFilter !== "All" && task.areaId !== areaFilter) return false;
+    if (workstreamFilter !== "All" && details.workstream !== workstreamFilter) return false;
+    return true;
+  });
+  const scopedVerified = scopedTasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
   const zoneRows = state.zoneTypes.map((zone) => {
     const areaIds = state.areas.filter((area) => area.zoneTypeId === zone.id).map((area) => area.id);
-    const tasks = state.liveTasks.filter((task) => areaIds.includes(task.areaId) && task.active && !task.notApplicable);
-    const latest = latestUpdateMap(state.taskUpdates);
+    const tasks = scopedTasks.filter((task) => areaIds.includes(task.areaId));
     const verified = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
     return { label: zone.name, total: tasks.length, verified, percent: percent(verified, tasks.length) };
   });
@@ -364,8 +410,29 @@ function DashboardTab({ state }: { state: EventPrepState; currentProfile: Profil
 
   return (
     <div className="space-y-5">
+      <section className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <button className="btn-primary w-full sm:w-auto" onClick={() => setFiltersOpen((current) => !current)}>
+            <Filter size={17} /> Filter
+          </button>
+          <p className="text-sm text-[var(--color-text-muted)]">
+            {filtersOpen ? "Choose the dashboard scope below." : "Open filters from the button and choose only what you need"}
+          </p>
+        </div>
+        {filtersOpen ? (
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <Select label="Zone Type" value={zoneFilter} onChange={(value) => {
+              setZoneFilter(value);
+              setAreaFilter("All");
+            }} options={["All", ...state.zoneTypes.map((zone) => ({ label: zone.name, value: zone.id }))]} />
+            <Select label="Area" value={areaFilter} onChange={setAreaFilter} options={["All", ...filteredAreas.map((area) => ({ label: area.name, value: area.id }))]} />
+            <Select label="Workstream" value={workstreamFilter} onChange={setWorkstreamFilter} options={["All", ...workstreamOptions]} />
+          </div>
+        ) : null}
+      </section>
+
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricCard title="Overall Verified Completion" value={`${metrics.overallVerifiedPercent}%`} helper={`${metrics.verifiedTasks}/${metrics.totalLiveTasks} verified`} tone="good" />
+        <MetricCard title="Overall Verified Completion" value={`${percent(scopedVerified, scopedTasks.length)}%`} helper={`${scopedVerified}/${scopedTasks.length} verified in scope`} tone="good" />
         <MetricCard title="Daily Reports Submitted" value={String(metrics.submittedReports)} helper={`${metrics.missingOrPartialReports} missing or partial`} />
         <MetricCard title="Needs Verification" value={String(metrics.needsVerification)} helper="Completed by users, awaiting review" tone="warning" />
         <MetricCard title="Issue Found Tasks" value={String(metrics.issueFound)} helper="User flagged task issues" tone="critical" />
@@ -396,8 +463,9 @@ function DashboardTab({ state }: { state: EventPrepState; currentProfile: Profil
         <Panel title="Area-Wise Progress">
           <div className="space-y-3">
             {state.areas.map((area) => {
-              const tasks = state.liveTasks.filter((task) => task.areaId === area.id && task.active && !task.notApplicable);
-              const latest = latestUpdateMap(state.taskUpdates);
+              if (zoneFilter !== "All" && area.zoneTypeId !== zoneFilter) return null;
+              if (areaFilter !== "All" && area.id !== areaFilter) return null;
+              const tasks = scopedTasks.filter((task) => task.areaId === area.id);
               const verified = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
               return <ProgressRow key={area.id} label={area.name} value={percent(verified, tasks.length)} helper={zoneName(state, area.zoneTypeId)} />;
             })}
@@ -405,9 +473,8 @@ function DashboardTab({ state }: { state: EventPrepState; currentProfile: Profil
         </Panel>
         <Panel title="Workstream Progress">
           <div className="space-y-3">
-            {unique(state.liveTasks.map((task) => taskDetails(state, task).workstream)).map((workstream) => {
-              const tasks = state.liveTasks.filter((task) => taskDetails(state, task).workstream === workstream && task.active && !task.notApplicable);
-              const latest = latestUpdateMap(state.taskUpdates);
+            {unique(scopedTasks.map((task) => taskDetails(state, task).workstream).filter(Boolean)).map((workstream) => {
+              const tasks = scopedTasks.filter((task) => taskDetails(state, task).workstream === workstream);
               const verified = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
               return <ProgressRow key={workstream} label={workstream} value={percent(verified, tasks.length)} helper={`${tasks.length} live tasks`} />;
             })}
@@ -2147,9 +2214,14 @@ function ActivityLogTab({ state, currentProfile, updateState, showToast }: { sta
 
 function Panel({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm">
+    <section className="dashboard-panel p-4">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="section-title">{title}</h2>
+        <div className="flex items-center gap-3">
+          <span className="panel-grip" aria-hidden="true">
+            <span /><span /><span /><span /><span /><span />
+          </span>
+          <h2 className="section-title">{title}</h2>
+        </div>
         {action}
       </div>
       {children}
@@ -2384,6 +2456,46 @@ function PeopleEditor<T extends EscalationPoint | SupportingPerson>({
 
 function updatePeopleRow<T extends EscalationPoint | SupportingPerson>(rows: T[], index: number, key: string, value: unknown, onChange: (rows: T[]) => void) {
   onChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, [key]: value } : row)) as T[]);
+}
+
+function exportLiveTasksCsv(state: EventPrepState) {
+  const latest = latestUpdateMap(state.taskUpdates);
+  const rows = state.liveTasks.map((task) => {
+    const details = taskDetails(state, task);
+    const update = latest.get(task.id);
+    return [
+      areaName(state, task.areaId),
+      zoneName(state, state.areas.find((area) => area.id === task.areaId)?.zoneTypeId || ""),
+      `Day ${task.prepDay}`,
+      details.workstream,
+      details.taskDetails,
+      task.taskType,
+      task.priority,
+      task.requiredQuantity || "",
+      task.unit || "",
+      update?.status || "Pending",
+      update?.verificationStatus || "Not Submitted",
+      task.dueDate
+    ];
+  });
+  const csv = [
+    ["Area", "Zone Type", "Prep Day", "Workstream", "Task", "Task Type", "Priority", "Required Quantity", "Unit", "Task Status", "Verification Status", "Due Date"],
+    ...rows
+  ].map((row) => row.map(csvCell).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `ashara-live-tasks-${todayIso()}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function csvCell(value: string | number) {
+  const text = String(value ?? "");
+  return `"${text.replace(/"/g, "\"\"")}"`;
 }
 
 function tabIcon(tab: AnyTab) {
