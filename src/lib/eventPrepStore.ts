@@ -6,6 +6,7 @@ import type {
   Area,
   AreaAccess,
   AreaRequest,
+  ActivityLog,
   DailyReport,
   EventPrepState,
   EventSettings,
@@ -14,6 +15,8 @@ import type {
   LiveTask,
   NotificationLog,
   Profile,
+  Reminder,
+  RequestReview,
   TaskFile,
   TaskTemplate,
   TaskUpdate,
@@ -117,7 +120,10 @@ async function loadFromSupabase(db: SupabaseClient): Promise<EventPrepState> {
     taskFiles,
     verificationLogs,
     requests,
+    requestReviews,
+    reminders,
     notificationLogs,
+    activityLogs,
     globalOptions,
     formFields,
     settings
@@ -132,7 +138,10 @@ async function loadFromSupabase(db: SupabaseClient): Promise<EventPrepState> {
     selectTable<TaskFile>(db, "task_files"),
     selectTable<VerificationLog>(db, "verification_logs"),
     selectTable<AreaRequest>(db, "requests"),
+    selectTable<RequestReview>(db, "request_reviews"),
+    selectTable<Reminder>(db, "reminders"),
     isAdmin ? selectTable<NotificationLog>(db, "notification_logs") : Promise.resolve([]),
+    isAdmin ? selectTable<ActivityLog>(db, "activity_logs") : Promise.resolve([]),
     selectTable<GlobalOption>(db, "global_options"),
     selectTable<FormField>(db, "form_fields"),
     selectSettings(db)
@@ -151,7 +160,10 @@ async function loadFromSupabase(db: SupabaseClient): Promise<EventPrepState> {
     taskFiles,
     verificationLogs,
     requests,
+    requestReviews,
+    reminders,
     notificationLogs,
+    activityLogs,
     globalOptions,
     formFields
   }, false);
@@ -178,11 +190,29 @@ async function saveToSupabase(db: SupabaseClient, state: EventPrepState, profile
   if (!isAdmin && profile) {
     const allowedAreaIds = new Set(state.areaAccess.filter((access) => access.profileId === profile.id).map((access) => access.areaId));
     const allowedTaskIds = new Set(state.liveTasks.filter((task) => allowedAreaIds.has(task.areaId)).map((task) => task.id));
+    const reviewRequestIds = new Set(state.requestReviews.filter((review) => review.reviewerId === profile.id).map((review) => review.requestId));
+    const managedProfileIds = new Set(
+      state.areaAccess
+        .filter((access) => allowedAreaIds.has(access.areaId))
+        .map((access) => access.profileId)
+    );
+    state.profiles.filter((item) => item.createdBy === profile.id).forEach((item) => managedProfileIds.add(item.id));
+    if (profile.role === "area_admin") {
+      await upsertRows(db, "profiles", state.profiles.filter((item) => item.createdBy === profile.id).map(profileToDb));
+    }
+    if (profile.role === "verifier") {
+      await upsertRows(db, "profiles", state.profiles.filter((item) => managedProfileIds.has(item.id) && item.role === "report_user").map(profileToDb));
+    }
+    if (profile.role === "area_admin") {
+      const createdProfileIds = new Set(state.profiles.filter((item) => item.createdBy === profile.id).map((item) => item.id));
+      await upsertRows(db, "area_access", state.areaAccess.filter((access) => createdProfileIds.has(access.profileId) && allowedAreaIds.has(access.areaId)).map(areaAccessToDb));
+    }
     await upsertRows(db, "daily_reports", state.dailyReports.filter((report) => allowedAreaIds.has(report.areaId)).map(reportToDb));
     await upsertRows(db, "task_updates", state.taskUpdates.filter((update) => allowedTaskIds.has(update.liveTaskId) && (update.updatedBy === profile.id || profile.role === "verifier")).map(updateToDb));
     await upsertRows(db, "task_files", state.taskFiles.filter((file) => allowedTaskIds.has(file.liveTaskId)).map(fileToDb));
     await upsertRows(db, "verification_logs", state.verificationLogs.filter((log) => log.verifierId === profile.id).map(verificationLogToDb));
-    await upsertRows(db, "requests", state.requests.filter((request) => request.requestedBy === profile.id).map(requestToDb));
+    await upsertRows(db, "requests", state.requests.filter((request) => request.requestedBy === profile.id || reviewRequestIds.has(request.id)).map(requestToDb));
+    await upsertRows(db, "request_reviews", state.requestReviews.filter((review) => review.reviewerId === profile.id).map(requestReviewToDb));
     return;
   }
 
@@ -205,7 +235,10 @@ async function saveToSupabase(db: SupabaseClient, state: EventPrepState, profile
   await upsertRows(db, "task_files", state.taskFiles.map(fileToDb));
   await upsertRows(db, "verification_logs", state.verificationLogs.map(verificationLogToDb));
   await upsertRows(db, "requests", state.requests.map(requestToDb));
+  await upsertRows(db, "request_reviews", state.requestReviews.map(requestReviewToDb));
+  await upsertRows(db, "reminders", state.reminders.map(reminderToDb));
   await upsertRows(db, "notification_logs", state.notificationLogs.map(notificationToDb));
+  await upsertRows(db, "activity_logs", state.activityLogs.map(activityLogToDb));
   await upsertRows(db, "global_options", state.globalOptions.map(globalOptionToDb));
   await upsertRows(db, "form_fields", state.formFields.map(formFieldToDb));
 }
@@ -248,7 +281,10 @@ function mergeWithSeed(partial: Partial<EventPrepState>, includeDemoData = true)
     taskFiles: partial.taskFiles || [],
     verificationLogs: partial.verificationLogs || [],
     requests: partial.requests || [],
+    requestReviews: partial.requestReviews || [],
+    reminders: partial.reminders?.length ? partial.reminders : seed.reminders,
     notificationLogs: partial.notificationLogs || [],
+    activityLogs: partial.activityLogs || [],
     globalOptions: partial.globalOptions?.length ? partial.globalOptions : seed.globalOptions,
     formFields: partial.formFields?.length ? partial.formFields : seed.formFields
   };
@@ -396,6 +432,38 @@ function fromDbRow<T>(row: Record<string, unknown>, table: string) {
         status: row.status || "queued",
         createdAt: String(row.created_at || new Date().toISOString())
       } as T;
+    case "request_reviews":
+      return {
+        id: String(row.id || ""),
+        requestId: String(row.request_id || ""),
+        reviewerId: String(row.reviewer_id || ""),
+        comment: String(row.comment || ""),
+        recommendation: String(row.recommendation || ""),
+        completed: Boolean(row.completed),
+        createdAt: String(row.created_at || new Date().toISOString())
+      } as T;
+    case "reminders":
+      return {
+        id: String(row.id || ""),
+        areaId: row.area_id ? String(row.area_id) : undefined,
+        reminderType: String(row.reminder_type || ""),
+        deadlineTime: String(row.deadline_time || "").slice(0, 5),
+        reminderTime: String(row.reminder_time || "").slice(0, 5),
+        escalationTime: String(row.escalation_time || "").slice(0, 5),
+        recipients: Array.isArray(row.recipients) ? row.recipients.map(String) : [],
+        active: Boolean(row.active ?? true)
+      } as T;
+    case "activity_logs":
+      return {
+        id: String(row.id || ""),
+        category: String(row.category || ""),
+        actorId: row.actor_id ? String(row.actor_id) : undefined,
+        action: String(row.action || ""),
+        entityType: String(row.entity_type || ""),
+        entityId: row.entity_id ? String(row.entity_id) : undefined,
+        metadata: row.metadata && typeof row.metadata === "object" ? row.metadata : {},
+        createdAt: String(row.created_at || new Date().toISOString())
+      } as T;
     case "global_options":
       return { id: String(row.id || ""), group: String(row.option_group || ""), value: String(row.value || ""), active: Boolean(row.active ?? true) } as T;
     case "form_fields":
@@ -495,6 +563,7 @@ function reportToDb(item: DailyReport) {
     report_date: item.reportDate,
     prep_day: item.prepDay,
     status: item.status,
+    general_remark: item.generalRemark,
     submitted_by: item.submittedBy || null,
     submitted_at: item.submittedAt || null,
     data: item,
@@ -569,6 +638,34 @@ function requestToDb(item: AreaRequest) {
   };
 }
 
+function requestReviewToDb(item: RequestReview) {
+  return {
+    id: item.id,
+    request_id: item.requestId,
+    reviewer_id: item.reviewerId,
+    comment: item.comment,
+    recommendation: item.recommendation,
+    completed: item.completed,
+    data: item,
+    updated_at: new Date().toISOString()
+  };
+}
+
+function reminderToDb(item: Reminder) {
+  return {
+    id: item.id,
+    area_id: item.areaId || null,
+    reminder_type: item.reminderType,
+    deadline_time: item.deadlineTime || null,
+    reminder_time: item.reminderTime || null,
+    escalation_time: item.escalationTime || null,
+    recipients: item.recipients,
+    active: item.active,
+    data: item,
+    updated_at: new Date().toISOString()
+  };
+}
+
 function notificationToDb(item: NotificationLog) {
   return {
     id: item.id,
@@ -576,6 +673,20 @@ function notificationToDb(item: NotificationLog) {
     recipient_email: item.recipientEmail,
     subject: item.subject,
     status: item.status,
+    data: item,
+    created_at: item.createdAt
+  };
+}
+
+function activityLogToDb(item: ActivityLog) {
+  return {
+    id: item.id,
+    category: item.category,
+    actor_id: item.actorId || null,
+    action: item.action,
+    entity_type: item.entityType,
+    entity_id: item.entityId || null,
+    metadata: item.metadata,
     data: item,
     created_at: item.createdAt
   };

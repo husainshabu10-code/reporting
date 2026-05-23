@@ -23,19 +23,26 @@ import {
   REQUEST_TYPES,
   TASK_TYPES,
   TEAM_TYPES,
+  UNIT_OPTIONS,
   USER_TASK_STATUSES,
   ZONE_TYPES,
+  type ActivityLog,
   type AreaRequest,
   type DashboardMetrics,
   type DailyReport,
   type EscalationPoint,
   type EventPrepState,
+  type FormField,
+  type GlobalOption,
   type LiveTask,
   type Profile,
+  type Reminder,
+  type RequestReview,
   type RequestStatus,
   type SupportingPerson,
   type TaskFile,
   type TaskTemplate,
+  type TaskTypeName,
   type TaskUpdate,
   type UserRole,
   type VerificationLog,
@@ -80,7 +87,8 @@ const ADMIN_TABS: AdminTab[] = [
   "Activity Log"
 ];
 const USER_TABS: UserTab[] = ["Daily Report", "My Area", "Requests", "Profile / Access"];
-const VERIFIER_TABS: AnyTab[] = ["Verification", "Requests", "Profile / Access"];
+const AREA_ADMIN_TABS: AnyTab[] = ["My Area", "Users & Access", "Requests", "Profile / Access"];
+const VERIFIER_TABS: AnyTab[] = ["Verification", "Requests", "Users & Access", "Profile / Access"];
 const VIEWER_TABS: AnyTab[] = ["Dashboard", "Profile / Access"];
 
 export default function EventPrepDashboard() {
@@ -161,13 +169,14 @@ export default function EventPrepDashboard() {
 
   const currentProfile = state ? getCurrentProfile(state, currentProfileId, sessionEmail) : undefined;
   const isAdmin = Boolean(currentProfile && ["super_admin", "admin"].includes(currentProfile.role));
+  const isAreaAdmin = currentProfile?.role === "area_admin";
   const isVerifier = currentProfile?.role === "verifier";
   const isViewer = currentProfile?.role === "viewer";
-  const tabs: AnyTab[] = isAdmin ? ADMIN_TABS : isVerifier ? VERIFIER_TABS : isViewer ? VIEWER_TABS : USER_TABS;
+  const tabs: AnyTab[] = isAdmin ? ADMIN_TABS : isAreaAdmin ? AREA_ADMIN_TABS : isVerifier ? VERIFIER_TABS : isViewer ? VIEWER_TABS : USER_TABS;
 
   useEffect(() => {
-    if (!tabs.includes(activeTab)) setActiveTab((isAdmin || isViewer ? "Dashboard" : isVerifier ? "Verification" : "Daily Report") as AnyTab);
-  }, [activeTab, isAdmin, isVerifier, isViewer, tabs]);
+    if (!tabs.includes(activeTab)) setActiveTab((isAdmin || isViewer ? "Dashboard" : isVerifier ? "Verification" : isAreaAdmin ? "My Area" : "Daily Report") as AnyTab);
+  }, [activeTab, isAdmin, isAreaAdmin, isVerifier, isViewer, tabs]);
 
   if (isEventPrepSupabaseConfigured() && authChecked && !sessionEmail) {
     return <LoginScreen authEmail={authEmail} authMessage={authMessage} setAuthEmail={setAuthEmail} sendLink={handleMagicLink} />;
@@ -208,7 +217,7 @@ export default function EventPrepDashboard() {
             <div>
               <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--color-accent)]">ASHARA MUBARAKAH</p>
               <h1 className="mt-1 text-xl font-black leading-tight text-[var(--color-primary)]">IT Event Preparation</h1>
-              <p className="mt-1 text-xs text-[var(--color-text-muted)]">Phase 1 reporting dashboard</p>
+              <p className="mt-1 text-xs text-[var(--color-text-muted)]">Phase 2 reporting dashboard</p>
             </div>
             <button className="icon-btn lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close navigation">
               <X size={18} />
@@ -287,16 +296,16 @@ export default function EventPrepDashboard() {
 
           <div className="mx-auto max-w-7xl p-4 lg:p-6">
             {activeTab === "Dashboard" ? <DashboardTab state={state} currentProfile={currentProfile} /> : null}
-            {activeTab === "Daily Reports" ? <DailyReportsTab state={state} currentProfile={currentProfile} /> : null}
-            {activeTab === "Master Tasks" ? <MasterTasksTab state={state} updateState={updateState} /> : null}
+            {activeTab === "Daily Reports" ? <DailyReportsTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
+            {activeTab === "Master Tasks" ? <MasterTasksTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
             {activeTab === "Zones / Areas" ? <ZonesAreasTab state={state} updateState={updateState} /> : null}
             {activeTab === "Verification" ? <VerificationTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
             {activeTab === "Requests" ? <RequestsTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
-            {activeTab === "Users & Access" ? <UsersAccessTab state={state} updateState={updateState} /> : null}
+            {activeTab === "Users & Access" ? <UsersAccessTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
             {activeTab === "Daily Report" ? <DailyReportTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
             {activeTab === "My Area" ? <MyAreaTab state={state} currentProfile={currentProfile} /> : null}
             {activeTab === "Profile / Access" ? <ProfileTab state={state} currentProfile={currentProfile} /> : null}
-            {["Forms", "Global Fields", "Reports", "Activity Log"].includes(activeTab) ? <FoundationTab state={state} tab={activeTab} /> : null}
+            {["Forms", "Global Fields", "Reports", "Activity Log"].includes(activeTab) ? <FoundationTab state={state} tab={activeTab} currentProfile={currentProfile} updateState={updateState} /> : null}
           </div>
         </section>
       </div>
@@ -402,29 +411,94 @@ function LoginScreen({
   );
 }
 
-function DailyReportsTab({ state }: { state: EventPrepState; currentProfile: Profile }) {
+function DailyReportsTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
   const today = todayIso();
   const rows = state.areas.map((area) => {
     const report = state.dailyReports.find((item) => item.areaId === area.id && item.reportDate === today);
     return { area, report };
   });
   return (
-    <Panel title="Daily Reports" action={<Badge>{today}</Badge>}>
-      <ResponsiveTable
-        headers={["Area", "Zone Type", "Status", "Remark", "Submitted"]}
-        rows={rows.map(({ area, report }) => [
-          area.name,
-          zoneName(state, area.zoneTypeId),
-          <StatusBadge key="status" value={report?.status || "Not Started"} />,
-          report?.generalRemark || "No report yet",
-          report?.submittedAt ? new Date(report.submittedAt).toLocaleString() : "-"
-        ])}
-      />
+    <div className="space-y-4">
+      <Panel title="Daily Reports" action={<Badge>{today}</Badge>}>
+        <ResponsiveTable
+          headers={["Area", "Zone Type", "Status", "Remark", "Submitted"]}
+          rows={rows.map(({ area, report }) => [
+            area.name,
+            zoneName(state, area.zoneTypeId),
+            <StatusBadge key="status" value={report?.status || "Not Started"} />,
+            report?.generalRemark || "No report yet",
+            report?.submittedAt ? new Date(report.submittedAt).toLocaleString() : "-"
+          ])}
+        />
+      </Panel>
+      {["super_admin", "admin"].includes(currentProfile.role) ? <RemindersConfig state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
+    </div>
+  );
+}
+
+function RemindersConfig({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+  const [reminderType, setReminderType] = useState("Daily report submission");
+  const [areaId, setAreaId] = useState("");
+  const reminderTypes = activeOptions(state, "Reminder types", [
+    "Daily report submission",
+    "Partially updated daily reports",
+    "Overdue tasks",
+    "Tasks due today",
+    "Pending verification",
+    "Rejected / Needs Correction tasks",
+    "Requests needing review",
+    "Access requests pending approval"
+  ]);
+  const addReminder = () => {
+    const reminder: Reminder = {
+      id: id("reminder"),
+      areaId: areaId || undefined,
+      reminderType,
+      deadlineTime: "20:00",
+      reminderTime: "18:30",
+      escalationTime: "21:00",
+      recipients: ["Admin"],
+      active: true
+    };
+    updateState((current) => withActivity({ ...current, reminders: [reminder, ...current.reminders] }, currentProfile, "Reminder activity", `Added ${reminder.reminderType} reminder`, "reminder", reminder.id, { active: true }));
+  };
+  const updateReminder = (reminderId: string, patch: Partial<Reminder>) => {
+    updateState((current) => withActivity({
+      ...current,
+      reminders: current.reminders.map((reminder) => (reminder.id === reminderId ? { ...reminder, ...patch } : reminder))
+    }, currentProfile, "Reminder activity", "Updated reminder rule", "reminder", reminderId, { changed: true }));
+  };
+  return (
+    <Panel title="Configurable Email Reminders" action={<Badge>Phase 2 config only</Badge>}>
+      <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+        <Select label="Reminder type" value={reminderType} onChange={setReminderType} options={reminderTypes} />
+        <Select label="Area / Zone" value={areaId} onChange={setAreaId} options={[{ label: "All areas", value: "" }, ...state.areas.map((area) => ({ label: area.name, value: area.id }))]} />
+        <button className="btn-primary" onClick={addReminder}>Add Reminder</button>
+      </div>
+      <div className="mt-4">
+        <ResponsiveTable
+          headers={["Type", "Area", "Deadline", "Reminder", "Escalation", "Recipients", "Active"]}
+          rows={state.reminders.map((reminder) => [
+            <select key="type" className="field" value={reminder.reminderType} onChange={(event) => updateReminder(reminder.id, { reminderType: event.target.value })}>
+              {reminderTypes.map((type) => <option key={type}>{type}</option>)}
+            </select>,
+            <select key="area" className="field" value={reminder.areaId || ""} onChange={(event) => updateReminder(reminder.id, { areaId: event.target.value || undefined })}>
+              <option value="">All areas</option>
+              {state.areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}
+            </select>,
+            <input key="deadline" className="field" type="time" value={reminder.deadlineTime} onChange={(event) => updateReminder(reminder.id, { deadlineTime: event.target.value })} />,
+            <input key="reminder" className="field" type="time" value={reminder.reminderTime} onChange={(event) => updateReminder(reminder.id, { reminderTime: event.target.value })} />,
+            <input key="escalation" className="field" type="time" value={reminder.escalationTime} onChange={(event) => updateReminder(reminder.id, { escalationTime: event.target.value })} />,
+            <input key="recipients" className="field min-w-48" value={reminder.recipients.join(", ")} onChange={(event) => updateReminder(reminder.id, { recipients: event.target.value.split(",").map((value) => value.trim()).filter(Boolean) })} />,
+            <input key="active" type="checkbox" checked={reminder.active} onChange={(event) => updateReminder(reminder.id, { active: event.target.checked })} />
+          ])}
+        />
+      </div>
     </Panel>
   );
 }
 
-function MasterTasksTab({ state, updateState }: { state: EventPrepState; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+function MasterTasksTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
   const [importMessage, setImportMessage] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dayFilter, setDayFilter] = useState("All");
@@ -433,6 +507,8 @@ function MasterTasksTab({ state, updateState }: { state: EventPrepState; updateS
   const [taskType, setTaskType] = useState<(typeof TASK_TYPES)[number]>("Simple Task");
   const [requiredQuantity, setRequiredQuantity] = useState("1");
   const [unit, setUnit] = useState("Item");
+  const unitOptions = activeOptions(state, "Units", UNIT_OPTIONS);
+  const priorityOptions = activeOptions(state, "Priority options", PRIORITY_OPTIONS);
 
   const filteredTemplates = state.taskTemplates.filter((template) => {
     const matchesDay = dayFilter === "All" || String(template.day) === dayFilter;
@@ -471,7 +547,7 @@ function MasterTasksTab({ state, updateState }: { state: EventPrepState; updateS
           return createLiveTask(template, applyAreaId, taskType, Number(requiredQuantity || 0), unit, current, current.settings.preparationStartDate);
         })
         .filter(Boolean) as LiveTask[];
-      return { ...current, liveTasks: [...newTasks, ...current.liveTasks] };
+      return withActivity({ ...current, liveTasks: [...newTasks, ...current.liveTasks] }, currentProfile, "Template changes", `Applied ${newTasks.length} template(s) to ${areaName(current, applyAreaId)}`, "live_task", applyAreaId, { count: newTasks.length });
     });
   };
 
@@ -505,7 +581,7 @@ function MasterTasksTab({ state, updateState }: { state: EventPrepState; updateS
           <Select label="Area" value={applyAreaId} onChange={setApplyAreaId} options={state.areas.map((area) => ({ label: area.name, value: area.id }))} />
           <Select label="Task Type" value={taskType} onChange={(value) => setTaskType(value as typeof taskType)} options={[...TASK_TYPES]} />
           <Input label="Required Qty" value={requiredQuantity} onChange={setRequiredQuantity} type="number" />
-          <Select label="Unit" value={unit} onChange={setUnit} options={["Item", "Device", "Point", "Document", "Person"]} />
+          <Select label="Unit" value={unit} onChange={setUnit} options={unitOptions} />
         </div>
         <button className="btn-primary mt-3" onClick={applyTemplates}>
           <Plus size={17} /> Apply Selected Templates
@@ -554,12 +630,23 @@ function MasterTasksTab({ state, updateState }: { state: EventPrepState; updateS
               <input key="start" className="field" type="date" value={task.startDate} onChange={(event) => updateLiveTask(task.id, { startDate: event.target.value })} />,
               <input key="due" className="field" type="date" value={task.dueDate} onChange={(event) => updateLiveTask(task.id, { dueDate: event.target.value })} />,
               <select key="priority" className="field" value={task.priority} onChange={(event) => updateLiveTask(task.id, { priority: event.target.value as LiveTask["priority"] })}>
-                {PRIORITY_OPTIONS.map((priority) => <option key={priority}>{priority}</option>)}
+                {priorityOptions.map((priority) => <option key={priority}>{priority}</option>)}
               </select>,
-              <select key="verifier" className="field" value={task.assignedVerifierIds[0] || ""} onChange={(event) => updateLiveTask(task.id, { assignedVerifierIds: event.target.value ? [event.target.value] : [] })}>
-                <option value="">No verifier</option>
-                {areaVerifierOptions.map((profile) => <option key={profile.id} value={profile.id}>{profile.fullName}</option>)}
-              </select>,
+              <div key="verifiers" className="grid gap-2">
+                {areaVerifierOptions.length ? areaVerifierOptions.map((profile) => (
+                  <label key={profile.id} className="flex items-center gap-2 text-xs font-bold text-[var(--color-primary)]">
+                    <input
+                      type="checkbox"
+                      checked={task.assignedVerifierIds.includes(profile.id)}
+                      onChange={(event) => {
+                        const next = event.target.checked ? [...task.assignedVerifierIds, profile.id] : task.assignedVerifierIds.filter((idValue) => idValue !== profile.id);
+                        updateLiveTask(task.id, { assignedVerifierIds: next });
+                      }}
+                    />
+                    {profile.fullName}
+                  </label>
+                )) : <span className="text-xs text-[var(--color-text-muted)]">No verifier assigned to area</span>}
+              </div>,
               <select key="rule" className="field" value={task.verificationRule} onChange={(event) => updateLiveTask(task.id, { verificationRule: event.target.value as LiveTask["verificationRule"] })}>
                 <option value="one_verifier">One verifier enough</option>
                 <option value="all_verifiers">All verifiers required</option>
@@ -705,7 +792,7 @@ function DailyReportTab({ state, currentProfile, updateState }: { state: EventPr
   }
 
   const saveDraft = () => {
-    updateState((current) => upsertReport(current, { ...report, generalRemark, status: "Draft Saved", updatedAt: new Date().toISOString() }));
+    updateState((current) => withActivity(upsertReport(current, { ...report, generalRemark, status: "Draft Saved", updatedAt: new Date().toISOString() }), currentProfile, "Daily reports", `Saved draft for ${area?.name || areaId}`, "daily_report", report.id, { status: "Draft Saved" }));
   };
 
   const submitReport = () => {
@@ -714,14 +801,14 @@ function DailyReportTab({ state, currentProfile, updateState }: { state: EventPr
     setMissingIds(missing);
     const nextStatus = missing.length ? "Partially Updated" : isLate(area?.dailyDeadline || "20:00") ? "Late Submitted" : "Submitted";
     updateState((current) =>
-      upsertReport(current, {
+      withActivity(upsertReport(current, {
         ...report,
         generalRemark,
         status: nextStatus,
         submittedBy: currentProfile.id,
         submittedAt: missing.length ? report.submittedAt : new Date().toISOString(),
         updatedAt: new Date().toISOString()
-      })
+      }), currentProfile, "Daily reports", `Submitted report for ${area?.name || areaId}`, "daily_report", report.id, { status: nextStatus, missingTasks: missing.length })
     );
   };
 
@@ -802,6 +889,14 @@ function TaskCard({
   const latest = latestUpdateMap(state.taskUpdates).get(task.id);
   const [draft, setDraft] = useState<TaskUpdate>(() => existing || createTaskUpdate(task, report, currentProfile.id, latest));
   const remaining = Math.max(0, (task.requiredQuantity || 0) - (draft.completedQuantity || 0));
+  const showStatus = isFormFieldVisible(state, task.taskType, "status");
+  const showRole = isFormFieldVisible(state, task.taskType, "user_role_standing");
+  const showQuantity = task.taskType === "Quantity-Based Task" && isFormFieldVisible(state, task.taskType, "completed_quantity");
+  const showRemarks = isFormFieldVisible(state, task.taskType, "remarks");
+  const showEscalations = isFormFieldVisible(state, task.taskType, "escalation_points");
+  const showSupport = isFormFieldVisible(state, task.taskType, "supporting_personnel");
+  const showUpload = isFormFieldVisible(state, task.taskType, "file_upload");
+  const teamTypeOptions = activeOptions(state, "Team Types", TEAM_TYPES);
 
   useEffect(() => {
     setDraft(existing || createTaskUpdate(task, report, currentProfile.id, latest));
@@ -814,32 +909,32 @@ function TaskCard({
     updateState((current) => {
       const without = current.taskUpdates.filter((update) => update.id !== next.id);
       const nextReport = current.dailyReports.some((item) => item.id === report.id) ? current.dailyReports : [report, ...current.dailyReports];
-      return { ...current, dailyReports: nextReport, taskUpdates: [next, ...without] };
+      return withActivity({ ...current, dailyReports: nextReport, taskUpdates: [next, ...without] }, currentProfile, "Task updates", `Updated task: ${template?.taskDetails || task.id}`, "task_update", next.id, { status: next.status });
     });
   };
 
   const requestNotApplicable = () => {
     const title = `Not applicable request: ${template?.taskDetails || "Task"}`;
-    updateState((current) => ({
-      ...current,
-      requests: [
-        {
-          id: id("request"),
-          requestType: "Not Applicable / Task Removal Request",
-          areaId: task.areaId,
-          relatedLiveTaskId: task.id,
-          title,
-          details: "User requested this task to be marked as not applicable for the area.",
-          priority: task.priority,
-          requiredByDate: todayIso(),
-          requestedBy: currentProfile.id,
-          status: "Under Review",
-          createdAt: new Date().toISOString()
-        },
-        ...current.requests
-      ],
-      notificationLogs: [createNotification("not_applicable_request", "admin@example.com", title), ...current.notificationLogs]
-    }));
+    updateState((current) => {
+      const request = {
+        id: id("request"),
+        requestType: "Not Applicable / Task Removal Request" as const,
+        areaId: task.areaId,
+        relatedLiveTaskId: task.id,
+        title,
+        details: "User requested this task to be marked as not applicable for the area.",
+        priority: task.priority,
+        requiredByDate: todayIso(),
+        requestedBy: currentProfile.id,
+        status: "Under Review" as const,
+        createdAt: new Date().toISOString()
+      };
+      return withActivity({
+        ...current,
+        requests: [request, ...current.requests],
+        notificationLogs: [createNotification("not_applicable_request", "admin@example.com", title), ...current.notificationLogs]
+      }, currentProfile, "Requests", title, "request", request.id, { status: request.status });
+    });
   };
 
   const addFile = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -891,12 +986,12 @@ function TaskCard({
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-3">
-        <Select label="Status" value={draft.status} onChange={(value) => setDraft({ ...draft, status: value as TaskUpdate["status"] })} options={[...USER_TASK_STATUSES]} />
-        <Input label="User role / standing" value={draft.userRoleStanding} onChange={(value) => setDraft({ ...draft, userRoleStanding: value })} placeholder="Local IT SPOC" />
-        {task.taskType === "Quantity-Based Task" ? <Input label={`Completed / installed quantity (${task.unit || "unit"})`} value={String(draft.completedQuantity || "")} onChange={(value) => setDraft({ ...draft, completedQuantity: Number(value || 0) })} type="number" /> : null}
+        {showStatus ? <Select label="Status" value={draft.status} onChange={(value) => setDraft({ ...draft, status: value as TaskUpdate["status"] })} options={[...USER_TASK_STATUSES]} /> : null}
+        {showRole ? <Input label="User role / standing" value={draft.userRoleStanding} onChange={(value) => setDraft({ ...draft, userRoleStanding: value })} placeholder="Local IT SPOC" /> : null}
+        {showQuantity ? <Input label={`Completed / installed quantity (${task.unit || "unit"})`} value={String(draft.completedQuantity || "")} onChange={(value) => setDraft({ ...draft, completedQuantity: Number(value || 0) })} type="number" /> : null}
       </div>
 
-      {task.taskType === "Quantity-Based Task" ? (
+      {showQuantity ? (
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <MiniStat label="Required" value={`${task.requiredQuantity || 0} ${task.unit || ""}`} />
           <MiniStat label="Completed" value={String(draft.completedQuantity || 0)} />
@@ -904,32 +999,35 @@ function TaskCard({
         </div>
       ) : null}
 
-      <label className="mt-3 block">
-        <span className="field-label">Remarks</span>
-        <textarea className="field mt-2 min-h-20" value={draft.remarks} onChange={(event) => setDraft({ ...draft, remarks: event.target.value })} />
-      </label>
+      {showRemarks ? (
+        <label className="mt-3 block">
+          <span className="field-label">Remarks</span>
+          <textarea className="field mt-2 min-h-20" value={draft.remarks} onChange={(event) => setDraft({ ...draft, remarks: event.target.value })} />
+        </label>
+      ) : null}
 
-      <PeopleEditor
+      {showEscalations ? <PeopleEditor
         title="Escalation Points"
         rows={draft.escalationPoints}
         addLabel="Add escalation point"
         onChange={(rows) => setDraft({ ...draft, escalationPoints: rows })}
         kind="escalation"
-      />
-      <PeopleEditor
+      /> : null}
+      {showSupport ? <PeopleEditor
         title="Supporting Personnel"
         rows={draft.supportingPersonnel}
         addLabel="Add supporting person"
         onChange={(rows) => setDraft({ ...draft, supportingPersonnel: rows })}
         kind="support"
-      />
+        teamTypeOptions={teamTypeOptions}
+      /> : null}
 
-      <div className="mt-3 rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+      {showUpload ? <div className="mt-3 rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-bg)] p-3">
         <label className="field-label">Upload evidence</label>
         <input className="field mt-2" type="file" multiple onChange={addFile} />
         <p className="mt-2 text-xs text-[var(--color-text-muted)]">{task.evidenceNote || "Uploads are optional in Phase 1. Files lock when review starts."}</p>
         {files.length ? <p className="mt-2 text-xs font-bold text-[var(--color-primary)]">{files.map((file) => file.fileName).join(", ")}</p> : null}
-      </div>
+      </div> : null}
 
       <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
         <button className="btn-secondary" onClick={requestNotApplicable}>Request Not Applicable</button>
@@ -952,22 +1050,26 @@ function VerificationTab({ state, currentProfile, updateState }: { state: EventP
   const act = (task: LiveTask, action: VerificationLog["action"]) => {
     const update = latest.get(task.id);
     if (!update) return;
+    if (!canActOnVerification(task, update, currentProfile, state.verificationLogs)) {
+      window.alert("This verification is waiting for another assigned verifier.");
+      return;
+    }
     const comment = window.prompt(action === "verified" ? "Verification comment" : "Correction comment") || "";
     updateState((current) => {
-      const nextStatus: VerificationStatus = action === "verified" ? "Verified Completed" : "Rejected / Needs Correction";
+      const log: VerificationLog = { id: id("verification"), liveTaskId: task.id, taskUpdateId: update.id, verifierId: currentProfile.id, action, comment, createdAt: new Date().toISOString() };
+      const nextStatus: VerificationStatus = action === "verified" ? nextVerificationStatus(task, update, currentProfile, [...current.verificationLogs, log]) : "Rejected / Needs Correction";
       const updatedTaskUpdate = {
         ...update,
         verificationStatus: nextStatus,
         correctionComment: action === "rejected" ? comment : update.correctionComment,
         updatedAt: new Date().toISOString()
       };
-      const log: VerificationLog = { id: id("verification"), liveTaskId: task.id, taskUpdateId: update.id, verifierId: currentProfile.id, action, comment, createdAt: new Date().toISOString() };
-      return {
+      return withActivity({
         ...current,
         taskUpdates: [updatedTaskUpdate, ...current.taskUpdates.filter((item) => item.id !== update.id)],
         verificationLogs: [log, ...current.verificationLogs],
         taskFiles: current.taskFiles.map((file) => (file.liveTaskId === task.id ? { ...file, reviewLocked: true } : file))
-      };
+      }, currentProfile, "Verification actions", `${action === "verified" ? "Verified" : "Rejected"} task`, "verification_log", log.id, { status: nextStatus });
     });
   };
 
@@ -977,6 +1079,7 @@ function VerificationTab({ state, currentProfile, updateState }: { state: EventP
         {queue.map((task) => {
           const template = state.taskTemplates.find((item) => item.id === task.templateId);
           const update = latest.get(task.id);
+          const canAct = update ? canActOnVerification(task, update, currentProfile, state.verificationLogs) : false;
           return (
             <article key={task.id} className="rounded-lg border border-[var(--color-border)] bg-white p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -984,14 +1087,17 @@ function VerificationTab({ state, currentProfile, updateState }: { state: EventP
                   <div className="flex flex-wrap gap-2">
                     <Badge>{areaName(state, task.areaId)}</Badge>
                     <StatusBadge value={update?.verificationStatus || "Needs Verification"} />
+                    <Badge>{verificationRuleLabel(task.verificationRule)}</Badge>
+                    {!canAct ? <StatusBadge value="Waiting for verifier turn" /> : null}
                   </div>
                   <h3 className="mt-2 font-black text-[var(--color-primary)]">{template?.taskDetails}</h3>
                   <p className="mt-1 text-sm text-[var(--color-text-muted)]">{update?.remarks || "No remarks"}</p>
                   {task.taskType === "Quantity-Based Task" ? <p className="mt-1 text-sm font-bold">Quantity: {update?.completedQuantity || 0}/{task.requiredQuantity || 0}</p> : null}
+                  <p className="mt-1 text-xs text-[var(--color-text-muted)]">Verifiers: {task.assignedVerifierIds.map((profileId) => state.profiles.find((profile) => profile.id === profileId)?.fullName || profileId).join(", ") || "None"}</p>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
-                  <button className="btn-primary" onClick={() => act(task, "verified")}>Verify</button>
-                  <button className="btn-secondary" onClick={() => act(task, "rejected")}>Reject / Needs Correction</button>
+                  <button className="btn-primary" disabled={!canAct} onClick={() => act(task, "verified")}>Verify</button>
+                  <button className="btn-secondary" disabled={!canAct} onClick={() => act(task, "rejected")}>Reject / Needs Correction</button>
                 </div>
               </div>
             </article>
@@ -1010,7 +1116,14 @@ function RequestsTab({ state, currentProfile, updateState }: { state: EventPrepS
   const [requestType, setRequestType] = useState<(typeof REQUEST_TYPES)[number]>("Extra Equipment Request");
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
-  const visibleRequests = isAdmin ? state.requests : state.requests.filter((request) => areas.some((area) => area.id === request.areaId) || request.requestedBy === currentProfile.id);
+  const [reviewerByRequest, setReviewerByRequest] = useState<Record<string, string>>({});
+  const assignedReviewRequestIds = new Set(state.requestReviews.filter((review) => review.reviewerId === currentProfile.id && !review.completed).map((review) => review.requestId));
+  const visibleRequests = isAdmin
+    ? state.requests
+    : currentProfile.role === "verifier"
+      ? state.requests.filter((request) => assignedReviewRequestIds.has(request.id))
+      : state.requests.filter((request) => areas.some((area) => area.id === request.areaId) || request.requestedBy === currentProfile.id);
+  const verifierOptions = state.profiles.filter((profile) => profile.role === "verifier" && profile.status === "active");
 
   const createRequest = () => {
     if (!title.trim() || !areaId) return;
@@ -1026,24 +1139,58 @@ function RequestsTab({ state, currentProfile, updateState }: { state: EventPrepS
       status: "Under Review",
       createdAt: new Date().toISOString()
     };
-    updateState((current) => ({
+    updateState((current) => withActivity({
       ...current,
       requests: [request, ...current.requests],
       notificationLogs: [createNotification("request_created", "admin@example.com", `New request: ${title}`), ...current.notificationLogs]
-    }));
+    }, currentProfile, "Requests", `Created request: ${title}`, "request", request.id, { status: request.status }));
     setTitle("");
     setDetails("");
   };
 
   const changeStatus = (request: AreaRequest, status: RequestStatus) => {
-    updateState((current) => ({
+    updateState((current) => withActivity({
       ...current,
       requests: current.requests.map((item) => (item.id === request.id ? { ...item, status } : item)),
       liveTasks:
         status === "Approved" && request.requestType === "Not Applicable / Task Removal Request" && request.relatedLiveTaskId
           ? current.liveTasks.map((task) => (task.id === request.relatedLiveTaskId ? { ...task, notApplicable: true, active: false } : task))
           : current.liveTasks
-    }));
+    }, currentProfile, "Requests", `Changed request status to ${status}`, "request", request.id, { status }));
+  };
+
+  const sendForVerification = (request: AreaRequest) => {
+    const reviewerId = reviewerByRequest[request.id];
+    if (!reviewerId) return;
+    updateState((current) => {
+      const review: RequestReview = {
+        id: id("request-review"),
+        requestId: request.id,
+        reviewerId,
+        comment: "",
+        recommendation: "",
+        completed: false,
+        createdAt: new Date().toISOString()
+      };
+      return withActivity({
+        ...current,
+        requests: current.requests.map((item) => (item.id === request.id ? { ...item, status: "Sent for Verification" } : item)),
+        requestReviews: [review, ...current.requestReviews],
+        notificationLogs: [createNotification("request_review", state.profiles.find((profile) => profile.id === reviewerId)?.email || "verifier@example.com", `Request sent for verification: ${request.title}`), ...current.notificationLogs]
+      }, currentProfile, "Requests", "Sent request for verifier review", "request", request.id, { reviewerAssigned: true });
+    });
+  };
+
+  const completeReview = (request: AreaRequest) => {
+    const review = state.requestReviews.find((item) => item.requestId === request.id && item.reviewerId === currentProfile.id && !item.completed);
+    if (!review) return;
+    const recommendation = window.prompt("Recommendation for admin", review.recommendation || "Approve / Reject / Need more info") || review.recommendation;
+    const comment = window.prompt("Review comment", review.comment) || review.comment;
+    updateState((current) => withActivity({
+      ...current,
+      requestReviews: current.requestReviews.map((item) => (item.id === review.id ? { ...item, recommendation, comment, completed: true } : item)),
+      requests: current.requests.map((item) => (item.id === request.id ? { ...item, status: "Under Review", decisionRemarks: comment || item.decisionRemarks } : item))
+    }, currentProfile, "Requests", "Completed verifier request review", "request_review", review.id, { completed: true }));
   };
 
   return (
@@ -1060,17 +1207,30 @@ function RequestsTab({ state, currentProfile, updateState }: { state: EventPrepS
       </Panel>
       <Panel title="Requests">
         <ResponsiveTable
-          headers={["Type", "Area", "Title", "Status", "Action"]}
+          headers={["Type", "Area", "Title", "Status", "Review", "Action"]}
           rows={visibleRequests.map((request) => [
             request.requestType,
             areaName(state, request.areaId),
             request.title,
             <StatusBadge key="status" value={request.status} />,
+            state.requestReviews.filter((review) => review.requestId === request.id).map((review) => {
+              const reviewer = state.profiles.find((profile) => profile.id === review.reviewerId)?.fullName || "Verifier";
+              return `${reviewer}: ${review.completed ? review.recommendation || "Completed" : "Pending"}`;
+            }).join("; ") || "-",
             isAdmin ? (
-              <select key="action" className="field" value={request.status} onChange={(event) => changeStatus(request, event.target.value as RequestStatus)}>
-                {REQUEST_STATUSES.map((status) => <option key={status}>{status}</option>)}
-              </select>
-            ) : "-"
+              <div key="action" className="grid gap-2">
+                <select className="field" value={request.status} onChange={(event) => changeStatus(request, event.target.value as RequestStatus)}>
+                  {REQUEST_STATUSES.map((status) => <option key={status}>{status}</option>)}
+                </select>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <select className="field" value={reviewerByRequest[request.id] || ""} onChange={(event) => setReviewerByRequest((current) => ({ ...current, [request.id]: event.target.value }))}>
+                    <option value="">Send to verifier</option>
+                    {verifierOptions.map((profile) => <option key={profile.id} value={profile.id}>{profile.fullName}</option>)}
+                  </select>
+                  <button className="btn-compact" onClick={() => sendForVerification(request)}>Send</button>
+                </div>
+              </div>
+            ) : assignedReviewRequestIds.has(request.id) ? <button key="complete" className="btn-compact" onClick={() => completeReview(request)}>Complete Review</button> : "-"
           ])}
         />
       </Panel>
@@ -1078,46 +1238,76 @@ function RequestsTab({ state, currentProfile, updateState }: { state: EventPrepS
   );
 }
 
-function UsersAccessTab({ state, updateState }: { state: EventPrepState; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+function UsersAccessTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+  const isAdmin = ["super_admin", "admin"].includes(currentProfile.role);
+  const isAreaAdmin = currentProfile.role === "area_admin";
+  const isVerifier = currentProfile.role === "verifier";
+  const managedAreas = isAdmin ? state.areas : getAllowedAreas(state, currentProfile);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [role, setRole] = useState<UserRole>("report_user");
-  const [areaId, setAreaId] = useState(state.areas[0]?.id || "");
+  const [areaId, setAreaId] = useState(managedAreas[0]?.id || "");
+  const shownProfiles = isAdmin
+    ? state.profiles
+    : state.profiles.filter((profile) => {
+      const access = state.areaAccess.filter((item) => item.profileId === profile.id);
+      return access.some((item) => managedAreas.some((area) => area.id === item.areaId)) || profile.createdBy === currentProfile.id;
+    });
+  const canAddUsers = isAdmin || isAreaAdmin;
   const addUser = () => {
     if (!email.trim() || !name.trim()) return;
-    const profile: Profile = { id: id("profile"), email, fullName: name, role, status: role === "report_user" ? "pending_approval" : "active" };
+    const assignedRole = isAreaAdmin ? "report_user" : role;
+    const profile: Profile = {
+      id: id("profile"),
+      email: email.trim().toLowerCase(),
+      fullName: name.trim(),
+      role: assignedRole,
+      status: assignedRole === "report_user" ? "pending_approval" : "active",
+      createdBy: currentProfile.id
+    };
     updateState((current) => ({
-      ...current,
+      ...withActivity(current, currentProfile, "Access changes", `Created ${roleLabel(assignedRole)} profile`, "profile", profile.id, { pendingApproval: profile.status === "pending_approval" }),
       profiles: [profile, ...current.profiles],
-      areaAccess: areaId ? [{ id: id("access"), profileId: profile.id, areaId, role }, ...current.areaAccess] : current.areaAccess,
-      notificationLogs: [createNotification("access_invite_pending", email, "Your access is pending approval"), ...current.notificationLogs]
+      areaAccess: areaId ? [{ id: id("access"), profileId: profile.id, areaId, role: assignedRole }, ...current.areaAccess] : current.areaAccess,
+      notificationLogs: [createNotification("access_invite_pending", profile.email, "Your access is pending approval"), ...current.notificationLogs]
     }));
     setEmail("");
     setName("");
   };
-  const approve = (profile: Profile) => updateState((current) => ({ ...current, profiles: current.profiles.map((item) => (item.id === profile.id ? { ...item, status: "active" } : item)) }));
+  const canApprove = (profile: Profile) => {
+    if (isAdmin) return true;
+    if (!isVerifier) return false;
+    const profileAreaIds = state.areaAccess.filter((access) => access.profileId === profile.id).map((access) => access.areaId);
+    return profileAreaIds.some((profileAreaId) => managedAreas.some((area) => area.id === profileAreaId));
+  };
+  const approve = (profile: Profile) => updateState((current) => withActivity({
+    ...current,
+    profiles: current.profiles.map((item) => (item.id === profile.id ? { ...item, status: "active" } : item)),
+    notificationLogs: [createNotification("access_approved", profile.email, "Your dashboard access is approved"), ...current.notificationLogs]
+  }, currentProfile, "Access changes", `Approved access for ${profile.fullName}`, "profile", profile.id, { approved: true }));
 
   return (
     <div className="space-y-4">
-      <Panel title="Add User / Access">
+      {canAddUsers ? <Panel title={isAreaAdmin ? "Add Report User For My Area" : "Add User / Access"}>
         <div className="grid gap-3 lg:grid-cols-5">
           <Input label="Full name" value={name} onChange={setName} />
           <Input label="Email" value={email} onChange={setEmail} type="email" />
-          <Select label="Role" value={role} onChange={(value) => setRole(value as UserRole)} options={["super_admin", "admin", "area_admin", "verifier", "report_user", "viewer"].map((value) => ({ label: roleLabel(value as UserRole), value }))} />
-          <Select label="Area access" value={areaId} onChange={setAreaId} options={state.areas.map((area) => ({ label: area.name, value: area.id }))} />
+          <Select label="Role" value={isAreaAdmin ? "report_user" : role} onChange={(value) => setRole(value as UserRole)} disabled={isAreaAdmin} options={["super_admin", "admin", "area_admin", "verifier", "report_user", "viewer"].map((value) => ({ label: roleLabel(value as UserRole), value }))} />
+          <Select label="Area access" value={areaId} onChange={setAreaId} options={managedAreas.map((area) => ({ label: area.name, value: area.id }))} />
           <button className="btn-primary self-end" onClick={addUser}>Add User</button>
         </div>
-      </Panel>
+        <p className="mt-3 text-xs text-[var(--color-text-muted)]">Report users are created as Pending Approval. Admins or assigned verifiers activate them before login works.</p>
+      </Panel> : null}
       <Panel title="Users & Access">
         <ResponsiveTable
           headers={["Name", "Email", "Role", "Status", "Areas", "Action"]}
-          rows={state.profiles.map((profile) => [
+          rows={shownProfiles.map((profile) => [
             profile.fullName,
             profile.email,
             roleLabel(profile.role),
             <StatusBadge key="status" value={profile.status.replace("_", " ")} />,
             state.areaAccess.filter((access) => access.profileId === profile.id).map((access) => areaName(state, access.areaId)).join(", ") || "All / not restricted",
-            profile.status === "pending_approval" ? <button key="approve" className="btn-compact" onClick={() => approve(profile)}>Approve</button> : "-"
+            profile.status === "pending_approval" && canApprove(profile) ? <button key="approve" className="btn-compact" onClick={() => approve(profile)}>Approve</button> : "-"
           ])}
         />
       </Panel>
@@ -1156,26 +1346,158 @@ function ProfileTab({ state, currentProfile }: { state: EventPrepState; currentP
   );
 }
 
-function FoundationTab({ state, tab }: { state: EventPrepState; tab: AnyTab }) {
-  if (tab === "Forms") {
-    return (
-      <Panel title="Forms Foundation">
-        <ResponsiveTable headers={["Task Type", "Field", "Visible", "Required"]} rows={state.formFields.map((field) => [field.taskType, field.label, field.visible ? "Yes" : "No", field.required ? "Yes" : "No"])} />
-      </Panel>
-    );
-  }
-  if (tab === "Global Fields") {
-    return (
-      <Panel title="Global Fields Foundation">
-        <ResponsiveTable headers={["Group", "Value", "Active"]} rows={state.globalOptions.map((option) => [option.group, option.value, option.active ? "Yes" : "No"])} />
-      </Panel>
-    );
-  }
+function FoundationTab({
+  state,
+  tab,
+  currentProfile,
+  updateState
+}: {
+  state: EventPrepState;
+  tab: AnyTab;
+  currentProfile: Profile;
+  updateState: (updater: (current: EventPrepState) => EventPrepState) => void;
+}) {
+  if (tab === "Forms") return <FormBuilderTab state={state} currentProfile={currentProfile} updateState={updateState} />;
+  if (tab === "Global Fields") return <GlobalFieldsTab state={state} currentProfile={currentProfile} updateState={updateState} />;
   if (tab === "Reports") return <EmptyState title="Reports foundation ready" body="PDF and Excel exports are reserved for Phase 3. The schema already includes report_exports." />;
+  return <ActivityLogTab state={state} currentProfile={currentProfile} updateState={updateState} />;
+}
+
+function FormBuilderTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+  const [taskType, setTaskType] = useState<TaskTypeName>("Simple Task");
+  const [label, setLabel] = useState("");
+  const addField = () => {
+    if (!label.trim()) return;
+    updateState((current) => {
+      const fieldsForType = current.formFields.filter((field) => field.taskType === taskType);
+      const field: FormField = {
+        id: id("field"),
+        taskType,
+        fieldKey: slug(label),
+        label: label.trim(),
+        required: false,
+        visible: true,
+        displayOrder: fieldsForType.length + 1
+      };
+      return withActivity({ ...current, formFields: [...current.formFields, field] }, currentProfile, "Form/global field changes", `Added form field ${field.label}`, "form_field", field.id, { visible: true });
+    });
+    setLabel("");
+  };
+  const updateField = (fieldId: string, patch: Partial<FormField>) => {
+    updateState((current) => withActivity({
+      ...current,
+      formFields: current.formFields.map((field) => (field.id === fieldId ? { ...field, ...patch } : field))
+    }, currentProfile, "Form/global field changes", "Updated form field", "form_field", fieldId, { changed: true }));
+  };
   return (
-    <Panel title="Activity / Notification Foundation">
-      <ResponsiveTable headers={["Type", "Recipient", "Subject", "Status"]} rows={state.notificationLogs.map((log) => [log.type, log.recipientEmail, log.subject, log.status])} />
-    </Panel>
+    <div className="space-y-4">
+      <Panel title="Add Form Field">
+        <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+          <Select label="Task Type" value={taskType} onChange={(value) => setTaskType(value as TaskTypeName)} options={[...TASK_TYPES]} />
+          <Input label="Field label" value={label} onChange={setLabel} placeholder="Testing result" />
+          <button className="btn-primary" onClick={addField}>Add Field</button>
+        </div>
+      </Panel>
+      <Panel title="Task Type Form Builder">
+        <ResponsiveTable
+          headers={["Task Type", "Field", "Order", "Visible", "Required"]}
+          rows={state.formFields
+            .slice()
+            .sort((a, b) => a.taskType.localeCompare(b.taskType) || a.displayOrder - b.displayOrder)
+            .map((field) => [
+              field.taskType,
+              <input key="label" className="field" value={field.label} onChange={(event) => updateField(field.id, { label: event.target.value })} />,
+              <input key="order" className="field w-20" type="number" value={field.displayOrder} onChange={(event) => updateField(field.id, { displayOrder: Number(event.target.value || 0) })} />,
+              <input key="visible" type="checkbox" checked={field.visible} onChange={(event) => updateField(field.id, { visible: event.target.checked })} />,
+              <input key="required" type="checkbox" checked={field.required} onChange={(event) => updateField(field.id, { required: event.target.checked })} />
+            ])}
+        />
+      </Panel>
+    </div>
+  );
+}
+
+function GlobalFieldsTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+  const groups = unique(state.globalOptions.map((option) => option.group));
+  const [group, setGroup] = useState(groups[0] || "Workstreams");
+  const [value, setValue] = useState("");
+  const addOption = () => {
+    if (!group.trim() || !value.trim()) return;
+    updateState((current) => {
+      const option: GlobalOption = { id: id("option"), group: group.trim(), value: value.trim(), active: true };
+      return withActivity({ ...current, globalOptions: [...current.globalOptions, option] }, currentProfile, "Form/global field changes", `Added global option ${option.value}`, "global_option", option.id, { active: true });
+    });
+    setValue("");
+  };
+  const updateOption = (optionId: string, patch: Partial<GlobalOption>) => {
+    updateState((current) => withActivity({
+      ...current,
+      globalOptions: current.globalOptions.map((option) => (option.id === optionId ? { ...option, ...patch } : option))
+    }, currentProfile, "Form/global field changes", "Updated global option", "global_option", optionId, { changed: true }));
+  };
+  return (
+    <div className="space-y-4">
+      <Panel title="Add Global Option">
+        <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+          <Input label="Group" value={group} onChange={setGroup} placeholder="Team Types" />
+          <Input label="Value" value={value} onChange={setValue} placeholder="Fiber Team" />
+          <button className="btn-primary" onClick={addOption}>Add Option</button>
+        </div>
+        <p className="mt-3 text-xs text-[var(--color-text-muted)]">Editable options are used by Phase 2 forms and task setup where applicable.</p>
+      </Panel>
+      <Panel title="Global Fields / Options">
+        <ResponsiveTable
+          headers={["Group", "Value", "Active"]}
+          rows={state.globalOptions
+            .slice()
+            .sort((a, b) => a.group.localeCompare(b.group) || a.value.localeCompare(b.value))
+            .map((option) => [
+              option.group,
+              <input key="value" className="field" value={option.value} onChange={(event) => updateOption(option.id, { value: event.target.value })} />,
+              <input key="active" type="checkbox" checked={option.active} onChange={(event) => updateOption(option.id, { active: event.target.checked })} />
+            ])}
+        />
+      </Panel>
+    </div>
+  );
+}
+
+function ActivityLogTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+  const activityOptions = state.globalOptions.filter((option) => option.group === "Activity Log Categories");
+  const updateOption = (optionId: string, active: boolean) => {
+    updateState((current) => ({
+      ...current,
+      globalOptions: current.globalOptions.map((option) => (option.id === optionId ? { ...option, active } : option))
+    }));
+  };
+  return (
+    <div className="space-y-4">
+      <Panel title="Activity Log Settings">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {activityOptions.map((option) => (
+            <label key={option.id} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3 text-sm font-bold text-[var(--color-primary)]">
+              <input type="checkbox" checked={option.active} onChange={(event) => updateOption(option.id, event.target.checked)} />
+              {option.value}
+            </label>
+          ))}
+        </div>
+      </Panel>
+      <Panel title="Activity Log">
+        <ResponsiveTable
+          headers={["Time", "Category", "Actor", "Action", "Entity"]}
+          rows={state.activityLogs.map((log) => [
+            new Date(log.createdAt).toLocaleString(),
+            log.category,
+            state.profiles.find((profile) => profile.id === log.actorId)?.fullName || "System",
+            log.action,
+            `${log.entityType}${log.entityId ? ` / ${log.entityId}` : ""}`
+          ])}
+        />
+      </Panel>
+      <Panel title="Email Notification Queue">
+        <ResponsiveTable headers={["Type", "Recipient", "Subject", "Status"]} rows={state.notificationLogs.map((log) => [log.type, log.recipientEmail, log.subject, log.status])} />
+      </Panel>
+    </div>
   );
 }
 
@@ -1317,13 +1639,15 @@ function PeopleEditor<T extends EscalationPoint | SupportingPerson>({
   rows,
   onChange,
   addLabel,
-  kind
+  kind,
+  teamTypeOptions = TEAM_TYPES
 }: {
   title: string;
   rows: T[];
   onChange: (rows: T[]) => void;
   addLabel: string;
   kind: "escalation" | "support";
+  teamTypeOptions?: readonly string[];
 }) {
   const add = () =>
     onChange([
@@ -1353,7 +1677,7 @@ function PeopleEditor<T extends EscalationPoint | SupportingPerson>({
               <div className="md:col-span-4">
                 <p className="mb-2 text-xs font-bold uppercase text-[var(--color-text-muted)]">Team Type</p>
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-                  {TEAM_TYPES.map((teamType) => (
+                  {teamTypeOptions.map((teamType) => (
                     <label key={teamType} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white px-2 py-2 text-xs font-bold text-[var(--color-primary)]">
                       <input
                         type="checkbox"
@@ -1391,6 +1715,64 @@ function tabIcon(tab: AnyTab) {
   if (tab.includes("User") || tab.includes("Access")) return <Users {...props} />;
   if (tab.includes("Activity")) return <CalendarClock {...props} />;
   return <CheckCircle2 {...props} />;
+}
+
+function activeOptions(state: EventPrepState, group: string, fallback: readonly string[]) {
+  const options = state.globalOptions.filter((option) => option.group === group && option.active).map((option) => option.value);
+  return options.length ? options : [...fallback];
+}
+
+function isFormFieldVisible(state: EventPrepState, taskType: TaskTypeName, fieldKey: string) {
+  const field = state.formFields.find((item) => item.taskType === taskType && item.fieldKey === fieldKey);
+  return field ? field.visible : true;
+}
+
+function canActOnVerification(task: LiveTask, update: TaskUpdate, profile: Profile, logs: VerificationLog[]) {
+  if (["super_admin", "admin"].includes(profile.role)) return true;
+  if (!task.assignedVerifierIds.includes(profile.id)) return false;
+  const verifiedIds = logs
+    .filter((log) => log.taskUpdateId === update.id && log.action === "verified")
+    .map((log) => log.verifierId);
+  if (verifiedIds.includes(profile.id)) return false;
+  if (task.verificationRule !== "sequential") return true;
+  const nextVerifier = task.assignedVerifierIds.find((verifierId) => !verifiedIds.includes(verifierId));
+  return nextVerifier === profile.id;
+}
+
+function nextVerificationStatus(task: LiveTask, update: TaskUpdate, profile: Profile, logs: VerificationLog[]): VerificationStatus {
+  if (["super_admin", "admin"].includes(profile.role) || !task.verificationRequired || task.verificationRule === "one_verifier") return "Verified Completed";
+  const verifiedIds = new Set(logs.filter((log) => log.taskUpdateId === update.id && log.action === "verified").map((log) => log.verifierId));
+  return task.assignedVerifierIds.every((verifierId) => verifiedIds.has(verifierId)) ? "Verified Completed" : "Partially Verified";
+}
+
+function verificationRuleLabel(rule: LiveTask["verificationRule"]) {
+  if (rule === "all_verifiers") return "All verifiers required";
+  if (rule === "sequential") return "Sequential verification";
+  return "One verifier enough";
+}
+
+function withActivity(
+  state: EventPrepState,
+  actor: Profile,
+  category: string,
+  action: string,
+  entityType: string,
+  entityId?: string,
+  metadata: ActivityLog["metadata"] = {}
+) {
+  const setting = state.globalOptions.find((option) => option.group === "Activity Log Categories" && option.value === category);
+  if (setting && !setting.active) return state;
+  const log: ActivityLog = {
+    id: id("activity"),
+    category,
+    actorId: actor.id,
+    action,
+    entityType,
+    entityId,
+    metadata,
+    createdAt: new Date().toISOString()
+  };
+  return { ...state, activityLogs: [log, ...state.activityLogs].slice(0, 500) };
 }
 
 function buildMetrics(state: EventPrepState): DashboardMetrics {

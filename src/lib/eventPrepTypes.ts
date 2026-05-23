@@ -200,6 +200,38 @@ export type AreaRequest = {
   createdAt: string;
 };
 
+export type RequestReview = {
+  id: string;
+  requestId: string;
+  reviewerId: string;
+  comment: string;
+  recommendation: string;
+  completed: boolean;
+  createdAt: string;
+};
+
+export type Reminder = {
+  id: string;
+  areaId?: string;
+  reminderType: string;
+  deadlineTime: string;
+  reminderTime: string;
+  escalationTime: string;
+  recipients: string[];
+  active: boolean;
+};
+
+export type ActivityLog = {
+  id: string;
+  category: string;
+  actorId?: string;
+  action: string;
+  entityType: string;
+  entityId?: string;
+  metadata: Record<string, string | number | boolean>;
+  createdAt: string;
+};
+
 export type NotificationLog = {
   id: string;
   type: string;
@@ -244,7 +276,10 @@ export type EventPrepState = {
   taskFiles: TaskFile[];
   verificationLogs: VerificationLog[];
   requests: AreaRequest[];
+  requestReviews: RequestReview[];
+  reminders: Reminder[];
   notificationLogs: NotificationLog[];
+  activityLogs: ActivityLog[];
   globalOptions: GlobalOption[];
   formFields: FormField[];
 };

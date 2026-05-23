@@ -11,6 +11,7 @@ import {
   type GlobalOption,
   type LiveTask,
   type Profile,
+  type Reminder,
   type TaskTemplate,
   type ZoneType
 } from "@/lib/eventPrepTypes";
@@ -26,6 +27,7 @@ export const zoneTypes: ZoneType[] = ZONE_TYPES.map((name, index) => ({
 export const seedProfiles: Profile[] = [
   { id: "profile-super-admin", email: "superadmin@example.com", fullName: "Super Admin", role: "super_admin", status: "active" },
   { id: "profile-admin", email: "admin@example.com", fullName: "Admin User", role: "admin", status: "active" },
+  { id: "profile-area-admin", email: "area.admin@example.com", fullName: "CMZ Area Admin", role: "area_admin", status: "active" },
   { id: "profile-verifier", email: "verifier@example.com", fullName: "Central IT Verifier", role: "verifier", status: "active" },
   { id: "profile-report-user", email: "report.user@example.com", fullName: "CMZ Report User", role: "report_user", status: "active" },
   { id: "profile-viewer", email: "viewer@example.com", fullName: "Viewer", role: "viewer", status: "active" }
@@ -65,6 +67,7 @@ export const seedAreas: Area[] = [
 ];
 
 export const seedAreaAccess: AreaAccess[] = [
+  { id: "access-area-admin-cmz", profileId: "profile-area-admin", areaId: "area-cmz-main", role: "area_admin" },
   { id: "access-report-cmz", profileId: "profile-report-user", areaId: "area-cmz-main", role: "report_user" },
   { id: "access-verifier-cmz", profileId: "profile-verifier", areaId: "area-cmz-main", role: "verifier" },
   { id: "access-verifier-shz", profileId: "profile-verifier", areaId: "area-central-shz", role: "verifier" }
@@ -164,7 +167,9 @@ const optionGroups: Array<[string, readonly string[]]> = [
   ["Task Types", TASK_TYPES],
   ["Status options", ["Pending", "In Progress", "Completed", "Issue Found"]],
   ["Request types", ["Extra Equipment Request", "Extra Manpower / Support Request", "Change in Required Quantity", "Technical Issue / Support Request", "Access Request", "Other Custom Request", "Not Applicable / Task Removal Request"]],
-  ["Evidence types", ["Photo", "Document", "Test Screenshot", "Signed Handoff"]]
+  ["Evidence types", ["Photo", "Document", "Test Screenshot", "Signed Handoff"]],
+  ["Reminder types", ["Daily report submission", "Partially updated daily reports", "Overdue tasks", "Tasks due today", "Pending verification", "Partially verified tasks", "Rejected / Needs Correction tasks", "Requests needing review", "Requests sent for verification", "Access requests pending approval"]],
+  ["Activity Log Categories", ["Login activity", "Task updates", "File activity", "Daily reports", "Verification actions", "Requests", "Access changes", "Area changes", "Template changes", "Reminder activity", "Form/global field changes"]]
 ];
 
 const seedGlobalOptions: GlobalOption[] = optionGroups.flatMap(([group, values]) =>
@@ -189,6 +194,27 @@ export const seedFormFields: FormField[] = TASK_TYPES.flatMap((taskType) =>
   }))
 );
 
+const seedReminders: Reminder[] = [
+  {
+    id: "reminder-daily-report-default",
+    reminderType: "Daily report submission",
+    deadlineTime: "20:00",
+    reminderTime: "18:30",
+    escalationTime: "21:00",
+    recipients: ["Admin", "Area Admin", "Verifier"],
+    active: true
+  },
+  {
+    id: "reminder-pending-verification-default",
+    reminderType: "Pending verification",
+    deadlineTime: "20:00",
+    reminderTime: "19:00",
+    escalationTime: "22:00",
+    recipients: ["Verifier", "Admin"],
+    active: true
+  }
+];
+
 export function createSeedState(): EventPrepState {
   return {
     settings: {
@@ -206,7 +232,10 @@ export function createSeedState(): EventPrepState {
     taskFiles: [],
     verificationLogs: [],
     requests: [],
+    requestReviews: [],
+    reminders: seedReminders,
     notificationLogs: [],
+    activityLogs: [],
     globalOptions: seedGlobalOptions,
     formFields: seedFormFields
   };

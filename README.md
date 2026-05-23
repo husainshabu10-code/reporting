@@ -1,6 +1,6 @@
 # ASHARA MUBARAKAH IT Event Preparation Dashboard
 
-Standalone Phase 1 dashboard for event IT preparation reporting.
+Standalone Phase 2 dashboard for event IT preparation reporting.
 
 ## Phase 1 Scope Built
 
@@ -17,9 +17,19 @@ Standalone Phase 1 dashboard for event IT preparation reporting.
 - Email notification foundation through queued `notification_logs`.
 - Basic admin dashboard where completion counts only `Verified Completed` tasks.
 
+## Phase 2 Scope Built
+
+- Area Admin can create report users only for assigned areas; those users stay `Pending Approval`.
+- Admin and assigned Verifier approval paths activate pending report users.
+- Request forwarding to verifiers with verifier recommendation/comment return to admin.
+- Multi-level task verification rules: one verifier, all verifiers, and sequential verification.
+- Configurable email reminder rules stored in `reminders`.
+- Editable Form Builder for task-type fields.
+- Editable Global Fields / Options, including team types, units, request/reminder types, and activity categories.
+- Activity Log settings and activity log table for key Phase 2 actions.
+
 ## Later Phases Not Built Yet
 
-- Phase 2: area admin approval flow, advanced request forwarding, multi-level verification, configurable reminders, form builder editing, global field editing, activity log settings.
 - Phase 3: PDF exports, Excel exports, viewer customization, presentation mode, advanced charts and filters.
 - Phase 4: WhatsApp integration, optional merge with existing AM IT dashboard, advanced analytics.
 
@@ -50,5 +60,5 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 ## Important Notes
 
 - The UI is intentionally separate from the existing AM IT website, but keeps the same visual language: green/gold palette, rounded cards, compact tabs, filters, badges, progress cards, and responsive dashboards.
-- City is not part of the Phase 1 workflow. The database keeps a nullable `city` column on `areas` so it can be added later without rebuilding.
+- City is not part of the Phase 1 or Phase 2 workflow. The database keeps a nullable `city` column on `areas` so it can be added later without rebuilding.
 - Excel import needs the `xlsx` package. It reads the `Day Plan` sheet when present and imports only the active template fields. Dependencies and risk are stored only as hidden reference.

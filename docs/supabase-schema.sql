@@ -1,5 +1,5 @@
 -- ASHARA MUBARAKAH IT Event Preparation Reporting Dashboard
--- Phase 1 schema with foundations for later phases.
+-- Phase 2 schema with foundations for later phases.
 -- Run in the Supabase SQL editor. Auth uses Supabase email magic links.
 
 create extension if not exists "pgcrypto";
@@ -380,6 +380,25 @@ as $$
     )
 $$;
 
+create or replace function public.can_manage_area_users(target_area_id text)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select public.is_admin()
+    or (
+      public.current_profile_role() in ('area_admin','verifier')
+      and exists (
+        select 1 from public.area_access aa
+        where aa.profile_id = public.current_profile_id()
+          and aa.area_id = target_area_id
+          and aa.role in ('area_admin','verifier')
+      )
+    )
+$$;
+
 alter table public.event_settings enable row level security;
 alter table public.profiles enable row level security;
 alter table public.roles enable row level security;
@@ -411,6 +430,9 @@ drop policy if exists "Admins manage settings" on public.event_settings;
 drop policy if exists "Authenticated read settings" on public.event_settings;
 drop policy if exists "Users read own profile or admins read all" on public.profiles;
 drop policy if exists "Admins manage profiles" on public.profiles;
+drop policy if exists "Area managers read area profiles" on public.profiles;
+drop policy if exists "Area admins create pending report users" on public.profiles;
+drop policy if exists "Verifiers approve area users" on public.profiles;
 drop policy if exists "Admins manage roles" on public.roles;
 drop policy if exists "Authenticated read roles" on public.roles;
 drop policy if exists "Admins manage permissions" on public.permissions;
@@ -420,6 +442,8 @@ drop policy if exists "Area access read areas" on public.areas;
 drop policy if exists "Admins manage areas" on public.areas;
 drop policy if exists "Users read own area access" on public.area_access;
 drop policy if exists "Admins manage area access" on public.area_access;
+drop policy if exists "Area managers read managed access" on public.area_access;
+drop policy if exists "Area admins create report user access" on public.area_access;
 drop policy if exists "Authenticated read task types" on public.task_types;
 drop policy if exists "Admins manage task types" on public.task_types;
 drop policy if exists "Admins manage templates" on public.task_templates;
@@ -443,8 +467,12 @@ drop policy if exists "Assigned verifiers create verification logs" on public.ve
 drop policy if exists "Area users read requests" on public.requests;
 drop policy if exists "Area users create requests" on public.requests;
 drop policy if exists "Admins manage requests" on public.requests;
+drop policy if exists "Reviewers read assigned requests" on public.requests;
+drop policy if exists "Reviewers update assigned requests" on public.requests;
 drop policy if exists "Admins manage request reviews" on public.request_reviews;
 drop policy if exists "Reviewer reads own request reviews" on public.request_reviews;
+drop policy if exists "Reviewers create own request reviews" on public.request_reviews;
+drop policy if exists "Reviewers update own request reviews" on public.request_reviews;
 drop policy if exists "Authenticated read form fields" on public.form_fields;
 drop policy if exists "Admins manage form fields" on public.form_fields;
 drop policy if exists "Authenticated read global options" on public.global_options;
@@ -464,6 +492,34 @@ create policy "Authenticated read settings" on public.event_settings for select 
 
 create policy "Users read own profile or admins read all" on public.profiles for select using (id = public.current_profile_id() or public.is_admin());
 create policy "Admins manage profiles" on public.profiles for all using (public.is_admin()) with check (public.is_admin());
+create policy "Area managers read area profiles" on public.profiles for select using (
+  created_by = public.current_profile_id()
+  or exists (
+    select 1
+    from public.area_access target_access
+    where target_access.profile_id = profiles.id
+      and public.can_manage_area_users(target_access.area_id)
+  )
+);
+create policy "Area admins create pending report users" on public.profiles for insert with check (
+  public.current_profile_role() = 'area_admin'
+  and role = 'report_user'
+  and status = 'pending_approval'
+  and created_by = public.current_profile_id()
+);
+create policy "Verifiers approve area users" on public.profiles for update using (
+  public.current_profile_role() = 'verifier'
+  and
+  exists (
+    select 1
+    from public.area_access target_access
+    where target_access.profile_id = profiles.id
+      and public.can_manage_area_users(target_access.area_id)
+  )
+) with check (
+  role = 'report_user'
+  and status in ('active','pending_approval','disabled')
+);
 
 create policy "Admins manage roles" on public.roles for all using (public.is_admin()) with check (public.is_admin());
 create policy "Authenticated read roles" on public.roles for select using (auth.role() = 'authenticated');
@@ -477,6 +533,18 @@ create policy "Admins manage areas" on public.areas for all using (public.is_adm
 
 create policy "Users read own area access" on public.area_access for select using (profile_id = public.current_profile_id() or public.is_admin());
 create policy "Admins manage area access" on public.area_access for all using (public.is_admin()) with check (public.is_admin());
+create policy "Area managers read managed access" on public.area_access for select using (public.can_manage_area_users(area_id));
+create policy "Area admins create report user access" on public.area_access for insert with check (
+  public.current_profile_role() = 'area_admin'
+  and role = 'report_user'
+  and public.can_manage_area_users(area_id)
+  and exists (
+    select 1 from public.profiles p
+    where p.id = profile_id
+      and p.created_by = public.current_profile_id()
+      and p.role = 'report_user'
+  )
+);
 
 create policy "Authenticated read task types" on public.task_types for select using (auth.role() = 'authenticated');
 create policy "Admins manage task types" on public.task_types for all using (public.is_admin()) with check (public.is_admin());
@@ -549,9 +617,31 @@ create policy "Assigned verifiers create verification logs" on public.verificati
 create policy "Area users read requests" on public.requests for select using (public.has_area_access(area_id) or requested_by = public.current_profile_id());
 create policy "Area users create requests" on public.requests for insert with check (requested_by = public.current_profile_id() and public.has_area_access(area_id));
 create policy "Admins manage requests" on public.requests for all using (public.is_admin()) with check (public.is_admin());
+create policy "Reviewers read assigned requests" on public.requests for select using (
+  exists (
+    select 1 from public.request_reviews rr
+    where rr.request_id = requests.id
+      and rr.reviewer_id = public.current_profile_id()
+  )
+);
+create policy "Reviewers update assigned requests" on public.requests for update using (
+  exists (
+    select 1 from public.request_reviews rr
+    where rr.request_id = requests.id
+      and rr.reviewer_id = public.current_profile_id()
+  )
+) with check (
+  exists (
+    select 1 from public.request_reviews rr
+    where rr.request_id = requests.id
+      and rr.reviewer_id = public.current_profile_id()
+  )
+);
 
 create policy "Admins manage request reviews" on public.request_reviews for all using (public.is_admin()) with check (public.is_admin());
 create policy "Reviewer reads own request reviews" on public.request_reviews for select using (reviewer_id = public.current_profile_id() or public.is_admin());
+create policy "Reviewers create own request reviews" on public.request_reviews for insert with check (reviewer_id = public.current_profile_id());
+create policy "Reviewers update own request reviews" on public.request_reviews for update using (reviewer_id = public.current_profile_id()) with check (reviewer_id = public.current_profile_id());
 
 create policy "Authenticated read form fields" on public.form_fields for select using (auth.role() = 'authenticated');
 create policy "Admins manage form fields" on public.form_fields for all using (public.is_admin()) with check (public.is_admin());
