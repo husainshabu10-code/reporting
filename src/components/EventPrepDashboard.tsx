@@ -91,26 +91,42 @@ export default function EventPrepDashboard() {
   const [syncStatus, setSyncStatus] = useState("Loading");
   const [authEmail, setAuthEmail] = useState("");
   const [authMessage, setAuthMessage] = useState("");
+  const [authChecked, setAuthChecked] = useState(false);
+  const [sessionEmail, setSessionEmail] = useState("");
   const saveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    loadEventPrepState().then((loaded) => {
+    const boot = async () => {
+      const db = eventPrepSupabase();
+      let authenticatedEmail = "";
+      if (db) {
+        const { data } = await db.auth.getUser();
+        authenticatedEmail = data.user?.email || "";
+        if (cancelled) return;
+        setSessionEmail(authenticatedEmail);
+        setAuthChecked(true);
+        if (!authenticatedEmail) {
+          setSyncStatus("Waiting for magic-link login");
+          return;
+        }
+      } else {
+        setAuthChecked(true);
+      }
+
+      const loaded = await loadEventPrepState();
       if (cancelled) return;
       setState(loaded);
       setSyncStatus(isEventPrepSupabaseConfigured() ? "Supabase ready" : "Local fallback");
-    });
-
-    const db = eventPrepSupabase();
-    db?.auth.getUser().then(({ data }) => {
-      const email = data.user?.email;
-      if (!email || cancelled) return;
-      setState((current) => {
-        if (!current) return current;
-        const match = current.profiles.find((profile) => profile.email.toLowerCase() === email.toLowerCase());
+      if (authenticatedEmail) {
+        const match = loaded.profiles.find((profile) => profile.email.toLowerCase() === authenticatedEmail.toLowerCase() && profile.status === "active");
         if (match) setCurrentProfileId(match.id);
-        return current;
-      });
+      }
+    };
+    boot().catch((error) => {
+      if (cancelled) return;
+      setAuthChecked(true);
+      setSyncStatus(readError(error, "Unable to load dashboard."));
     });
 
     return () => {
@@ -122,16 +138,28 @@ export default function EventPrepDashboard() {
     if (!state) return;
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
-      saveEventPrepState(state)
+      const activeProfile = getCurrentProfile(state, currentProfileId, sessionEmail);
+      if (isEventPrepSupabaseConfigured() && !activeProfile) return;
+      saveEventPrepState(state, activeProfile)
         .then(() => setSyncStatus(isEventPrepSupabaseConfigured() ? "Saved to Supabase" : "Saved locally"))
         .catch((error) => setSyncStatus(readError(error, "Save failed")));
     }, 450);
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     };
-  }, [state]);
+  }, [currentProfileId, sessionEmail, state]);
 
-  const currentProfile = state?.profiles.find((profile) => profile.id === currentProfileId) || state?.profiles[0];
+  const handleMagicLink = async () => {
+    try {
+      setAuthMessage("Sending magic link...");
+      await sendMagicLink(authEmail);
+      setAuthMessage("Magic link sent. Check your email.");
+    } catch (error) {
+      setAuthMessage(readError(error, "Could not send magic link."));
+    }
+  };
+
+  const currentProfile = state ? getCurrentProfile(state, currentProfileId, sessionEmail) : undefined;
   const isAdmin = Boolean(currentProfile && ["super_admin", "admin"].includes(currentProfile.role));
   const isVerifier = currentProfile?.role === "verifier";
   const isViewer = currentProfile?.role === "viewer";
@@ -141,7 +169,11 @@ export default function EventPrepDashboard() {
     if (!tabs.includes(activeTab)) setActiveTab((isAdmin || isViewer ? "Dashboard" : isVerifier ? "Verification" : "Daily Report") as AnyTab);
   }, [activeTab, isAdmin, isVerifier, isViewer, tabs]);
 
-  if (!state || !currentProfile) {
+  if (isEventPrepSupabaseConfigured() && authChecked && !sessionEmail) {
+    return <LoginScreen authEmail={authEmail} authMessage={authMessage} setAuthEmail={setAuthEmail} sendLink={handleMagicLink} />;
+  }
+
+  if (!state) {
     return (
       <main className="min-h-screen bg-[var(--color-bg)] p-4 text-[var(--color-text)]">
         <div className="mx-auto flex min-h-[70vh] max-w-xl items-center justify-center">
@@ -153,16 +185,20 @@ export default function EventPrepDashboard() {
     );
   }
 
+  if (!currentProfile) {
+    return (
+      <main className="min-h-screen bg-[var(--color-bg)] p-4 text-[var(--color-text)]">
+        <div className="mx-auto flex min-h-[70vh] max-w-xl items-center justify-center">
+          <div className="rounded-lg border border-[var(--color-border)] bg-white p-6 shadow-soft">
+            <p className="text-sm font-bold text-[var(--color-primary)]">You are not authorized to access this dashboard.</p>
+            <p className="mt-2 text-sm text-[var(--color-text-muted)]">Ask an admin to create and activate a profile for {sessionEmail || "your email"}.</p>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   const updateState = (updater: (current: EventPrepState) => EventPrepState) => setState((current) => (current ? updater(current) : current));
-  const handleMagicLink = async () => {
-    try {
-      setAuthMessage("Sending magic link...");
-      await sendMagicLink(authEmail);
-      setAuthMessage("Magic link sent. Check your email.");
-    } catch (error) {
-      setAuthMessage(readError(error, "Could not send magic link."));
-    }
-  };
 
   return (
     <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
@@ -180,14 +216,23 @@ export default function EventPrepDashboard() {
           </div>
 
           <div className="mt-5 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-            <label className="field-label">Demo profile</label>
-            <select className="field mt-2" value={currentProfileId} onChange={(event) => setCurrentProfileId(event.target.value)}>
-              {state.profiles.map((profile) => (
-                <option key={profile.id} value={profile.id}>
-                  {profile.fullName} - {roleLabel(profile.role)}
-                </option>
-              ))}
-            </select>
+            {!isEventPrepSupabaseConfigured() ? (
+              <>
+                <label className="field-label">Demo profile</label>
+                <select className="field mt-2" value={currentProfileId} onChange={(event) => setCurrentProfileId(event.target.value)}>
+                  {state.profiles.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.fullName} - {roleLabel(profile.role)}
+                    </option>
+                  ))}
+                </select>
+              </>
+            ) : (
+              <>
+                <p className="field-label">Signed in as</p>
+                <p className="mt-2 text-sm font-bold text-[var(--color-primary)]">{currentProfile.email}</p>
+              </>
+            )}
             <p className="mt-2 text-xs text-[var(--color-text-muted)]">{syncStatus}</p>
           </div>
 
@@ -207,7 +252,7 @@ export default function EventPrepDashboard() {
             ))}
           </nav>
 
-          <div className="mt-5 rounded-lg border border-[var(--color-border)] p-3">
+          {!isEventPrepSupabaseConfigured() ? null : <div className="mt-5 rounded-lg border border-[var(--color-border)] p-3">
             <p className="text-xs font-bold uppercase text-[var(--color-text-muted)]">Magic-link login</p>
             <div className="mt-2 flex gap-2">
               <input className="field min-w-0" type="email" placeholder="email@example.com" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} />
@@ -216,7 +261,7 @@ export default function EventPrepDashboard() {
               </button>
             </div>
             {authMessage ? <p className="mt-2 text-xs text-[var(--color-text-muted)]">{authMessage}</p> : null}
-          </div>
+          </div>}
         </aside>
 
         {sidebarOpen ? <button className="fixed inset-0 z-30 bg-black/20 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close menu" /> : null}
@@ -327,6 +372,36 @@ function DashboardTab({ state }: { state: EventPrepState; currentProfile: Profil
   );
 }
 
+function LoginScreen({
+  authEmail,
+  authMessage,
+  setAuthEmail,
+  sendLink
+}: {
+  authEmail: string;
+  authMessage: string;
+  setAuthEmail: (value: string) => void;
+  sendLink: () => void;
+}) {
+  return (
+    <main className="min-h-screen bg-[var(--color-bg)] p-4 text-[var(--color-text)]">
+      <div className="mx-auto flex min-h-[80vh] max-w-md items-center justify-center">
+        <section className="w-full rounded-lg border border-[var(--color-border)] bg-white p-5 shadow-soft">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--color-accent)]">ASHARA MUBARAKAH</p>
+          <h1 className="mt-2 text-2xl font-black text-[var(--color-primary)]">IT Event Preparation</h1>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">Sign in with your authorized email address.</p>
+          <label className="mt-4 block">
+            <span className="field-label">Email magic link</span>
+            <input className="field mt-2" type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@example.com" />
+          </label>
+          <button className="btn-primary mt-3 w-full" onClick={sendLink}>Send Magic Link</button>
+          {authMessage ? <p className="mt-3 text-sm font-bold text-[var(--color-primary)]">{authMessage}</p> : null}
+        </section>
+      </div>
+    </main>
+  );
+}
+
 function DailyReportsTab({ state }: { state: EventPrepState; currentProfile: Profile }) {
   const today = todayIso();
   const rows = state.areas.map((area) => {
@@ -393,7 +468,7 @@ function MasterTasksTab({ state, updateState }: { state: EventPrepState; updateS
         .filter((templateId) => !current.liveTasks.some((task) => task.templateId === templateId && task.areaId === applyAreaId))
         .map((templateId) => {
           const template = current.taskTemplates.find((item) => item.id === templateId);
-          return createLiveTask(template, applyAreaId, taskType, Number(requiredQuantity || 0), unit, current.profiles, current.settings.preparationStartDate);
+          return createLiveTask(template, applyAreaId, taskType, Number(requiredQuantity || 0), unit, current, current.settings.preparationStartDate);
         })
         .filter(Boolean) as LiveTask[];
       return { ...current, liveTasks: [...newTasks, ...current.liveTasks] };
@@ -461,9 +536,13 @@ function MasterTasksTab({ state, updateState }: { state: EventPrepState; updateS
 
       <Panel title="Live Tasks Area Configuration" action={<Badge>{state.liveTasks.length} live tasks</Badge>}>
         <ResponsiveTable
-          headers={["Area", "Task", "Type", "Qty", "Unit", "Start", "Due", "Priority", "Rule", "Active"]}
+          headers={["Area", "Task", "Type", "Qty", "Unit", "Start", "Due", "Priority", "Verifier", "Rule", "Active"]}
           rows={state.liveTasks.map((task) => {
             const template = state.taskTemplates.find((item) => item.id === task.templateId);
+            const areaVerifierOptions = state.areaAccess
+              .filter((access) => access.areaId === task.areaId && access.role === "verifier")
+              .map((access) => state.profiles.find((profile) => profile.id === access.profileId))
+              .filter(Boolean) as Profile[];
             return [
               areaName(state, task.areaId),
               template?.taskDetails || "Task",
@@ -476,6 +555,10 @@ function MasterTasksTab({ state, updateState }: { state: EventPrepState; updateS
               <input key="due" className="field" type="date" value={task.dueDate} onChange={(event) => updateLiveTask(task.id, { dueDate: event.target.value })} />,
               <select key="priority" className="field" value={task.priority} onChange={(event) => updateLiveTask(task.id, { priority: event.target.value as LiveTask["priority"] })}>
                 {PRIORITY_OPTIONS.map((priority) => <option key={priority}>{priority}</option>)}
+              </select>,
+              <select key="verifier" className="field" value={task.assignedVerifierIds[0] || ""} onChange={(event) => updateLiveTask(task.id, { assignedVerifierIds: event.target.value ? [event.target.value] : [] })}>
+                <option value="">No verifier</option>
+                {areaVerifierOptions.map((profile) => <option key={profile.id} value={profile.id}>{profile.fullName}</option>)}
               </select>,
               <select key="rule" className="field" value={task.verificationRule} onChange={(event) => updateLiveTask(task.id, { verificationRule: event.target.value as LiveTask["verificationRule"] })}>
                 <option value="one_verifier">One verifier enough</option>
@@ -514,6 +597,28 @@ function ZonesAreasTab({ state, updateState }: { state: EventPrepState; updateSt
     }));
     setName("");
   };
+  const updateArea = (areaId: string, patch: Partial<EventPrepState["areas"][number]>) => {
+    updateState((current) => ({ ...current, areas: current.areas.map((area) => (area.id === areaId ? { ...area, ...patch } : area)) }));
+  };
+  const deleteArea = (areaId: string) => {
+    if (!window.confirm("Delete this area and its Phase 1 live tasks, reports, requests, and access records?")) return;
+    updateState((current) => {
+      const liveTaskIds = current.liveTasks.filter((task) => task.areaId === areaId).map((task) => task.id);
+      const reportIds = current.dailyReports.filter((report) => report.areaId === areaId).map((report) => report.id);
+      const updateIds = current.taskUpdates.filter((update) => liveTaskIds.includes(update.liveTaskId) || reportIds.includes(update.dailyReportId)).map((update) => update.id);
+      return {
+        ...current,
+        areas: current.areas.filter((area) => area.id !== areaId),
+        areaAccess: current.areaAccess.filter((access) => access.areaId !== areaId),
+        liveTasks: current.liveTasks.filter((task) => task.areaId !== areaId),
+        dailyReports: current.dailyReports.filter((report) => report.areaId !== areaId),
+        taskUpdates: current.taskUpdates.filter((update) => !updateIds.includes(update.id)),
+        taskFiles: current.taskFiles.filter((file) => !liveTaskIds.includes(file.liveTaskId) && !updateIds.includes(file.taskUpdateId)),
+        verificationLogs: current.verificationLogs.filter((log) => !liveTaskIds.includes(log.liveTaskId) && !updateIds.includes(log.taskUpdateId)),
+        requests: current.requests.filter((request) => request.areaId !== areaId)
+      };
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -544,8 +649,19 @@ function ZonesAreasTab({ state, updateState }: { state: EventPrepState; updateSt
       </Panel>
       <Panel title="Zones / Areas">
         <ResponsiveTable
-          headers={["Zone Type", "Area", "Code", "Deadline", "Reminder", "Escalation"]}
-          rows={state.areas.map((area) => [zoneName(state, area.zoneTypeId), area.name, area.code, area.dailyDeadline, area.reminderTime, area.escalationTime])}
+          headers={["Zone Type", "Area", "Code", "Deadline", "Reminder", "Escalation", "Active", "Action"]}
+          rows={state.areas.map((area) => [
+            <select key="zone" className="field" value={area.zoneTypeId} onChange={(event) => updateArea(area.id, { zoneTypeId: event.target.value })}>
+              {state.zoneTypes.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}
+            </select>,
+            <input key="name" className="field" value={area.name} onChange={(event) => updateArea(area.id, { name: event.target.value, code: slug(event.target.value).toUpperCase() })} />,
+            area.code,
+            <input key="deadline" className="field" type="time" value={area.dailyDeadline} onChange={(event) => updateArea(area.id, { dailyDeadline: event.target.value })} />,
+            <input key="reminder" className="field" type="time" value={area.reminderTime} onChange={(event) => updateArea(area.id, { reminderTime: event.target.value })} />,
+            <input key="escalation" className="field" type="time" value={area.escalationTime} onChange={(event) => updateArea(area.id, { escalationTime: event.target.value })} />,
+            <input key="active" type="checkbox" checked={area.active} onChange={(event) => updateArea(area.id, { active: event.target.checked })} />,
+            <button key="delete" className="btn-compact" onClick={() => deleteArea(area.id)}>Delete</button>
+          ])}
         />
       </Panel>
     </div>
@@ -594,7 +710,7 @@ function DailyReportTab({ state, currentProfile, updateState }: { state: EventPr
 
   const submitReport = () => {
     const todayTasks = tasks.filter((task) => task.prepDay === currentDay);
-    const missing = todayTasks.filter((task) => !latest.get(task.id)).map((task) => task.id);
+    const missing = todayTasks.filter((task) => !state.taskUpdates.some((update) => update.liveTaskId === task.id && update.dailyReportId === report.id)).map((task) => task.id);
     setMissingIds(missing);
     const nextStatus = missing.length ? "Partially Updated" : isLate(area?.dailyDeadline || "20:00") ? "Late Submitted" : "Submitted";
     updateState((current) =>
@@ -692,8 +808,9 @@ function TaskCard({
   }, [existing?.id, report.id, task.id]);
 
   const saveTask = () => {
-    const nextVerification: VerificationStatus = draft.status === "Completed" ? "Needs Verification" : draft.verificationStatus === "Rejected / Needs Correction" ? "Needs Verification" : draft.verificationStatus;
-    const next = { ...draft, verificationStatus: nextVerification, updatedAt: new Date().toISOString() };
+    const nextVerification: VerificationStatus = draft.status === "Completed" ? (task.verificationRequired ? "Needs Verification" : "Verified Completed") : draft.verificationStatus === "Rejected / Needs Correction" ? "Needs Verification" : draft.verificationStatus;
+    const completedQuantity = task.taskType === "Quantity-Based Task" ? Math.max(0, Math.min(Number(draft.completedQuantity || 0), Number(task.requiredQuantity || draft.completedQuantity || 0))) : draft.completedQuantity;
+    const next = { ...draft, completedQuantity, verificationStatus: nextVerification, updatedAt: new Date().toISOString() };
     updateState((current) => {
       const without = current.taskUpdates.filter((update) => update.id !== next.id);
       const nextReport = current.dailyReports.some((item) => item.id === report.id) ? current.dailyReports : [report, ...current.dailyReports];
@@ -729,12 +846,13 @@ function TaskCard({
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
     const newFiles: TaskFile[] = [];
+    const savedDraft = { ...draft, updatedAt: new Date().toISOString() };
     for (const file of files) {
       const uploaded = await uploadTaskEvidence(file, task.id);
       newFiles.push({
         id: id("file"),
         liveTaskId: task.id,
-        taskUpdateId: draft.id,
+        taskUpdateId: savedDraft.id,
         fileName: file.name,
         fileType: file.type || "unknown",
         fileSize: file.size,
@@ -743,7 +861,11 @@ function TaskCard({
         uploadedAt: new Date().toISOString()
       });
     }
-    updateState((current) => ({ ...current, taskFiles: [...newFiles, ...current.taskFiles] }));
+    updateState((current) => {
+      const nextReports = current.dailyReports.some((item) => item.id === report.id) ? current.dailyReports : [report, ...current.dailyReports];
+      const nextUpdates = [savedDraft, ...current.taskUpdates.filter((update) => update.id !== savedDraft.id)];
+      return { ...current, dailyReports: nextReports, taskUpdates: nextUpdates, taskFiles: [...newFiles, ...current.taskFiles] };
+    });
     event.target.value = "";
   };
 
@@ -809,8 +931,8 @@ function TaskCard({
         {files.length ? <p className="mt-2 text-xs font-bold text-[var(--color-primary)]">{files.map((file) => file.fileName).join(", ")}</p> : null}
       </div>
 
-      <div className="mt-4 flex justify-end">
-        <button className="btn-secondary mr-2" onClick={requestNotApplicable}>Request Not Applicable</button>
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+        <button className="btn-secondary" onClick={requestNotApplicable}>Request Not Applicable</button>
         <button className="btn-primary" onClick={saveTask}>Save Task Update</button>
       </div>
     </article>
@@ -867,7 +989,7 @@ function VerificationTab({ state, currentProfile, updateState }: { state: EventP
                   <p className="mt-1 text-sm text-[var(--color-text-muted)]">{update?.remarks || "No remarks"}</p>
                   {task.taskType === "Quantity-Based Task" ? <p className="mt-1 text-sm font-bold">Quantity: {update?.completedQuantity || 0}/{task.requiredQuantity || 0}</p> : null}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <button className="btn-primary" onClick={() => act(task, "verified")}>Verify</button>
                   <button className="btn-secondary" onClick={() => act(task, "rejected")}>Reject / Needs Correction</button>
                 </div>
@@ -1274,15 +1396,17 @@ function tabIcon(tab: AnyTab) {
 function buildMetrics(state: EventPrepState): DashboardMetrics {
   const tasks = state.liveTasks.filter((task) => task.active && !task.notApplicable);
   const latest = latestUpdateMap(state.taskUpdates);
+  const todayReports = state.dailyReports.filter((report) => report.reportDate === todayIso());
   const verifiedTasks = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
-  const submittedReports = state.dailyReports.filter((report) => ["Submitted", "Late Submitted", "Closed"].includes(report.status)).length;
-  const missingOrPartialReports = state.areas.length - state.dailyReports.filter((report) => report.reportDate === todayIso() && ["Submitted", "Late Submitted", "Closed"].includes(report.status)).length;
+  const submittedReports = todayReports.filter((report) => ["Submitted", "Late Submitted", "Closed"].includes(report.status)).length;
+  const partialReports = todayReports.filter((report) => ["Draft Saved", "Partially Updated"].includes(report.status)).length;
+  const missingReports = state.areas.filter((area) => area.active).length - todayReports.filter((report) => ["Submitted", "Late Submitted", "Closed", "Draft Saved", "Partially Updated"].includes(report.status)).length;
   return {
     overallVerifiedPercent: percent(verifiedTasks, tasks.length),
     totalLiveTasks: tasks.length,
     verifiedTasks,
     submittedReports,
-    missingOrPartialReports: Math.max(0, missingOrPartialReports),
+    missingOrPartialReports: Math.max(0, missingReports) + partialReports,
     needsVerification: tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Needs Verification").length,
     issueFound: tasks.filter((task) => latest.get(task.id)?.status === "Issue Found").length,
     pendingRequests: state.requests.filter((request) => ["Under Review", "Sent for Verification", "Need More Info"].includes(request.status)).length,
@@ -1293,8 +1417,11 @@ function buildMetrics(state: EventPrepState): DashboardMetrics {
 function buildAttention(state: EventPrepState) {
   const latest = latestUpdateMap(state.taskUpdates);
   const tasks = state.liveTasks.filter((task) => task.active && !task.notApplicable);
+  const todayReports = state.dailyReports.filter((report) => report.reportDate === todayIso());
+  const missingReports = state.areas.filter((area) => area.active).length - todayReports.filter((report) => ["Submitted", "Late Submitted", "Closed", "Draft Saved", "Partially Updated"].includes(report.status)).length;
   return [
-    { label: "Missing Daily Reports", count: buildMetrics(state).missingOrPartialReports },
+    { label: "Missing Daily Reports", count: Math.max(0, missingReports) },
+    { label: "Partially Updated Reports", count: todayReports.filter((report) => ["Draft Saved", "Partially Updated"].includes(report.status)).length },
     { label: "Issue Found Tasks", count: tasks.filter((task) => latest.get(task.id)?.status === "Issue Found").length },
     { label: "Tasks Needing Verification", count: tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Needs Verification").length },
     { label: "Rejected / Needs Correction", count: tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Rejected / Needs Correction").length },
@@ -1318,6 +1445,13 @@ function getAllowedAreas(state: EventPrepState, profile: Profile) {
   if (["super_admin", "admin"].includes(profile.role)) return state.areas;
   const accessAreaIds = state.areaAccess.filter((access) => access.profileId === profile.id).map((access) => access.areaId);
   return state.areas.filter((area) => accessAreaIds.includes(area.id));
+}
+
+function getCurrentProfile(state: EventPrepState, currentProfileId: string, sessionEmail: string) {
+  if (isEventPrepSupabaseConfigured()) {
+    return state.profiles.find((profile) => profile.email.toLowerCase() === sessionEmail.toLowerCase() && profile.status === "active");
+  }
+  return state.profiles.find((profile) => profile.id === currentProfileId) || state.profiles[0];
 }
 
 function getOrCreateReport(state: EventPrepState, areaId: string, prepDay: number): DailyReport {
@@ -1377,7 +1511,7 @@ function rowsToTemplates(rows: Array<Record<string, unknown>>): TaskTemplate[] {
       const priority = normalizePriority(get("Priority Level"));
       return {
         id: `template-${slug(`${get("Day")}-${get("Workstream")}-${taskDetails}`)}`,
-        day: Number(get("Day").replace(/[^0-9]/g, "")) || 1,
+        day: Math.min(20, Math.max(1, Number(get("Day").replace(/[^0-9]/g, "")) || 1)),
         priorityLevel: priority,
         mainObjective: get("Main Objective"),
         workstream: get("Workstream") || "General",
@@ -1421,10 +1555,11 @@ function splitCsvLine(line: string | string[]) {
   return cells;
 }
 
-function createLiveTask(template: TaskTemplate | undefined, areaId: string, taskType: LiveTask["taskType"], requiredQuantity: number, unit: string, profiles: Profile[], preparationStartDate: string): LiveTask | null {
+function createLiveTask(template: TaskTemplate | undefined, areaId: string, taskType: LiveTask["taskType"], requiredQuantity: number, unit: string, state: EventPrepState, preparationStartDate: string): LiveTask | null {
   if (!template) return null;
-  const verifierIds = profiles.filter((profile) => profile.role === "verifier").map((profile) => profile.id).slice(0, 1);
-  const reportUserIds = profiles.filter((profile) => profile.role === "report_user").map((profile) => profile.id);
+  const areaAccess = state.areaAccess.filter((access) => access.areaId === areaId);
+  const verifierIds = areaAccess.filter((access) => access.role === "verifier").map((access) => access.profileId);
+  const reportUserIds = areaAccess.filter((access) => access.role === "report_user").map((access) => access.profileId);
   return {
     id: `live-${areaId}-${template.id}`,
     templateId: template.id,

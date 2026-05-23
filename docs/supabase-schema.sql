@@ -327,6 +327,22 @@ insert into storage.buckets (id, name, public)
 values ('task-evidence', 'task-evidence', false)
 on conflict (id) do update set public = false;
 
+create or replace function public.current_profile_id()
+returns text
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select id from public.profiles
+  where status = 'active'
+    and (
+      id = auth.uid()::text
+      or lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+    )
+  limit 1
+$$;
+
 create or replace function public.current_profile_role()
 returns text
 language sql
@@ -335,7 +351,7 @@ set search_path = public
 stable
 as $$
   select role from public.profiles
-  where id = auth.uid()::text and status = 'active'
+  where id = public.current_profile_id() and status = 'active'
   limit 1
 $$;
 
@@ -359,7 +375,7 @@ as $$
   select public.is_admin()
     or exists (
       select 1 from public.area_access aa
-      where aa.profile_id = auth.uid()::text
+      where aa.profile_id = public.current_profile_id()
         and aa.area_id = target_area_id
     )
 $$;
@@ -391,10 +407,62 @@ alter table public.report_exports enable row level security;
 grant usage on schema public to authenticated, service_role;
 grant select, insert, update, delete on all tables in schema public to authenticated, service_role;
 
+drop policy if exists "Admins manage settings" on public.event_settings;
+drop policy if exists "Authenticated read settings" on public.event_settings;
+drop policy if exists "Users read own profile or admins read all" on public.profiles;
+drop policy if exists "Admins manage profiles" on public.profiles;
+drop policy if exists "Admins manage roles" on public.roles;
+drop policy if exists "Authenticated read roles" on public.roles;
+drop policy if exists "Admins manage permissions" on public.permissions;
+drop policy if exists "Authenticated read zone types" on public.zone_types;
+drop policy if exists "Admins manage zone types" on public.zone_types;
+drop policy if exists "Area access read areas" on public.areas;
+drop policy if exists "Admins manage areas" on public.areas;
+drop policy if exists "Users read own area access" on public.area_access;
+drop policy if exists "Admins manage area access" on public.area_access;
+drop policy if exists "Authenticated read task types" on public.task_types;
+drop policy if exists "Admins manage task types" on public.task_types;
+drop policy if exists "Admins manage templates" on public.task_templates;
+drop policy if exists "Area users read applied templates" on public.task_templates;
+drop policy if exists "Area users read live tasks" on public.live_tasks;
+drop policy if exists "Admins manage live tasks" on public.live_tasks;
+drop policy if exists "Area users read reports" on public.daily_reports;
+drop policy if exists "Area users write reports" on public.daily_reports;
+drop policy if exists "Area users update reports" on public.daily_reports;
+drop policy if exists "Admins delete reports" on public.daily_reports;
+drop policy if exists "Area users read task updates" on public.task_updates;
+drop policy if exists "Area users write task updates" on public.task_updates;
+drop policy if exists "Area users update task updates" on public.task_updates;
+drop policy if exists "Area users read files" on public.task_files;
+drop policy if exists "Area users add files" on public.task_files;
+drop policy if exists "Admins manage files" on public.task_files;
+drop policy if exists "Area users read task verifiers" on public.task_verifiers;
+drop policy if exists "Admins manage task verifiers" on public.task_verifiers;
+drop policy if exists "Assigned verifiers and admins read verification logs" on public.verification_logs;
+drop policy if exists "Assigned verifiers create verification logs" on public.verification_logs;
+drop policy if exists "Area users read requests" on public.requests;
+drop policy if exists "Area users create requests" on public.requests;
+drop policy if exists "Admins manage requests" on public.requests;
+drop policy if exists "Admins manage request reviews" on public.request_reviews;
+drop policy if exists "Reviewer reads own request reviews" on public.request_reviews;
+drop policy if exists "Authenticated read form fields" on public.form_fields;
+drop policy if exists "Admins manage form fields" on public.form_fields;
+drop policy if exists "Authenticated read global options" on public.global_options;
+drop policy if exists "Admins manage global options" on public.global_options;
+drop policy if exists "Admins manage reminders" on public.reminders;
+drop policy if exists "Admins read notifications" on public.notification_logs;
+drop policy if exists "Admins manage notifications" on public.notification_logs;
+drop policy if exists "Admins read activity logs" on public.activity_logs;
+drop policy if exists "Admins manage activity logs" on public.activity_logs;
+drop policy if exists "Admins manage exports" on public.report_exports;
+drop policy if exists "Area users read task evidence" on storage.objects;
+drop policy if exists "Authenticated upload task evidence" on storage.objects;
+drop policy if exists "Admins manage task evidence" on storage.objects;
+
 create policy "Admins manage settings" on public.event_settings for all using (public.is_admin()) with check (public.is_admin());
 create policy "Authenticated read settings" on public.event_settings for select using (auth.role() = 'authenticated');
 
-create policy "Users read own profile or admins read all" on public.profiles for select using (id = auth.uid()::text or public.is_admin());
+create policy "Users read own profile or admins read all" on public.profiles for select using (id = public.current_profile_id() or public.is_admin());
 create policy "Admins manage profiles" on public.profiles for all using (public.is_admin()) with check (public.is_admin());
 
 create policy "Admins manage roles" on public.roles for all using (public.is_admin()) with check (public.is_admin());
@@ -407,13 +475,21 @@ create policy "Admins manage zone types" on public.zone_types for all using (pub
 create policy "Area access read areas" on public.areas for select using (public.has_area_access(id));
 create policy "Admins manage areas" on public.areas for all using (public.is_admin()) with check (public.is_admin());
 
-create policy "Users read own area access" on public.area_access for select using (profile_id = auth.uid()::text or public.is_admin());
+create policy "Users read own area access" on public.area_access for select using (profile_id = public.current_profile_id() or public.is_admin());
 create policy "Admins manage area access" on public.area_access for all using (public.is_admin()) with check (public.is_admin());
 
 create policy "Authenticated read task types" on public.task_types for select using (auth.role() = 'authenticated');
 create policy "Admins manage task types" on public.task_types for all using (public.is_admin()) with check (public.is_admin());
 
 create policy "Admins manage templates" on public.task_templates for all using (public.is_admin()) with check (public.is_admin());
+create policy "Area users read applied templates" on public.task_templates for select using (
+  public.is_admin()
+  or exists (
+    select 1 from public.live_tasks lt
+    where lt.template_id = id
+      and public.has_area_access(lt.area_id)
+  )
+);
 
 create policy "Area users read live tasks" on public.live_tasks for select using (public.has_area_access(area_id));
 create policy "Admins manage live tasks" on public.live_tasks for all using (public.is_admin()) with check (public.is_admin());
@@ -427,13 +503,27 @@ create policy "Area users read task updates" on public.task_updates for select u
   exists (select 1 from public.live_tasks lt where lt.id = live_task_id and public.has_area_access(lt.area_id))
 );
 create policy "Area users write task updates" on public.task_updates for insert with check (
-  updated_by = auth.uid()::text
+  updated_by = public.current_profile_id()
   and exists (select 1 from public.live_tasks lt where lt.id = live_task_id and public.has_area_access(lt.area_id))
 );
 create policy "Area users update task updates" on public.task_updates for update using (
-  public.is_admin() or updated_by = auth.uid()::text
+  public.is_admin()
+  or updated_by = public.current_profile_id()
+  or exists (
+    select 1 from public.live_tasks lt
+    where lt.id = live_task_id
+      and public.current_profile_id() = any(lt.assigned_verifier_ids)
+      and public.has_area_access(lt.area_id)
+  )
 ) with check (
-  public.is_admin() or updated_by = auth.uid()::text
+  public.is_admin()
+  or updated_by = public.current_profile_id()
+  or exists (
+    select 1 from public.live_tasks lt
+    where lt.id = live_task_id
+      and public.current_profile_id() = any(lt.assigned_verifier_ids)
+      and public.has_area_access(lt.area_id)
+  )
 );
 
 create policy "Area users read files" on public.task_files for select using (
@@ -450,18 +540,18 @@ create policy "Area users read task verifiers" on public.task_verifiers for sele
 create policy "Admins manage task verifiers" on public.task_verifiers for all using (public.is_admin()) with check (public.is_admin());
 
 create policy "Assigned verifiers and admins read verification logs" on public.verification_logs for select using (
-  public.is_admin() or verifier_id = auth.uid()::text
+  public.is_admin() or verifier_id = public.current_profile_id()
 );
 create policy "Assigned verifiers create verification logs" on public.verification_logs for insert with check (
-  public.is_admin() or verifier_id = auth.uid()::text
+  public.is_admin() or verifier_id = public.current_profile_id()
 );
 
-create policy "Area users read requests" on public.requests for select using (public.has_area_access(area_id) or requested_by = auth.uid()::text);
-create policy "Area users create requests" on public.requests for insert with check (requested_by = auth.uid()::text and public.has_area_access(area_id));
+create policy "Area users read requests" on public.requests for select using (public.has_area_access(area_id) or requested_by = public.current_profile_id());
+create policy "Area users create requests" on public.requests for insert with check (requested_by = public.current_profile_id() and public.has_area_access(area_id));
 create policy "Admins manage requests" on public.requests for all using (public.is_admin()) with check (public.is_admin());
 
 create policy "Admins manage request reviews" on public.request_reviews for all using (public.is_admin()) with check (public.is_admin());
-create policy "Reviewer reads own request reviews" on public.request_reviews for select using (reviewer_id = auth.uid()::text or public.is_admin());
+create policy "Reviewer reads own request reviews" on public.request_reviews for select using (reviewer_id = public.current_profile_id() or public.is_admin());
 
 create policy "Authenticated read form fields" on public.form_fields for select using (auth.role() = 'authenticated');
 create policy "Admins manage form fields" on public.form_fields for all using (public.is_admin()) with check (public.is_admin());
@@ -476,9 +566,20 @@ create policy "Admins manage exports" on public.report_exports for all using (pu
 
 create policy "Area users read task evidence" on storage.objects for select using (
   bucket_id = 'task-evidence'
+  and exists (
+    select 1 from public.live_tasks lt
+    where lt.id = split_part(name, '/', 1)
+      and public.has_area_access(lt.area_id)
+  )
 );
 create policy "Authenticated upload task evidence" on storage.objects for insert with check (
-  bucket_id = 'task-evidence' and auth.role() = 'authenticated'
+  bucket_id = 'task-evidence'
+  and auth.role() = 'authenticated'
+  and exists (
+    select 1 from public.live_tasks lt
+    where lt.id = split_part(name, '/', 1)
+      and public.has_area_access(lt.area_id)
+  )
 );
 create policy "Admins manage task evidence" on storage.objects for all using (
   bucket_id = 'task-evidence' and public.is_admin()
