@@ -898,57 +898,140 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
       </Panel>
 
       <Panel title="Live Tasks Area Configuration" action={<Badge>{state.liveTasks.length} live tasks</Badge>}>
-        <ResponsiveTable
-          headers={["Area", "Task", "Type", "Qty", "Unit", "Start", "Due", "Priority", "Verifier", "Rule", "Active", "Details"]}
-          rows={state.liveTasks.map((task) => {
-            const details = taskDetails(state, task);
-            const areaVerifierOptions = state.areaAccess
-              .filter((access) => access.areaId === task.areaId && access.role === "verifier")
-              .map((access) => state.profiles.find((profile) => profile.id === access.profileId))
-              .filter(Boolean) as Profile[];
-            return [
-              areaName(state, task.areaId),
-              <button key="task" className="block max-w-72 text-left hover:underline" onClick={() => setSelectedTaskId(task.id)}>
-                <span className="block font-black text-[var(--color-primary)]">{details.taskDetails}</span>
-                <span className="mt-1 block text-xs font-bold text-[var(--color-text-muted)]">{[details.workstream, details.expectedOutput].filter(Boolean).join(" / ") || "Open to edit details"}</span>
-              </button>,
-              <select key="type" className="field" value={task.taskType} onChange={(event) => updateLiveTask(task.id, { taskType: event.target.value as LiveTask["taskType"] })}>
-                {TASK_TYPES.map((type) => <option key={type}>{type}</option>)}
-              </select>,
-              <input key="qty" className="field w-24" type="number" value={task.requiredQuantity || ""} onChange={(event) => updateLiveTask(task.id, { requiredQuantity: Number(event.target.value || 0) })} />,
-              <input key="unit" className="field w-28" value={task.unit || ""} onChange={(event) => updateLiveTask(task.id, { unit: event.target.value })} />,
-              <input key="start" className="field" type="date" value={task.startDate} onChange={(event) => updateLiveTask(task.id, { startDate: event.target.value })} />,
-              <input key="due" className="field" type="date" value={task.dueDate} onChange={(event) => updateLiveTask(task.id, { dueDate: event.target.value })} />,
-              <select key="priority" className="field" value={task.priority} onChange={(event) => updateLiveTask(task.id, { priority: event.target.value as LiveTask["priority"] })}>
-                {priorityOptions.map((priority) => <option key={priority}>{priority}</option>)}
-              </select>,
-              <div key="verifiers" className="grid gap-2">
-                {areaVerifierOptions.length ? areaVerifierOptions.map((profile) => (
-                  <label key={profile.id} className="flex items-center gap-2 text-xs font-bold text-[var(--color-primary)]">
-                    <input
-                      type="checkbox"
-                      checked={task.assignedVerifierIds.includes(profile.id)}
-                      onChange={(event) => {
-                        const next = event.target.checked ? [...task.assignedVerifierIds, profile.id] : task.assignedVerifierIds.filter((idValue) => idValue !== profile.id);
-                        updateLiveTask(task.id, { assignedVerifierIds: next });
-                      }}
-                    />
-                    {profile.fullName}
-                  </label>
-                )) : <span className="text-xs text-[var(--color-text-muted)]">No verifier assigned to area</span>}
-              </div>,
-              <select key="rule" className="field" value={task.verificationRule} onChange={(event) => updateLiveTask(task.id, { verificationRule: event.target.value as LiveTask["verificationRule"] })}>
-                <option value="one_verifier">One verifier enough</option>
-                <option value="all_verifiers">All verifiers required</option>
-                <option value="sequential">Sequential</option>
-              </select>,
-              <input key="active" type="checkbox" checked={task.active} onChange={(event) => updateLiveTask(task.id, { active: event.target.checked })} />,
-              <button key="open" className="btn-compact" onClick={() => setSelectedTaskId(task.id)}>Open</button>
-            ];
-          })}
+        <LiveTasksConfigTable
+          state={state}
+          priorityOptions={priorityOptions}
+          updateLiveTask={updateLiveTask}
+          openTask={setSelectedTaskId}
         />
       </Panel>
       {selectedTask ? <LiveTaskEditorModal state={state} task={selectedTask} updateState={updateState} close={() => setSelectedTaskId("")} showToast={showToast} /> : null}
+    </div>
+  );
+}
+
+function LiveTasksConfigTable({
+  state,
+  priorityOptions,
+  updateLiveTask,
+  openTask
+}: {
+  state: EventPrepState;
+  priorityOptions: string[];
+  updateLiveTask: (taskId: string, patch: Partial<LiveTask>) => void;
+  openTask: (taskId: string) => void;
+}) {
+  const grouped = state.areas
+    .map((area) => {
+      const tasks = state.liveTasks.filter((task) => task.areaId === area.id);
+      const workstreams = unique(tasks.map((task) => taskDetails(state, task).workstream || "General"));
+      return { area, tasks, workstreams };
+    })
+    .filter((group) => group.tasks.length);
+
+  if (!grouped.length) return <EmptyState title="No live tasks yet" body="Add a custom task or apply reference templates to an area." />;
+
+  return (
+    <div className="space-y-5">
+      {grouped.map(({ area, workstreams }) => (
+        <section key={area.id} className="live-task-group">
+          <h3 className="text-lg font-black text-[var(--color-primary)]">Area: {area.name}</h3>
+          {workstreams.map((workstream) => {
+            const tasks = state.liveTasks.filter((task) => task.areaId === area.id && (taskDetails(state, task).workstream || "General") === workstream);
+            return (
+              <div key={`${area.id}-${workstream}`} className="mt-4">
+                <p className="mb-3 text-sm font-black text-[var(--color-primary)]">Workstream: {workstream}</p>
+                <div className="overflow-x-auto">
+                  <table className="live-task-table min-w-[1180px]">
+                    <thead>
+                      <tr>
+                        <th>Task</th>
+                        <th>Type</th>
+                        <th>Qty</th>
+                        <th>Unit</th>
+                        <th>Start</th>
+                        <th>Due</th>
+                        <th>Priority</th>
+                        <th>Verifier</th>
+                        <th>Rule</th>
+                        <th>Active</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tasks.map((task) => {
+                        const details = taskDetails(state, task);
+                        const areaVerifierOptions = state.areaAccess
+                          .filter((access) => access.areaId === task.areaId && access.role === "verifier")
+                          .map((access) => state.profiles.find((profile) => profile.id === access.profileId))
+                          .filter(Boolean) as Profile[];
+                        return (
+                          <tr key={task.id}>
+                            <td className="w-[28rem]">
+                              <button className="task-title-link" onClick={() => openTask(task.id)} title="Open task details">
+                                <span>{details.taskDetails}</span>
+                                <small>{[details.expectedOutput, details.requiredEquipment].filter(Boolean).join(" / ") || "Click task to edit full details"}</small>
+                              </button>
+                            </td>
+                            <td>
+                              <select className="field min-w-44" value={task.taskType} onChange={(event) => updateLiveTask(task.id, { taskType: event.target.value as LiveTask["taskType"] })}>
+                                {TASK_TYPES.map((type) => <option key={type}>{type}</option>)}
+                              </select>
+                            </td>
+                            <td>
+                              <input className="field w-24" type="number" value={task.requiredQuantity || ""} onChange={(event) => updateLiveTask(task.id, { requiredQuantity: Number(event.target.value || 0) })} />
+                            </td>
+                            <td>
+                              <input className="field w-28" value={task.unit || ""} onChange={(event) => updateLiveTask(task.id, { unit: event.target.value })} />
+                            </td>
+                            <td>
+                              <input className="field min-w-36" type="date" value={task.startDate} onChange={(event) => updateLiveTask(task.id, { startDate: event.target.value })} />
+                            </td>
+                            <td>
+                              <input className="field min-w-36" type="date" value={task.dueDate} onChange={(event) => updateLiveTask(task.id, { dueDate: event.target.value })} />
+                            </td>
+                            <td>
+                              <select className="field min-w-32" value={task.priority} onChange={(event) => updateLiveTask(task.id, { priority: event.target.value as LiveTask["priority"] })}>
+                                {priorityOptions.map((priority) => <option key={priority}>{priority}</option>)}
+                              </select>
+                            </td>
+                            <td>
+                              <div className="grid min-w-40 gap-2">
+                                {areaVerifierOptions.length ? areaVerifierOptions.map((profile) => (
+                                  <label key={profile.id} className="flex items-center gap-2 text-xs font-bold text-[var(--color-primary)]">
+                                    <input
+                                      type="checkbox"
+                                      checked={task.assignedVerifierIds.includes(profile.id)}
+                                      onChange={(event) => {
+                                        const next = event.target.checked ? [...task.assignedVerifierIds, profile.id] : task.assignedVerifierIds.filter((idValue) => idValue !== profile.id);
+                                        updateLiveTask(task.id, { assignedVerifierIds: next });
+                                      }}
+                                    />
+                                    {profile.fullName}
+                                  </label>
+                                )) : <span className="text-xs text-[var(--color-text-muted)]">No verifier</span>}
+                              </div>
+                            </td>
+                            <td>
+                              <select className="field min-w-40" value={task.verificationRule} onChange={(event) => updateLiveTask(task.id, { verificationRule: event.target.value as LiveTask["verificationRule"] })}>
+                                <option value="one_verifier">One verifier enough</option>
+                                <option value="all_verifiers">All verifiers required</option>
+                                <option value="sequential">Sequential</option>
+                              </select>
+                            </td>
+                            <td className="text-center">
+                              <input type="checkbox" checked={task.active} onChange={(event) => updateLiveTask(task.id, { active: event.target.checked })} aria-label={`Toggle ${details.taskDetails}`} />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      ))}
     </div>
   );
 }
