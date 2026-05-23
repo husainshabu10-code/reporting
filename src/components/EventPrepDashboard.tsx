@@ -1397,7 +1397,7 @@ function UsersAccessTab({ state, currentProfile, updateState }: { state: EventPr
             email: email.trim().toLowerCase(),
             fullName: name.trim(),
             role: assignedRole,
-            status: assignedRole === "report_user" ? "pending_approval" as const : "active" as const,
+            status: isAreaAdmin ? "pending_approval" as const : "active" as const,
             mustChangePassword: true,
             createdBy: currentProfile.id
           },

@@ -60,7 +60,7 @@ async function createUser(db: ServerDb, actor: Profile & { authUserId?: string }
     email,
     fullName: body.fullName.trim(),
     role,
-    status: role === "report_user" ? "pending_approval" : "active",
+    status: isAreaAdmin ? "pending_approval" : "active",
     mustChangePassword: true,
     createdBy: actor.id
   };
@@ -109,8 +109,9 @@ async function changePassword(db: ServerDb, actor: Profile & { authUserId?: stri
 async function getActorProfile(db: ServerDb, request: Request) {
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) throw new Error("Missing signed-in session.");
-  const { data, error } = await db.auth.getUser(token);
-  if (error || !data.user) throw new Error("Invalid session.");
+  const authDb = authSupabase();
+  const { data, error } = await authDb.auth.getUser(token);
+  if (error || !data.user) throw new Error(`Invalid session. ${error?.message || "Please sign out and sign in again."}`);
   const profile = await getProfile(db, data.user.id, data.user.email || "");
   if (!profile) throw new Error("No active dashboard profile exists for this login.");
   if (profile.status === "pending_approval") throw new Error("Your profile is pending approval.");
@@ -225,6 +226,13 @@ function serverSupabase() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error("Server Supabase URL or service role key is missing.");
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+function authSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  if (!url || !key) throw new Error("Public Supabase auth environment variables are missing on the server.");
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
