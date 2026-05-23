@@ -294,7 +294,7 @@ export default function EventPrepDashboard() {
   return (
     <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
       <div className="flex min-h-screen">
-        <aside className={`app-sidebar fixed inset-y-0 left-0 z-40 flex w-80 flex-col border-r border-white/10 bg-[var(--color-primary)] text-white shadow-2xl transition-[transform,width] duration-200 lg:sticky lg:translate-x-0 ${sidebarCollapsed ? "lg:w-20" : "lg:w-80"} ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <aside className={`app-sidebar fixed inset-y-0 left-0 z-40 flex w-80 flex-col border-r border-white/10 bg-[var(--color-primary)] text-white shadow-2xl transition-[transform,width] duration-300 lg:sticky lg:inset-auto lg:top-0 lg:h-screen lg:translate-x-0 ${sidebarCollapsed ? "lg:w-20" : "lg:w-80"} ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
           <div className="flex items-start justify-between gap-3 px-5 py-6">
             <div className={sidebarCollapsed ? "lg:hidden" : ""}>
               <p className="text-xs font-black uppercase tracking-[0.16em] text-white/85">ASHARA MUBARAKAH</p>
@@ -333,7 +333,7 @@ export default function EventPrepDashboard() {
             {tabs.map((tab) => (
               <button
                 key={tab}
-                className={`sidebar-nav-item group flex min-h-12 w-full items-center gap-3 rounded-lg px-4 text-left text-sm font-black transition ${activeTab === tab ? "bg-[var(--color-accent)] text-[var(--color-primary)] shadow-lg shadow-black/10" : "text-white/90 hover:bg-white/10 hover:text-white"} ${sidebarCollapsed ? "lg:justify-center lg:px-2" : ""}`}
+                className={`sidebar-nav-item group flex min-h-12 w-full items-center gap-3 rounded-lg px-4 text-left text-sm font-black ${activeTab === tab ? "is-active bg-[var(--color-accent)] text-[var(--color-primary)] shadow-lg shadow-black/10" : "text-white/90 hover:bg-white/10 hover:text-white"} ${sidebarCollapsed ? "lg:justify-center lg:px-2" : ""}`}
                 onClick={() => {
                   setActiveTab(tab);
                   setSidebarOpen(false);
@@ -358,7 +358,7 @@ export default function EventPrepDashboard() {
           </div>
         </aside>
 
-        {sidebarOpen ? <button className="fixed inset-0 z-30 bg-black/20 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close menu" /> : null}
+        {sidebarOpen ? <button className="motion-overlay fixed inset-0 z-30 bg-black/20 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close menu" /> : null}
 
         <section className="min-w-0 flex-1">
           <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-[rgba(250,247,239,0.96)] px-4 py-4 backdrop-blur">
@@ -384,7 +384,7 @@ export default function EventPrepDashboard() {
             </div>
           </header>
 
-          <div className="mx-auto max-w-[96rem] p-4 lg:p-6">
+          <div className="animate-fade-in mx-auto max-w-[96rem] p-4 lg:p-6">
             <NotificationCenter state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} />
             {activeTab === "Dashboard" ? <DashboardTab state={state} currentProfile={currentProfile} /> : null}
             {activeTab === "Daily Reports" ? <DailyReportsTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
@@ -980,7 +980,7 @@ function LiveTasksConfigTable({
   return (
     <div className="space-y-5">
       {grouped.map(({ area, workstreams }) => (
-        <section key={area.id} className="live-task-group">
+        <section key={area.id} className="live-task-group motion-card animate-fade-in">
           <h3 className="text-lg font-black text-[var(--color-primary)]">Area: {area.name}</h3>
           {workstreams.map((workstream) => {
             const tasks = state.liveTasks.filter((task) => task.areaId === area.id && (taskDetails(state, task).workstream || "General") === workstream);
@@ -2532,7 +2532,7 @@ function ActivityLogTab({ state, currentProfile, updateState, showToast }: { sta
 
 function Panel({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
-    <section className="dashboard-panel p-4">
+    <section className="dashboard-panel motion-card animate-fade-in p-4">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <span className="panel-grip" aria-hidden="true">
@@ -2584,7 +2584,7 @@ function ToastStack({ toasts, dismissToast }: { toasts: ToastMessage[]; dismissT
 function MetricCard({ title, value, helper, tone }: { title: string; value: string; helper: string; tone?: "good" | "warning" | "critical" }) {
   const color = tone === "critical" ? "text-[var(--color-important)]" : tone === "warning" ? "text-[var(--color-accent)]" : "text-[var(--color-primary)]";
   return (
-    <div className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm">
+    <div className="motion-card animate-fade-in rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm">
       <p className="text-xs font-bold uppercase text-[var(--color-text-muted)]">{title}</p>
       <p className={`mt-2 text-3xl font-black ${color}`}>{value}</p>
       <p className="mt-1 text-xs text-[var(--color-text-muted)]">{helper}</p>
@@ -2600,7 +2600,7 @@ function ProgressRow({ label, value, helper }: { label: string; value: number; h
         <p className="text-[var(--color-text-muted)]">{value}%</p>
       </div>
       <div className="mt-2 h-2 rounded-full bg-[var(--color-accent-light)]">
-        <div className="h-2 rounded-full bg-[var(--color-secondary)]" style={{ width: `${value}%` }} />
+        <div className="progress-fill h-2 rounded-full bg-[var(--color-secondary)]" style={{ width: `${value}%` }} />
       </div>
       <p className="mt-1 text-xs text-[var(--color-text-muted)]">{helper}</p>
     </div>
@@ -2615,7 +2615,7 @@ function DashboardBarChart({ rows, compact = false }: { rows: Array<{ label: str
         <div key={row.label} className="grid gap-2 sm:grid-cols-[11rem_1fr_5rem] sm:items-center">
           <p className="truncate text-sm font-bold text-[var(--color-text-muted)]">{row.label}</p>
           <div className="h-3 overflow-hidden rounded-full bg-[var(--color-accent-light)]">
-            <div className="h-full rounded-full bg-[var(--color-accent)]" style={{ width: `${row.value}%` }} />
+            <div className="progress-fill h-full rounded-full bg-[var(--color-accent)]" style={{ width: `${row.value}%` }} />
           </div>
           <p className="text-sm font-black text-[var(--color-primary)]">{row.value}%</p>
           {!compact ? <p className="text-xs text-[var(--color-text-muted)] sm:col-start-2">{row.helper}</p> : null}
