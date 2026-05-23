@@ -80,6 +80,9 @@ type AdminTab =
 type UserTab = "Daily Report" | "My Area" | "Requests" | "Profile / Access";
 type AnyTab = AdminTab | UserTab;
 type TaskView = "today" | "pending" | "issue" | "correction" | "all";
+type ToastTone = "success" | "info" | "warning" | "error";
+type ToastMessage = { id: string; title: string; message?: string; tone: ToastTone };
+type ShowToast = (title: string, message?: string, tone?: ToastTone) => void;
 
 const ADMIN_TABS: AdminTab[] = [
   "Dashboard",
@@ -111,6 +114,7 @@ export default function EventPrepDashboard() {
   const [authChecked, setAuthChecked] = useState(false);
   const [sessionEmail, setSessionEmail] = useState("");
   const [sessionUserId, setSessionUserId] = useState("");
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const saveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -183,6 +187,14 @@ export default function EventPrepDashboard() {
     await signOutEventPrep();
     window.location.reload();
   };
+  const showToast: ShowToast = (title, message, tone = "success") => {
+    const toast: ToastMessage = { id: id("toast"), title, message, tone };
+    setToasts((current) => [toast, ...current].slice(0, 4));
+    window.setTimeout(() => {
+      setToasts((current) => current.filter((item) => item.id !== toast.id));
+    }, 3600);
+  };
+  const dismissToast = (toastId: string) => setToasts((current) => current.filter((item) => item.id !== toastId));
 
   const currentProfile = state ? getCurrentProfile(state, currentProfileId, sessionEmail, sessionUserId) : undefined;
   const isAdmin = Boolean(currentProfile && ["super_admin", "admin"].includes(currentProfile.role));
@@ -318,21 +330,22 @@ export default function EventPrepDashboard() {
           </header>
 
           <div className="mx-auto max-w-7xl p-4 lg:p-6">
-            <NotificationCenter state={state} currentProfile={currentProfile} updateState={updateState} />
+            <NotificationCenter state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} />
             {activeTab === "Dashboard" ? <DashboardTab state={state} currentProfile={currentProfile} /> : null}
-            {activeTab === "Daily Reports" ? <DailyReportsTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
-            {activeTab === "Master Tasks" ? <MasterTasksTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
-            {activeTab === "Zones / Areas" ? <ZonesAreasTab state={state} updateState={updateState} /> : null}
-            {activeTab === "Verification" ? <VerificationTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
-            {activeTab === "Requests" ? <RequestsTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
-            {activeTab === "Users & Access" ? <UsersAccessTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
-            {activeTab === "Daily Report" ? <DailyReportTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
+            {activeTab === "Daily Reports" ? <DailyReportsTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
+            {activeTab === "Master Tasks" ? <MasterTasksTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
+            {activeTab === "Zones / Areas" ? <ZonesAreasTab state={state} updateState={updateState} showToast={showToast} /> : null}
+            {activeTab === "Verification" ? <VerificationTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
+            {activeTab === "Requests" ? <RequestsTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
+            {activeTab === "Users & Access" ? <UsersAccessTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
+            {activeTab === "Daily Report" ? <DailyReportTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
             {activeTab === "My Area" ? <MyAreaTab state={state} currentProfile={currentProfile} /> : null}
-            {activeTab === "Profile / Access" ? <ProfileTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
-            {["Forms", "Global Fields", "Reports", "Activity Log"].includes(activeTab) ? <FoundationTab state={state} tab={activeTab} currentProfile={currentProfile} updateState={updateState} /> : null}
+            {activeTab === "Profile / Access" ? <ProfileTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
+            {["Forms", "Global Fields", "Reports", "Activity Log"].includes(activeTab) ? <FoundationTab state={state} tab={activeTab} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
           </div>
         </section>
       </div>
+      <ToastStack toasts={toasts} dismissToast={dismissToast} />
     </main>
   );
 }
@@ -497,7 +510,7 @@ function PasswordChangeScreen({ profile, onChanged, signOut }: { profile: Profil
   );
 }
 
-function DailyReportsTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+function DailyReportsTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const today = todayIso();
   const rows = state.areas.map((area) => {
     const report = state.dailyReports.find((item) => item.areaId === area.id && item.reportDate === today);
@@ -517,12 +530,12 @@ function DailyReportsTab({ state, currentProfile, updateState }: { state: EventP
           ])}
         />
       </Panel>
-      {["super_admin", "admin"].includes(currentProfile.role) ? <RemindersConfig state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
+      {["super_admin", "admin"].includes(currentProfile.role) ? <RemindersConfig state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
     </div>
   );
 }
 
-function NotificationCenter({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+function NotificationCenter({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const stored = unreadNotificationsFor(state, currentProfile);
   const generated = buildUserAlerts(state, currentProfile);
   const count = stored.length + generated.length;
@@ -532,6 +545,7 @@ function NotificationCenter({ state, currentProfile, updateState }: { state: Eve
       ...current,
       notifications: current.notifications.map((notification) => (notification.id === notificationId ? { ...notification, isRead: true } : notification))
     }));
+    showToast("Notification marked read", "This alert is now cleared from your unread list.");
   };
   return (
     <Panel title="Alerts & Notifications" action={<Badge>{count} item(s)</Badge>}>
@@ -562,7 +576,7 @@ function NotificationCenter({ state, currentProfile, updateState }: { state: Eve
   );
 }
 
-function RemindersConfig({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+function RemindersConfig({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const [reminderType, setReminderType] = useState("Daily report submission");
   const [areaId, setAreaId] = useState("");
   const reminderTypes = activeOptions(state, "Reminder types", [
@@ -587,6 +601,7 @@ function RemindersConfig({ state, currentProfile, updateState }: { state: EventP
       active: true
     };
     updateState((current) => withActivity({ ...current, reminders: [reminder, ...current.reminders] }, currentProfile, "Reminder activity", `Added ${reminder.reminderType} reminder`, "reminder", reminder.id, { active: true }));
+    showToast("Reminder created", `${reminder.reminderType} is now tracked in-app.`);
   };
   const updateReminder = (reminderId: string, patch: Partial<Reminder>) => {
     updateState((current) => withActivity({
@@ -624,7 +639,7 @@ function RemindersConfig({ state, currentProfile, updateState }: { state: EventP
   );
 }
 
-function MasterTasksTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+function MasterTasksTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const [importMessage, setImportMessage] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [dayFilter, setDayFilter] = useState("All");
@@ -652,17 +667,23 @@ function MasterTasksTab({ state, currentProfile, updateState }: { state: EventPr
         taskTemplates: mergeTemplates(current.taskTemplates, templates)
       }));
       setImportMessage(`${templates.length} task templates imported into the reusable master template list.`);
+      showToast("Import completed", `${templates.length} template(s) added to Master Tasks.`);
     } catch (error) {
       setImportMessage(readError(error, "Import failed."));
+      showToast("Import failed", readError(error, "Please check the file and try again."), "error");
     } finally {
       event.target.value = "";
     }
   };
 
   const applyTemplates = () => {
-    if (!applyAreaId || !selectedIds.length) return;
+    if (!applyAreaId || !selectedIds.length) {
+      showToast("Nothing selected", "Choose at least one template and an area first.", "warning");
+      return;
+    }
+    const templatesToApply = selectedIds.filter((templateId) => !state.liveTasks.some((task) => task.templateId === templateId && task.areaId === applyAreaId));
     updateState((current) => {
-      const newTasks = selectedIds
+      const newTasks = templatesToApply
         .filter((templateId) => !current.liveTasks.some((task) => task.templateId === templateId && task.areaId === applyAreaId))
         .map((templateId) => {
           const template = current.taskTemplates.find((item) => item.id === templateId);
@@ -671,6 +692,11 @@ function MasterTasksTab({ state, currentProfile, updateState }: { state: EventPr
         .filter(Boolean) as LiveTask[];
       return withActivity({ ...current, liveTasks: [...newTasks, ...current.liveTasks] }, currentProfile, "Template changes", `Applied ${newTasks.length} template(s) to ${areaName(current, applyAreaId)}`, "live_task", applyAreaId, { count: newTasks.length });
     });
+    showToast(
+      templatesToApply.length ? "Templates applied" : "No new live tasks",
+      templatesToApply.length ? `${templatesToApply.length} live task(s) created for ${areaName(state, applyAreaId)}.` : "Those templates were already applied to this area.",
+      templatesToApply.length ? "success" : "info"
+    );
   };
 
   const updateLiveTask = (taskId: string, patch: Partial<LiveTask>) => {
@@ -689,7 +715,10 @@ function MasterTasksTab({ state, currentProfile, updateState }: { state: EventPr
             <input className="field mt-2" type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} />
             <p className="mt-2 text-xs text-[var(--color-text-muted)]">Imports useful Day Plan columns into reusable templates. Dependencies and risk are kept only as hidden reference.</p>
           </div>
-          <button className="btn-secondary" onClick={() => setSelectedIds(filteredTemplates.map((template) => template.id))}>
+          <button className="btn-secondary" onClick={() => {
+            setSelectedIds(filteredTemplates.map((template) => template.id));
+            showToast("Templates selected", `${filteredTemplates.length} filtered template(s) selected.`, "info");
+          }}>
             Select Filtered
           </button>
         </div>
@@ -783,11 +812,15 @@ function MasterTasksTab({ state, currentProfile, updateState }: { state: EventPr
   );
 }
 
-function ZonesAreasTab({ state, updateState }: { state: EventPrepState; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+function ZonesAreasTab({ state, updateState, showToast }: { state: EventPrepState; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const [name, setName] = useState("");
   const [zoneTypeId, setZoneTypeId] = useState(state.zoneTypes[0]?.id || "");
   const addArea = () => {
-    if (!name.trim()) return;
+    if (!name.trim()) {
+      showToast("Area name required", "Enter an area name before adding it.", "warning");
+      return;
+    }
+    const createdName = name.trim();
     updateState((current) => ({
       ...current,
       areas: [
@@ -795,8 +828,8 @@ function ZonesAreasTab({ state, updateState }: { state: EventPrepState; updateSt
         {
           id: id("area"),
           zoneTypeId,
-          name: name.trim(),
-          code: slug(name).toUpperCase(),
+          name: createdName,
+          code: slug(createdName).toUpperCase(),
           active: true,
           dailyDeadline: "20:00",
           reminderTime: "18:30",
@@ -805,6 +838,7 @@ function ZonesAreasTab({ state, updateState }: { state: EventPrepState; updateSt
       ]
     }));
     setName("");
+    showToast("Area added", `${createdName} is ready for access and live tasks.`);
   };
   const updateArea = (areaId: string, patch: Partial<EventPrepState["areas"][number]>) => {
     updateState((current) => ({ ...current, areas: current.areas.map((area) => (area.id === areaId ? { ...area, ...patch } : area)) }));
@@ -827,6 +861,7 @@ function ZonesAreasTab({ state, updateState }: { state: EventPrepState; updateSt
         requests: current.requests.filter((request) => request.areaId !== areaId)
       };
     });
+    showToast("Area deleted", "Related Phase 1 records were removed from the dashboard.", "info");
   };
 
   return (
@@ -877,7 +912,7 @@ function ZonesAreasTab({ state, updateState }: { state: EventPrepState; updateSt
   );
 }
 
-function DailyReportTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+function DailyReportTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const allowedAreas = getAllowedAreas(state, currentProfile);
   const [areaId, setAreaId] = useState(allowedAreas[0]?.id || "");
   const [taskView, setTaskView] = useState<TaskView>("today");
@@ -915,6 +950,7 @@ function DailyReportTab({ state, currentProfile, updateState }: { state: EventPr
 
   const saveDraft = () => {
     updateState((current) => withActivity(upsertReport(current, { ...report, generalRemark, status: "Draft Saved", updatedAt: new Date().toISOString() }), currentProfile, "Daily reports", `Saved draft for ${area?.name || areaId}`, "daily_report", report.id, { status: "Draft Saved" }));
+    showToast("Draft saved", "This report is saved, but it is not submitted yet.", "info");
   };
 
   const submitReport = () => {
@@ -931,6 +967,11 @@ function DailyReportTab({ state, currentProfile, updateState }: { state: EventPr
         submittedAt: missing.length ? report.submittedAt : new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }), currentProfile, "Daily reports", `Submitted report for ${area?.name || areaId}`, "daily_report", report.id, { status: nextStatus, missingTasks: missing.length })
+    );
+    showToast(
+      missing.length ? "Report partially updated" : nextStatus,
+      missing.length ? `${missing.length} task(s) still need an update before final submission.` : "Daily report submitted successfully.",
+      missing.length ? "warning" : "success"
     );
   };
 
@@ -955,12 +996,12 @@ function DailyReportTab({ state, currentProfile, updateState }: { state: EventPr
 
       {corrections.length ? (
         <Panel title="Needs Correction" action={<Badge>{corrections.length} task(s)</Badge>}>
-          <TaskCardList state={state} tasks={corrections} report={report} currentProfile={currentProfile} updateState={updateState} missingIds={missingIds} />
+          <TaskCardList state={state} tasks={corrections} report={report} currentProfile={currentProfile} updateState={updateState} missingIds={missingIds} showToast={showToast} />
         </Panel>
       ) : null}
 
       <Panel title="Task Cards" action={<Badge>{visibleTasks.length} shown</Badge>}>
-        <TaskCardList state={state} tasks={visibleTasks} report={report} currentProfile={currentProfile} updateState={updateState} missingIds={missingIds} />
+        <TaskCardList state={state} tasks={visibleTasks} report={report} currentProfile={currentProfile} updateState={updateState} missingIds={missingIds} showToast={showToast} />
       </Panel>
     </div>
   );
@@ -972,7 +1013,8 @@ function TaskCardList({
   report,
   currentProfile,
   updateState,
-  missingIds
+  missingIds,
+  showToast
 }: {
   state: EventPrepState;
   tasks: LiveTask[];
@@ -980,12 +1022,13 @@ function TaskCardList({
   currentProfile: Profile;
   updateState: (updater: (current: EventPrepState) => EventPrepState) => void;
   missingIds: string[];
+  showToast: ShowToast;
 }) {
   if (!tasks.length) return <EmptyState title="No tasks in this view" body="Change the task view filter or ask admin to apply task templates to this area." />;
   return (
     <div className="grid gap-3">
       {tasks.map((task) => (
-        <TaskCard key={task.id} state={state} task={task} report={report} currentProfile={currentProfile} updateState={updateState} missing={missingIds.includes(task.id)} />
+        <TaskCard key={task.id} state={state} task={task} report={report} currentProfile={currentProfile} updateState={updateState} missing={missingIds.includes(task.id)} showToast={showToast} />
       ))}
     </div>
   );
@@ -997,7 +1040,8 @@ function TaskCard({
   report,
   currentProfile,
   updateState,
-  missing
+  missing,
+  showToast
 }: {
   state: EventPrepState;
   task: LiveTask;
@@ -1005,6 +1049,7 @@ function TaskCard({
   currentProfile: Profile;
   updateState: (updater: (current: EventPrepState) => EventPrepState) => void;
   missing: boolean;
+  showToast: ShowToast;
 }) {
   const template = state.taskTemplates.find((item) => item.id === task.templateId);
   const existing = state.taskUpdates.find((update) => update.liveTaskId === task.id && update.dailyReportId === report.id);
@@ -1036,6 +1081,11 @@ function TaskCard({
         : [];
       return withActivity({ ...current, dailyReports: nextReport, taskUpdates: [next, ...without], notifications: [...verifierNotifications, ...current.notifications] }, currentProfile, "Task updates", `Updated task: ${template?.taskDetails || task.id}`, "task_update", next.id, { status: next.status });
     });
+    showToast(
+      nextVerification === "Needs Verification" ? "Task sent for verification" : "Task update saved",
+      nextVerification === "Needs Verification" ? "A verifier can now review this task." : "Your task changes were saved.",
+      nextVerification === "Needs Verification" ? "info" : "success"
+    );
   };
 
   const requestNotApplicable = () => {
@@ -1060,6 +1110,7 @@ function TaskCard({
         notifications: [...notifyAdmins(current, "Request status changed", title, "A not applicable request needs review.", { areaId: task.areaId, relatedTaskId: task.id, relatedRequestId: request.id }), ...current.notifications]
       }, currentProfile, "Requests", title, "request", request.id, { status: request.status });
     });
+    showToast("Request created", "Admin can now review the not applicable request.", "info");
   };
 
   const addFile = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -1087,6 +1138,7 @@ function TaskCard({
       return { ...current, dailyReports: nextReports, taskUpdates: nextUpdates, taskFiles: [...newFiles, ...current.taskFiles] };
     });
     event.target.value = "";
+    showToast("Upload added", `${newFiles.length} file(s) attached to this task.`);
   };
 
   const files = state.taskFiles.filter((file) => file.liveTaskId === task.id);
@@ -1162,7 +1214,7 @@ function TaskCard({
   );
 }
 
-function VerificationTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+function VerificationTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const latest = latestUpdateMap(state.taskUpdates);
   const assignedAreaIds = getAllowedAreas(state, currentProfile).map((area) => area.id);
   const queue = state.liveTasks.filter((task) => {
@@ -1177,6 +1229,7 @@ function VerificationTab({ state, currentProfile, updateState }: { state: EventP
     if (!update) return;
     if (!canActOnVerification(task, update, currentProfile, state.verificationLogs)) {
       window.alert("This verification is waiting for another assigned verifier.");
+      showToast("Verification blocked", "This task is waiting for another assigned verifier.", "warning");
       return;
     }
     const comment = window.prompt(action === "verified" ? "Verification comment" : "Correction comment") || "";
@@ -1197,6 +1250,7 @@ function VerificationTab({ state, currentProfile, updateState }: { state: EventP
         notifications: action === "rejected" ? [createInAppNotification(update.updatedBy, "Task needs correction", "Task needs correction", comment || "A verifier requested correction.", { areaId: task.areaId, relatedTaskId: task.id, relatedDailyReportId: update.dailyReportId }), ...current.notifications] : current.notifications
       }, currentProfile, "Verification actions", `${action === "verified" ? "Verified" : "Rejected"} task`, "verification_log", log.id, { status: nextStatus });
     });
+    showToast(action === "verified" ? "Task verified" : "Correction requested", action === "verified" ? "Progress will count this task once verification is complete." : "The report user will see your correction comment.", action === "verified" ? "success" : "warning");
   };
 
   return (
@@ -1235,7 +1289,7 @@ function VerificationTab({ state, currentProfile, updateState }: { state: EventP
   );
 }
 
-function RequestsTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+function RequestsTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const isAdmin = ["super_admin", "admin"].includes(currentProfile.role);
   const areas = getAllowedAreas(state, currentProfile);
   const [areaId, setAreaId] = useState(areas[0]?.id || state.areas[0]?.id || "");
@@ -1252,7 +1306,10 @@ function RequestsTab({ state, currentProfile, updateState }: { state: EventPrepS
   const verifierOptions = state.profiles.filter((profile) => profile.role === "verifier" && profile.status === "active");
 
   const createRequest = () => {
-    if (!title.trim() || !areaId) return;
+    if (!title.trim() || !areaId) {
+      showToast("Request needs a title", "Add a request title and area before submitting.", "warning");
+      return;
+    }
     const request: AreaRequest = {
       id: id("request"),
       requestType,
@@ -1272,6 +1329,7 @@ function RequestsTab({ state, currentProfile, updateState }: { state: EventPrepS
     }, currentProfile, "Requests", `Created request: ${title}`, "request", request.id, { status: request.status }));
     setTitle("");
     setDetails("");
+    showToast("Request submitted", "Admin can now review this request.", "success");
   };
 
   const changeStatus = (request: AreaRequest, status: RequestStatus) => {
@@ -1284,11 +1342,15 @@ function RequestsTab({ state, currentProfile, updateState }: { state: EventPrepS
           ? current.liveTasks.map((task) => (task.id === request.relatedLiveTaskId ? { ...task, notApplicable: true, active: false } : task))
           : current.liveTasks
     }, currentProfile, "Requests", `Changed request status to ${status}`, "request", request.id, { status }));
+    showToast("Request updated", `${request.title} is now ${status}.`, status === "Rejected" ? "warning" : "success");
   };
 
   const sendForVerification = (request: AreaRequest) => {
     const reviewerId = reviewerByRequest[request.id];
-    if (!reviewerId) return;
+    if (!reviewerId) {
+      showToast("Choose a verifier", "Select a verifier before sending the request.", "warning");
+      return;
+    }
     updateState((current) => {
       const review: RequestReview = {
         id: id("request-review"),
@@ -1306,6 +1368,7 @@ function RequestsTab({ state, currentProfile, updateState }: { state: EventPrepS
         notifications: [createInAppNotification(reviewerId, "Request status changed", `Review request: ${request.title}`, "Admin sent this request to you for verification.", { areaId: request.areaId, relatedRequestId: request.id }), ...current.notifications]
       }, currentProfile, "Requests", "Sent request for verifier review", "request", request.id, { reviewerAssigned: true });
     });
+    showToast("Sent for verification", "The assigned verifier will see it in their queue.", "info");
   };
 
   const completeReview = (request: AreaRequest) => {
@@ -1318,6 +1381,7 @@ function RequestsTab({ state, currentProfile, updateState }: { state: EventPrepS
       requestReviews: current.requestReviews.map((item) => (item.id === review.id ? { ...item, recommendation, comment, completed: true } : item)),
       requests: current.requests.map((item) => (item.id === request.id ? { ...item, status: "Under Review", decisionRemarks: comment || item.decisionRemarks } : item))
     }, currentProfile, "Requests", "Completed verifier request review", "request_review", review.id, { completed: true }));
+    showToast("Review completed", "Admin can now take the final request action.", "success");
   };
 
   return (
@@ -1365,7 +1429,7 @@ function RequestsTab({ state, currentProfile, updateState }: { state: EventPrepS
   );
 }
 
-function UsersAccessTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+function UsersAccessTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const isAdmin = ["super_admin", "admin"].includes(currentProfile.role);
   const isAreaAdmin = currentProfile.role === "area_admin";
   const isVerifier = currentProfile.role === "verifier";
@@ -1385,7 +1449,10 @@ function UsersAccessTab({ state, currentProfile, updateState }: { state: EventPr
     });
   const canAddUsers = isAdmin || isAreaAdmin;
   const addUser = async () => {
-    if (!email.trim() || !name.trim()) return;
+    if (!email.trim() || !name.trim()) {
+      showToast("User details required", "Enter the full name and login ID before creating credentials.", "warning");
+      return;
+    }
     const assignedRole = isAreaAdmin ? "report_user" : role;
     try {
       setAccessMessage("Creating user credentials...");
@@ -1412,11 +1479,13 @@ function UsersAccessTab({ state, currentProfile, updateState }: { state: EventPr
       }));
       setTemporaryPassword(result.temporaryPassword);
       setAccessMessage(profile.status === "pending_approval" ? "User created / pending approval." : "User credentials created.");
+      showToast(profile.status === "pending_approval" ? "User pending approval" : "Credentials created", "Temporary password is shown once in this panel.", profile.status === "pending_approval" ? "info" : "success");
       setEmail("");
       setName("");
       setCustomPassword("");
     } catch (error) {
       setAccessMessage(readError(error, "Unable to create user credentials."));
+      showToast("Could not create credentials", readError(error, "Please check the details and try again."), "error");
     }
   };
   const canApprove = (profile: Profile) => {
@@ -1435,8 +1504,10 @@ function UsersAccessTab({ state, currentProfile, updateState }: { state: EventPr
         notifications: [createInAppNotification(profile.id, "Access request approved/rejected", "Access approved", "Your dashboard access is active.", {}), ...current.notifications]
       }, currentProfile, "Access changes", `Approved access for ${profile.fullName}`, "profile", profile.id, { approved: true }));
       setAccessMessage("User approved.");
+      showToast("User approved", `${profile.fullName} can now sign in.`, "success");
     } catch (error) {
       setAccessMessage(readError(error, "Unable to approve user."));
+      showToast("Approval failed", readError(error, "Please try again."), "error");
     }
   };
   const resetPassword = async (profile: Profile) => {
@@ -1450,8 +1521,10 @@ function UsersAccessTab({ state, currentProfile, updateState }: { state: EventPr
       }, currentProfile, "Access changes", `Reset password for ${profile.fullName}`, "profile", profile.id, { passwordReset: true }));
       setTemporaryPassword(result.temporaryPassword);
       setAccessMessage("Password reset. The new password is shown below once.");
+      showToast("Password reset", "The new temporary password is shown once in this panel.", "success");
     } catch (error) {
       setAccessMessage(readError(error, "Unable to reset password."));
+      showToast("Password reset failed", readError(error, "Please try again."), "error");
     }
   };
 
@@ -1508,7 +1581,7 @@ function MyAreaTab({ state, currentProfile }: { state: EventPrepState; currentPr
   );
 }
 
-function ProfileTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+function ProfileTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [message, setMessage] = useState("");
@@ -1524,8 +1597,10 @@ function ProfileTab({ state, currentProfile, updateState }: { state: EventPrepSt
       setPassword("");
       setConfirm("");
       setMessage("Password changed.");
+      showToast("Password changed", "Your new password is active now.", "success");
     } catch (error) {
       setMessage(readError(error, "Unable to change password."));
+      showToast("Password change failed", readError(error, "Please check both fields and try again."), "error");
     }
   };
   return (
@@ -1556,31 +1631,37 @@ function FoundationTab({
   state,
   tab,
   currentProfile,
-  updateState
+  updateState,
+  showToast
 }: {
   state: EventPrepState;
   tab: AnyTab;
   currentProfile: Profile;
   updateState: (updater: (current: EventPrepState) => EventPrepState) => void;
+  showToast: ShowToast;
 }) {
-  if (tab === "Forms") return <FormBuilderTab state={state} currentProfile={currentProfile} updateState={updateState} />;
-  if (tab === "Global Fields") return <GlobalFieldsTab state={state} currentProfile={currentProfile} updateState={updateState} />;
+  if (tab === "Forms") return <FormBuilderTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} />;
+  if (tab === "Global Fields") return <GlobalFieldsTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} />;
   if (tab === "Reports") return <EmptyState title="Reports foundation ready" body="PDF and Excel exports are reserved for Phase 3. The schema already includes report_exports." />;
-  return <ActivityLogTab state={state} currentProfile={currentProfile} updateState={updateState} />;
+  return <ActivityLogTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} />;
 }
 
-function FormBuilderTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+function FormBuilderTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const [taskType, setTaskType] = useState<TaskTypeName>("Simple Task");
   const [label, setLabel] = useState("");
   const addField = () => {
-    if (!label.trim()) return;
+    if (!label.trim()) {
+      showToast("Field label required", "Add a label before creating the form field.", "warning");
+      return;
+    }
+    const fieldLabel = label.trim();
     updateState((current) => {
       const fieldsForType = current.formFields.filter((field) => field.taskType === taskType);
       const field: FormField = {
         id: id("field"),
         taskType,
-        fieldKey: slug(label),
-        label: label.trim(),
+        fieldKey: slug(fieldLabel),
+        label: fieldLabel,
         required: false,
         visible: true,
         displayOrder: fieldsForType.length + 1
@@ -1588,6 +1669,7 @@ function FormBuilderTab({ state, currentProfile, updateState }: { state: EventPr
       return withActivity({ ...current, formFields: [...current.formFields, field] }, currentProfile, "Form/global field changes", `Added form field ${field.label}`, "form_field", field.id, { visible: true });
     });
     setLabel("");
+    showToast("Form field added", `${fieldLabel} was added to ${taskType}.`);
   };
   const updateField = (fieldId: string, patch: Partial<FormField>) => {
     updateState((current) => withActivity({
@@ -1623,17 +1705,22 @@ function FormBuilderTab({ state, currentProfile, updateState }: { state: EventPr
   );
 }
 
-function GlobalFieldsTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+function GlobalFieldsTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const groups = unique(state.globalOptions.map((option) => option.group));
   const [group, setGroup] = useState(groups[0] || "Workstreams");
   const [value, setValue] = useState("");
   const addOption = () => {
-    if (!group.trim() || !value.trim()) return;
+    if (!group.trim() || !value.trim()) {
+      showToast("Option details required", "Add both the group and value before saving.", "warning");
+      return;
+    }
+    const optionValue = value.trim();
     updateState((current) => {
-      const option: GlobalOption = { id: id("option"), group: group.trim(), value: value.trim(), active: true };
+      const option: GlobalOption = { id: id("option"), group: group.trim(), value: optionValue, active: true };
       return withActivity({ ...current, globalOptions: [...current.globalOptions, option] }, currentProfile, "Form/global field changes", `Added global option ${option.value}`, "global_option", option.id, { active: true });
     });
     setValue("");
+    showToast("Global option added", `${optionValue} is now available in ${group.trim()}.`);
   };
   const updateOption = (optionId: string, patch: Partial<GlobalOption>) => {
     updateState((current) => withActivity({
@@ -1668,13 +1755,14 @@ function GlobalFieldsTab({ state, currentProfile, updateState }: { state: EventP
   );
 }
 
-function ActivityLogTab({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+function ActivityLogTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const activityOptions = state.globalOptions.filter((option) => option.group === "Activity Log Categories");
   const updateOption = (optionId: string, active: boolean) => {
     updateState((current) => ({
       ...current,
       globalOptions: current.globalOptions.map((option) => (option.id === optionId ? { ...option, active } : option))
     }));
+    showToast("Activity setting updated", `Logging is now ${active ? "on" : "off"} for this category.`, "info");
   };
   return (
     <div className="space-y-4">
@@ -1716,6 +1804,40 @@ function Panel({ title, action, children }: { title: string; action?: ReactNode;
       </div>
       {children}
     </section>
+  );
+}
+
+function ToastStack({ toasts, dismissToast }: { toasts: ToastMessage[]; dismissToast: (toastId: string) => void }) {
+  if (!toasts.length) return null;
+  const toneClass: Record<ToastTone, string> = {
+    success: "border-[var(--color-primary)] bg-white",
+    info: "border-[var(--color-accent)] bg-white",
+    warning: "border-[#C9A227] bg-[#FFF8E1]",
+    error: "border-[var(--color-important)] bg-white"
+  };
+  const dotClass: Record<ToastTone, string> = {
+    success: "bg-[var(--color-primary)]",
+    info: "bg-[var(--color-accent)]",
+    warning: "bg-[#C9A227]",
+    error: "bg-[var(--color-important)]"
+  };
+  return (
+    <div className="pointer-events-none fixed bottom-4 right-4 z-[90] grid w-[calc(100%-2rem)] max-w-sm gap-2 sm:bottom-6 sm:right-6">
+      {toasts.map((toast) => (
+        <div key={toast.id} className={`toast-card pointer-events-auto rounded-lg border-l-4 p-4 shadow-soft ${toneClass[toast.tone]}`}>
+          <div className="flex items-start gap-3">
+            <span className={`mt-1 h-2.5 w-2.5 flex-none rounded-full ${dotClass[toast.tone]}`} />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-black text-[var(--color-primary)]">{toast.title}</p>
+              {toast.message ? <p className="mt-1 text-sm text-[var(--color-text-muted)]">{toast.message}</p> : null}
+            </div>
+            <button className="mini-icon-btn h-8 min-h-8 w-8" onClick={() => dismissToast(toast.id)} aria-label="Dismiss notification">
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
