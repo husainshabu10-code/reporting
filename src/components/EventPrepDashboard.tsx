@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Download,
+  Eye,
+  FileDown,
   FileSpreadsheet,
   FileText,
   Filter,
@@ -16,6 +18,7 @@ import {
   LogOut,
   Menu,
   Plus,
+  Presentation,
   Settings2,
   ShieldCheck,
   Upload,
@@ -43,6 +46,7 @@ import {
   type InAppNotification,
   type LiveTask,
   type Profile,
+  type ReportExport,
   type Reminder,
   type RequestReview,
   type RequestStatus,
@@ -112,6 +116,7 @@ export default function EventPrepDashboard() {
   const [activeTab, setActiveTab] = useState<AnyTab>("Dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [presentationMode, setPresentationMode] = useState(false);
   const [syncStatus, setSyncStatus] = useState("Loading");
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
@@ -206,11 +211,11 @@ export default function EventPrepDashboard() {
   const isAreaAdmin = currentProfile?.role === "area_admin";
   const isVerifier = currentProfile?.role === "verifier";
   const isViewer = currentProfile?.role === "viewer";
-  const tabs: AnyTab[] = isAdmin ? ADMIN_TABS : isAreaAdmin ? AREA_ADMIN_TABS : isVerifier ? VERIFIER_TABS : isViewer ? VIEWER_TABS : USER_TABS;
+  const tabs: AnyTab[] = isAdmin ? ADMIN_TABS : isAreaAdmin ? AREA_ADMIN_TABS : isVerifier ? VERIFIER_TABS : isViewer ? viewerTabsFor(state || undefined, currentProfile) : USER_TABS;
 
   useEffect(() => {
-    if (!tabs.includes(activeTab)) setActiveTab((isAdmin || isViewer ? "Dashboard" : isVerifier ? "Verification" : isAreaAdmin ? "My Area" : "Daily Report") as AnyTab);
-  }, [activeTab, isAdmin, isAreaAdmin, isVerifier, isViewer, tabs]);
+    if (!tabs.includes(activeTab)) setActiveTab(tabs[0] || (isVerifier ? "Verification" : isAreaAdmin ? "My Area" : "Daily Report"));
+  }, [activeTab, isAreaAdmin, isVerifier, tabs]);
 
   if (isEventPrepSupabaseConfigured() && authChecked && !sessionEmail) {
     return <LoginScreen loginId={loginId} password={password} authMessage={authMessage} setLoginId={setLoginId} setPassword={setPassword} signIn={handlePasswordLogin} />;
@@ -267,6 +272,24 @@ export default function EventPrepDashboard() {
     exportLiveTasksCsv(state);
     showToast("CSV exported", "Live task summary downloaded from the dashboard.", "success");
   };
+
+  if (presentationMode && activeTab === "Dashboard") {
+    return (
+      <main className="min-h-screen bg-[var(--color-bg)] p-4 text-[var(--color-text)]">
+        <div className="mx-auto max-w-[96rem]">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--color-border)] bg-white p-3 shadow-sm">
+            <div>
+              <p className="text-xs font-black uppercase text-[var(--color-accent)]">Presentation Mode</p>
+              <h1 className="text-xl font-black text-[var(--color-primary)]">IT / Event Preparation Dashboard</h1>
+            </div>
+            <button className="btn-primary" onClick={() => setPresentationMode(false)}>Exit Presentation</button>
+          </div>
+          <DashboardTab state={state} currentProfile={currentProfile} presentationMode />
+        </div>
+        <ToastStack toasts={toasts} dismissToast={dismissToast} />
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[var(--color-bg)] text-[var(--color-text)]">
@@ -351,6 +374,7 @@ export default function EventPrepDashboard() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {activeTab === "Dashboard" ? <button className="top-action-btn" onClick={() => showToast("Dashboard settings", "Dashboard cards are using verified-completion data only.", "info")}><Settings2 size={16} /> Chart Settings</button> : null}
+                {activeTab === "Dashboard" ? <button className="top-action-btn" onClick={() => setPresentationMode(true)}><Presentation size={16} /> Presentation</button> : null}
                 {isAdmin ? <button className="top-action-btn" onClick={() => openWorkspace("Zones / Areas", "Area setup opened", "Create or update event areas from this tab.")}><Plus size={16} /> Add Area</button> : null}
                 {isAdmin ? <button className="top-action-btn top-action-primary" onClick={() => openWorkspace("Master Tasks", "Task setup opened", "Add a custom live task or apply reference templates.")}><Plus size={16} /> Add Task</button> : null}
                 {isAdmin ? <button className="top-action-btn" onClick={exportCsv}><Download size={16} /> Export CSV</button> : null}
@@ -372,7 +396,8 @@ export default function EventPrepDashboard() {
             {activeTab === "Daily Report" ? <DailyReportTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
             {activeTab === "My Area" ? <MyAreaTab state={state} currentProfile={currentProfile} /> : null}
             {activeTab === "Profile / Access" ? <ProfileTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
-            {["Forms", "Global Fields", "Reports", "Activity Log"].includes(activeTab) ? <FoundationTab state={state} tab={activeTab} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
+            {activeTab === "Reports" ? <ReportsTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
+            {["Forms", "Global Fields", "Activity Log"].includes(activeTab) ? <FoundationTab state={state} tab={activeTab} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
           </div>
         </section>
       </div>
@@ -381,36 +406,54 @@ export default function EventPrepDashboard() {
   );
 }
 
-function DashboardTab({ state }: { state: EventPrepState; currentProfile: Profile }) {
-  const metrics = useMemo(() => buildMetrics(state), [state]);
+function DashboardTab({ state, currentProfile, presentationMode = false }: { state: EventPrepState; currentProfile: Profile; presentationMode?: boolean }) {
+  const allowedAreaIds = dashboardAllowedAreaIds(state, currentProfile);
+  const metrics = useMemo(() => buildMetricsForAreas(state, allowedAreaIds), [state, allowedAreaIds.join("|")]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [zoneFilter, setZoneFilter] = useState("All");
   const [areaFilter, setAreaFilter] = useState("All");
   const [workstreamFilter, setWorkstreamFilter] = useState("All");
+  const [dayFilter, setDayFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [verificationFilter, setVerificationFilter] = useState("All");
+  const [priorityFilter, setPriorityFilter] = useState("All");
   const latest = latestUpdateMap(state.taskUpdates);
-  const workstreamOptions = unique(state.liveTasks.map((task) => taskDetails(state, task).workstream).filter(Boolean));
-  const filteredAreas = state.areas.filter((area) => zoneFilter === "All" || area.zoneTypeId === zoneFilter);
+  const allowedAreas = state.areas.filter((area) => allowedAreaIds.includes(area.id));
+  const workstreamOptions = unique(state.liveTasks.filter((task) => allowedAreaIds.includes(task.areaId)).map((task) => taskDetails(state, task).workstream).filter(Boolean));
+  const filteredAreas = allowedAreas.filter((area) => zoneFilter === "All" || area.zoneTypeId === zoneFilter);
+  const dayOptions = unique(state.liveTasks.filter((task) => allowedAreaIds.includes(task.areaId)).map((task) => String(task.prepDay))).sort((a, b) => Number(a) - Number(b));
   const scopedTasks = state.liveTasks.filter((task) => {
     const area = state.areas.find((item) => item.id === task.areaId);
     const details = taskDetails(state, task);
+    const update = latest.get(task.id);
+    if (!allowedAreaIds.includes(task.areaId)) return false;
     if (!task.active || task.notApplicable) return false;
     if (zoneFilter !== "All" && area?.zoneTypeId !== zoneFilter) return false;
     if (areaFilter !== "All" && task.areaId !== areaFilter) return false;
     if (workstreamFilter !== "All" && details.workstream !== workstreamFilter) return false;
+    if (dayFilter !== "All" && String(task.prepDay) !== dayFilter) return false;
+    if (statusFilter !== "All" && (update?.status || "Pending") !== statusFilter) return false;
+    if (verificationFilter !== "All" && (update?.verificationStatus || "Not Submitted") !== verificationFilter) return false;
+    if (priorityFilter !== "All" && task.priority !== priorityFilter) return false;
     return true;
   });
   const scopedVerified = scopedTasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
   const zoneRows = state.zoneTypes.map((zone) => {
-    const areaIds = state.areas.filter((area) => area.zoneTypeId === zone.id).map((area) => area.id);
+    const areaIds = allowedAreas.filter((area) => area.zoneTypeId === zone.id).map((area) => area.id);
     const tasks = scopedTasks.filter((task) => areaIds.includes(task.areaId));
     const verified = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
     return { label: zone.name, total: tasks.length, verified, percent: percent(verified, tasks.length) };
   });
-  const attention = buildAttention(state);
+  const attention = buildAttention(state).filter((item) => presentationMode ? !["Pending Requests", "Rejected / Needs Correction Tasks"].includes(item.label) : true);
+  const dayRows = dayOptions.map((day) => {
+    const tasks = scopedTasks.filter((task) => String(task.prepDay) === day);
+    const verified = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
+    return { label: `Day ${day}`, value: percent(verified, tasks.length), helper: `${verified}/${tasks.length} verified` };
+  }).filter((row) => row.helper !== "0/0 verified");
 
   return (
     <div className="space-y-5">
-      <section className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm">
+      {!presentationMode ? <section className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <button className="btn-primary w-full sm:w-auto" onClick={() => setFiltersOpen((current) => !current)}>
             <Filter size={17} /> Filter
@@ -420,32 +463,32 @@ function DashboardTab({ state }: { state: EventPrepState; currentProfile: Profil
           </p>
         </div>
         {filtersOpen ? (
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="mt-4 grid gap-3 md:grid-cols-4">
             <Select label="Zone Type" value={zoneFilter} onChange={(value) => {
               setZoneFilter(value);
               setAreaFilter("All");
-            }} options={["All", ...state.zoneTypes.map((zone) => ({ label: zone.name, value: zone.id }))]} />
+            }} options={["All", ...state.zoneTypes.filter((zone) => allowedAreas.some((area) => area.zoneTypeId === zone.id)).map((zone) => ({ label: zone.name, value: zone.id }))]} />
             <Select label="Area" value={areaFilter} onChange={setAreaFilter} options={["All", ...filteredAreas.map((area) => ({ label: area.name, value: area.id }))]} />
+            <Select label="Day" value={dayFilter} onChange={setDayFilter} options={["All", ...dayOptions]} />
             <Select label="Workstream" value={workstreamFilter} onChange={setWorkstreamFilter} options={["All", ...workstreamOptions]} />
+            <Select label="Task Status" value={statusFilter} onChange={setStatusFilter} options={["All", ...USER_TASK_STATUSES]} />
+            <Select label="Verification" value={verificationFilter} onChange={setVerificationFilter} options={["All", ...VERIFICATION_STATUSES]} />
+            <Select label="Priority" value={priorityFilter} onChange={setPriorityFilter} options={["All", ...PRIORITY_OPTIONS]} />
           </div>
         ) : null}
-      </section>
+      </section> : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard title="Overall Verified Completion" value={`${percent(scopedVerified, scopedTasks.length)}%`} helper={`${scopedVerified}/${scopedTasks.length} verified in scope`} tone="good" />
-        <MetricCard title="Daily Reports Submitted" value={String(metrics.submittedReports)} helper={`${metrics.missingOrPartialReports} missing or partial`} />
-        <MetricCard title="Needs Verification" value={String(metrics.needsVerification)} helper="Completed by users, awaiting review" tone="warning" />
-        <MetricCard title="Issue Found Tasks" value={String(metrics.issueFound)} helper="User flagged task issues" tone="critical" />
+        <MetricCard title="Daily Reports Submitted" value={String(metrics.submittedReports)} helper={presentationMode ? "Submitted reports" : `${metrics.missingOrPartialReports} missing or partial`} />
+        <MetricCard title="Needs Verification" value={String(metrics.needsVerification)} helper={presentationMode ? "Awaiting review" : "Completed by users, awaiting review"} tone="warning" />
+        <MetricCard title="Issue Found Tasks" value={String(metrics.issueFound)} helper={presentationMode ? "Attention count" : "User flagged task issues"} tone="critical" />
         <MetricCard title="Countdown to Event" value={`${metrics.daysToEvent}d`} helper={state.settings.eventStartDate} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <Panel title="Zone Type Progress" action={<Badge>Verified completed only</Badge>}>
-          <div className="space-y-4">
-            {zoneRows.map((row) => (
-              <ProgressRow key={row.label} label={row.label} value={row.percent} helper={`${row.verified}/${row.total} tasks`} />
-            ))}
-          </div>
+          <DashboardBarChart rows={zoneRows.map((row) => ({ label: row.label, value: row.percent, helper: `${row.verified}/${row.total} tasks` }))} />
         </Panel>
         <Panel title="Attention Required">
           <div className="grid gap-2 sm:grid-cols-2">
@@ -459,10 +502,10 @@ function DashboardTab({ state }: { state: EventPrepState; currentProfile: Profil
         </Panel>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-3">
         <Panel title="Area-Wise Progress">
           <div className="space-y-3">
-            {state.areas.map((area) => {
+            {allowedAreas.map((area) => {
               if (zoneFilter !== "All" && area.zoneTypeId !== zoneFilter) return null;
               if (areaFilter !== "All" && area.id !== areaFilter) return null;
               const tasks = scopedTasks.filter((task) => task.areaId === area.id);
@@ -470,6 +513,9 @@ function DashboardTab({ state }: { state: EventPrepState; currentProfile: Profil
               return <ProgressRow key={area.id} label={area.name} value={percent(verified, tasks.length)} helper={zoneName(state, area.zoneTypeId)} />;
             })}
           </div>
+        </Panel>
+        <Panel title="Day-Wise Progress">
+          <DashboardBarChart rows={dayRows} compact />
         </Panel>
         <Panel title="Workstream Progress">
           <div className="space-y-3">
@@ -1935,7 +1981,7 @@ function UsersAccessTab({ state, currentProfile, updateState, showToast }: { sta
       showToast("Password reset failed", readError(error, "Please try again."), "error");
     }
   };
-  const saveUserAccess = (profile: Profile, nextRole: UserRole, nextStatus: Profile["status"], nextAreaIds: string[]) => {
+  const saveUserAccess = (profile: Profile, nextRole: UserRole, nextStatus: Profile["status"], nextAreaIds: string[], viewerAccess?: Profile["viewerAccess"]) => {
     if (profile.id === currentProfile.id) {
       showToast("Own access protected", "Edit another Super Admin if you need to change your own access.", "warning");
       return;
@@ -1949,7 +1995,7 @@ function UsersAccessTab({ state, currentProfile, updateState, showToast }: { sta
         ];
       return withActivity({
         ...current,
-        profiles: current.profiles.map((item) => (item.id === profile.id ? { ...item, role: nextRole, status: nextStatus } : item)),
+        profiles: current.profiles.map((item) => (item.id === profile.id ? { ...item, role: nextRole, status: nextStatus, viewerAccess: nextRole === "viewer" ? viewerAccess : undefined } : item)),
         areaAccess
       }, currentProfile, "Access changes", `Updated access for ${profile.fullName}`, "profile", profile.id, { role: nextRole, status: nextStatus });
     });
@@ -1979,6 +2025,7 @@ function UsersAccessTab({ state, currentProfile, updateState, showToast }: { sta
                 key={profile.id}
                 profile={profile}
                 areas={state.areas}
+                zoneTypes={state.zoneTypes}
                 currentAreaIds={state.areaAccess.filter((access) => access.profileId === profile.id).map((access) => access.areaId)}
                 onSave={saveUserAccess}
               />
@@ -2011,23 +2058,45 @@ function UsersAccessTab({ state, currentProfile, updateState, showToast }: { sta
 function AccessEditor({
   profile,
   areas,
+  zoneTypes,
   currentAreaIds,
   onSave
 }: {
   profile: Profile;
   areas: EventPrepState["areas"];
+  zoneTypes: EventPrepState["zoneTypes"];
   currentAreaIds: string[];
-  onSave: (profile: Profile, nextRole: UserRole, nextStatus: Profile["status"], nextAreaIds: string[]) => void;
+  onSave: (profile: Profile, nextRole: UserRole, nextStatus: Profile["status"], nextAreaIds: string[], viewerAccess?: Profile["viewerAccess"]) => void;
 }) {
   const [role, setRole] = useState<UserRole>(profile.role);
   const [status, setStatus] = useState<Profile["status"]>(profile.status);
   const [areaIds, setAreaIds] = useState<string[]>(currentAreaIds);
+  const currentViewerAccess = viewerAccessFor(profile, { areas, zoneTypes } as EventPrepState);
+  const [viewerDashboard, setViewerDashboard] = useState(currentViewerAccess.canSeeDashboard);
+  const [viewerZoneIds, setViewerZoneIds] = useState<string[]>(currentViewerAccess.zoneTypeIds);
+  const [viewerReportTypes, setViewerReportTypes] = useState<string[]>(currentViewerAccess.reportTypes);
+  const [viewerPdf, setViewerPdf] = useState(currentViewerAccess.canExportPdf);
+  const [viewerExcel, setViewerExcel] = useState(currentViewerAccess.canExportExcel);
   useEffect(() => {
     setRole(profile.role);
     setStatus(profile.status);
     setAreaIds(currentAreaIds);
-  }, [profile.id, profile.role, profile.status, currentAreaIds.join("|")]);
+    const access = viewerAccessFor(profile, { areas, zoneTypes } as EventPrepState);
+    setViewerDashboard(access.canSeeDashboard);
+    setViewerZoneIds(access.zoneTypeIds);
+    setViewerReportTypes(access.reportTypes);
+    setViewerPdf(access.canExportPdf);
+    setViewerExcel(access.canExportExcel);
+  }, [profile.id, profile.role, profile.status, currentAreaIds.join("|"), areas.length, zoneTypes.length]);
   const allAreasRole = ["super_admin", "admin"].includes(role);
+  const nextViewerAccess: Profile["viewerAccess"] = {
+    canSeeDashboard: viewerDashboard,
+    zoneTypeIds: viewerZoneIds,
+    areaIds,
+    reportTypes: viewerReportTypes,
+    canExportPdf: viewerPdf,
+    canExportExcel: viewerExcel
+  };
   return (
     <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -2038,7 +2107,7 @@ function AccessEditor({
         <div className="grid gap-3 md:grid-cols-[12rem_12rem_auto] md:items-end">
           <Select label="Role" value={role} onChange={(value) => setRole(value as UserRole)} options={["super_admin", "admin", "area_admin", "verifier", "report_user", "viewer"].map((value) => ({ label: roleLabel(value as UserRole), value }))} />
           <Select label="Status" value={status} onChange={(value) => setStatus(value as Profile["status"])} options={[{ label: "Active", value: "active" }, { label: "Pending Approval", value: "pending_approval" }, { label: "Disabled", value: "disabled" }]} />
-          <button className="btn-primary" onClick={() => onSave(profile, role, status, areaIds)}>Save Access</button>
+          <button className="btn-primary" onClick={() => onSave(profile, role, status, areaIds, role === "viewer" ? nextViewerAccess : undefined)}>Save Access</button>
         </div>
       </div>
       <div className="mt-3">
@@ -2060,6 +2129,58 @@ function AccessEditor({
           </div>
         )}
       </div>
+      {role === "viewer" ? (
+        <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-white p-3">
+          <div className="flex items-center gap-2 text-sm font-black text-[var(--color-primary)]">
+            <Eye size={16} />
+            Viewer permissions
+          </div>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            <label className="flex items-center gap-2 text-sm font-bold text-[var(--color-primary)]">
+              <input type="checkbox" checked={viewerDashboard} onChange={(event) => setViewerDashboard(event.target.checked)} />
+              Can see dashboard
+            </label>
+            <label className="flex items-center gap-2 text-sm font-bold text-[var(--color-primary)]">
+              <input type="checkbox" checked={viewerPdf} onChange={(event) => setViewerPdf(event.target.checked)} />
+              Can export PDF
+            </label>
+            <label className="flex items-center gap-2 text-sm font-bold text-[var(--color-primary)]">
+              <input type="checkbox" checked={viewerExcel} onChange={(event) => setViewerExcel(event.target.checked)} />
+              Can export Excel
+            </label>
+          </div>
+          <div className="mt-3">
+            <p className="field-label">Visible zone types</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              {zoneTypes.map((zone) => (
+                <label key={zone.id} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-2 text-sm font-bold text-[var(--color-primary)]">
+                  <input
+                    type="checkbox"
+                    checked={viewerZoneIds.includes(zone.id)}
+                    onChange={(event) => setViewerZoneIds((current) => event.target.checked ? [...current, zone.id] : current.filter((idValue) => idValue !== zone.id))}
+                  />
+                  {zone.name}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="mt-3">
+            <p className="field-label">Allowed report types</p>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {["Daily Area Report PDF", "Overall Progress Report PDF"].map((reportType) => (
+                <label key={reportType} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-2 text-sm font-bold text-[var(--color-primary)]">
+                  <input
+                    type="checkbox"
+                    checked={viewerReportTypes.includes(reportType)}
+                    onChange={(event) => setViewerReportTypes((current) => event.target.checked ? [...current, reportType] : current.filter((value) => value !== reportType))}
+                  />
+                  {reportType}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -2127,6 +2248,121 @@ function ProfileTab({ state, currentProfile, updateState, showToast }: { state: 
   );
 }
 
+function ReportsTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
+  const isAdmin = ["super_admin", "admin"].includes(currentProfile.role);
+  const viewerAccess = viewerAccessFor(currentProfile, state);
+  const allowedAreas = dashboardAllowedAreas(state, currentProfile);
+  const [areaId, setAreaId] = useState(allowedAreas[0]?.id || "");
+  const [reportDate, setReportDate] = useState(todayIso());
+  const canPdf = isAdmin || viewerAccess.canExportPdf;
+  const canExcel = isAdmin || viewerAccess.canExportExcel;
+  const canDaily = isAdmin || viewerAccess.reportTypes.includes("Daily Area Report PDF");
+  const canOverall = isAdmin || viewerAccess.reportTypes.includes("Overall Progress Report PDF");
+  const exportHistory = isAdmin ? state.reportExports : state.reportExports.filter((reportExport) => reportExport.requestedBy === currentProfile.id);
+
+  const recordExport = (exportType: string, selectedAreaId?: string) => {
+    const createdAt = new Date().toISOString();
+    const reportExport: ReportExport = {
+      id: id("export"),
+      exportType,
+      requestedBy: currentProfile.id,
+      areaId: selectedAreaId,
+      status: "generated",
+      createdAt
+    };
+    updateState((current) => withActivity({
+      ...current,
+      reportExports: [reportExport, ...current.reportExports]
+    }, currentProfile, "Daily reports", `Generated ${exportType}`, "report_export", reportExport.id, { exportType }));
+  };
+
+  const exportDailyPdf = () => {
+    if (!canPdf || !canDaily || !areaId) {
+      showToast("Export not allowed", "Your access does not allow this PDF report.", "warning");
+      return;
+    }
+    try {
+      openPrintableReport("Daily Area Report", dailyAreaReportHtml(state, areaId, reportDate));
+      recordExport("Daily Area Report PDF", areaId);
+      showToast("PDF report opened", "Use the browser print dialog to save it as PDF.", "success");
+    } catch (error) {
+      showToast("PDF report blocked", readError(error, "Allow popups and try again."), "error");
+    }
+  };
+
+  const exportOverallPdf = () => {
+    if (!canPdf || !canOverall) {
+      showToast("Export not allowed", "Your access does not allow this PDF report.", "warning");
+      return;
+    }
+    try {
+      openPrintableReport("Overall Progress Report", overallProgressReportHtml(state, allowedAreas.map((area) => area.id)));
+      recordExport("Overall Progress Report PDF");
+      showToast("PDF report opened", "Use the browser print dialog to save it as PDF.", "success");
+    } catch (error) {
+      showToast("PDF report blocked", readError(error, "Allow popups and try again."), "error");
+    }
+  };
+
+  const exportExcel = async () => {
+    if (!canExcel) {
+      showToast("Excel export blocked", "This account does not have Excel export permission.", "warning");
+      return;
+    }
+    try {
+      await exportAdminWorkbook(state, allowedAreas.map((area) => area.id), isAdmin);
+      recordExport(isAdmin ? "Admin Excel Export" : "Viewer Excel Export");
+      showToast("Excel exported", "The workbook download has started.", "success");
+    } catch (error) {
+      showToast("Excel export failed", readError(error, "Could not generate workbook."), "error");
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Panel title="Phase 3 Reports & Exports" action={<Badge>{exportHistory.length} export(s)</Badge>}>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
+            <FileDown className="text-[var(--color-accent)]" size={22} />
+            <h3 className="mt-3 font-black text-[var(--color-primary)]">Daily Area Report PDF</h3>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">Includes task updates, remarks, quantity progress, evidence list, issues, submission time, and verification status.</p>
+            <div className="mt-3 grid gap-3">
+              <Select label="Area" value={areaId} onChange={setAreaId} options={allowedAreas.map((area) => ({ label: area.name, value: area.id }))} />
+              <Input label="Report date" value={reportDate} onChange={setReportDate} type="date" />
+              <button className="btn-primary" disabled={!canPdf || !canDaily || !areaId} onClick={exportDailyPdf}>Open PDF Report</button>
+            </div>
+          </div>
+          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
+            <BarChart3 className="text-[var(--color-accent)]" size={22} />
+            <h3 className="mt-3 font-black text-[var(--color-primary)]">Overall Progress Report PDF</h3>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">Shows verified completion, zone, area, day, workstream progress, and attention counts.</p>
+            <button className="btn-primary mt-3" disabled={!canPdf || !canOverall} onClick={exportOverallPdf}>Open PDF Report</button>
+          </div>
+          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
+            <FileSpreadsheet className="text-[var(--color-accent)]" size={22} />
+            <h3 className="mt-3 font-black text-[var(--color-primary)]">Excel Workbook Export</h3>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">{isAdmin ? "Includes master tasks, update history, requests, verification logs, areas, and user access." : "Only available when admin grants Excel export permission."}</p>
+            <button className="btn-primary mt-3" disabled={!canExcel} onClick={exportExcel}>Download Excel</button>
+          </div>
+        </div>
+      </Panel>
+
+      <Panel title="Export History">
+        <ResponsiveTable
+          headers={["Type", "Requested By", "Area", "Status", "Created"]}
+          rows={exportHistory.map((reportExport) => [
+            reportExport.exportType,
+            state.profiles.find((profile) => profile.id === reportExport.requestedBy)?.fullName || "User",
+            reportExport.areaId ? areaName(state, reportExport.areaId) : "Overall",
+            <StatusBadge key="status" value={reportExport.status} />,
+            new Date(reportExport.createdAt).toLocaleString()
+          ])}
+        />
+      </Panel>
+    </div>
+  );
+}
+
 function FoundationTab({
   state,
   tab,
@@ -2142,7 +2378,6 @@ function FoundationTab({
 }) {
   if (tab === "Forms") return <FormBuilderTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} />;
   if (tab === "Global Fields") return <GlobalFieldsTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} />;
-  if (tab === "Reports") return <EmptyState title="Reports foundation ready" body="PDF and Excel exports are reserved for Phase 3. The schema already includes report_exports." />;
   return <ActivityLogTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} />;
 }
 
@@ -2372,6 +2607,24 @@ function ProgressRow({ label, value, helper }: { label: string; value: number; h
   );
 }
 
+function DashboardBarChart({ rows, compact = false }: { rows: Array<{ label: string; value: number; helper: string }>; compact?: boolean }) {
+  if (!rows.length) return <EmptyState title="No chart data" body="Adjust filters or add live tasks to populate this chart." />;
+  return (
+    <div className={compact ? "space-y-2" : "space-y-3"}>
+      {rows.map((row) => (
+        <div key={row.label} className="grid gap-2 sm:grid-cols-[11rem_1fr_5rem] sm:items-center">
+          <p className="truncate text-sm font-bold text-[var(--color-text-muted)]">{row.label}</p>
+          <div className="h-3 overflow-hidden rounded-full bg-[var(--color-accent-light)]">
+            <div className="h-full rounded-full bg-[var(--color-accent)]" style={{ width: `${row.value}%` }} />
+          </div>
+          <p className="text-sm font-black text-[var(--color-primary)]">{row.value}%</p>
+          {!compact ? <p className="text-xs text-[var(--color-text-muted)] sm:col-start-2">{row.helper}</p> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function MiniStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
@@ -2581,6 +2834,114 @@ function csvCell(value: string | number) {
   return `"${text.replace(/"/g, "\"\"")}"`;
 }
 
+function openPrintableReport(title: string, bodyHtml: string) {
+  const popup = window.open("", "_blank", "width=1100,height=800");
+  if (!popup) throw new Error("Popup blocked. Allow popups to open the printable report.");
+  popup.document.write(`<!doctype html><html><head><title>${escapeHtml(title)}</title><style>
+    :root{--green:#0B4F3A;--gold:#C9A227;--light:#F3E7C3;--border:#E8DDC5;--text:#1F2933;--muted:#6B7280}
+    body{margin:0;background:#FAF7EF;color:var(--text);font-family:Arial,Helvetica,sans-serif}
+    main{max-width:1100px;margin:0 auto;padding:28px}
+    h1,h2,h3{color:var(--green);margin:0 0 12px}
+    .brand{color:var(--gold);font-weight:900;letter-spacing:.12em;text-transform:uppercase;font-size:12px}
+    .card{background:white;border:1px solid var(--border);border-radius:8px;padding:16px;margin:14px 0}
+    table{width:100%;border-collapse:collapse;background:white}
+    th{background:var(--light);color:var(--green);text-align:left;text-transform:uppercase;font-size:12px}
+    th,td{border:1px solid var(--border);padding:9px;vertical-align:top}
+    .badge{display:inline-block;border-radius:999px;background:var(--light);padding:4px 9px;color:var(--green);font-weight:800;font-size:12px}
+    .metric{display:inline-block;margin:0 10px 10px 0;border:1px solid var(--border);border-radius:8px;background:white;padding:10px 14px}
+    .metric strong{display:block;color:var(--green);font-size:22px}
+    @media print{button{display:none}body{background:white}main{padding:0}.card{break-inside:avoid}}
+  </style></head><body><main>${bodyHtml}</main><script>window.focus();setTimeout(()=>window.print(),300);</script></body></html>`);
+  popup.document.close();
+}
+
+function dailyAreaReportHtml(state: EventPrepState, areaId: string, reportDate: string) {
+  const area = state.areas.find((item) => item.id === areaId);
+  const report = state.dailyReports.find((item) => item.areaId === areaId && item.reportDate === reportDate);
+  const reportIds = new Set(state.dailyReports.filter((item) => item.areaId === areaId && item.reportDate === reportDate).map((item) => item.id));
+  const taskIds = new Set(state.liveTasks.filter((task) => task.areaId === areaId).map((task) => task.id));
+  const updates = state.taskUpdates.filter((update) => taskIds.has(update.liveTaskId) && reportIds.has(update.dailyReportId));
+  const rows = updates.map((update) => {
+    const task = state.liveTasks.find((item) => item.id === update.liveTaskId);
+    const details = task ? taskDetails(state, task) : undefined;
+    const files = state.taskFiles.filter((file) => file.taskUpdateId === update.id).map((file) => file.fileName).join(", ") || "None";
+    return `<tr><td>${escapeHtml(details?.taskDetails || "Task")}</td><td>${escapeHtml(update.status)}</td><td>${escapeHtml(update.remarks || "-")}</td><td>${task?.taskType === "Quantity-Based Task" ? `${update.completedQuantity || 0}/${task.requiredQuantity || 0} ${escapeHtml(task.unit || "")}` : "-"}</td><td>${escapeHtml(files)}</td><td>${escapeHtml(update.verificationStatus)}</td></tr>`;
+  }).join("");
+  return `
+    <p class="brand">Ashara Mubarakah</p>
+    <h1>Daily Area Report</h1>
+    <div class="card">
+      <span class="badge">${escapeHtml(zoneName(state, area?.zoneTypeId || ""))}</span>
+      <h2>${escapeHtml(area?.name || "Area")}</h2>
+      <p>Report date: <strong>${escapeHtml(reportDate)}</strong></p>
+      <p>Status: <strong>${escapeHtml(report?.status || "Not Started")}</strong></p>
+      <p>Submitted by: <strong>${escapeHtml(state.profiles.find((profile) => profile.id === report?.submittedBy)?.fullName || "-")}</strong></p>
+      <p>Submission time: <strong>${escapeHtml(report?.submittedAt ? new Date(report.submittedAt).toLocaleString() : "-")}</strong></p>
+      <p>General remark: ${escapeHtml(report?.generalRemark || "-")}</p>
+    </div>
+    <div class="card">
+      <h2>Tasks Updated That Day</h2>
+      <table><thead><tr><th>Task</th><th>Status</th><th>Remarks</th><th>Quantity</th><th>Evidence</th><th>Verification</th></tr></thead><tbody>${rows || `<tr><td colspan="6">No task updates found for this date.</td></tr>`}</tbody></table>
+    </div>`;
+}
+
+function overallProgressReportHtml(state: EventPrepState, allowedAreaIds: string[]) {
+  const metrics = buildMetricsForAreas(state, allowedAreaIds);
+  const latest = latestUpdateMap(state.taskUpdates);
+  const areaRows = state.areas.filter((area) => allowedAreaIds.includes(area.id)).map((area) => {
+    const tasks = state.liveTasks.filter((task) => task.areaId === area.id && task.active && !task.notApplicable);
+    const verified = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
+    return `<tr><td>${escapeHtml(area.name)}</td><td>${escapeHtml(zoneName(state, area.zoneTypeId))}</td><td>${percent(verified, tasks.length)}%</td><td>${verified}/${tasks.length}</td></tr>`;
+  }).join("");
+  const attentionRows = buildAttention(state).map((item) => `<tr><td>${escapeHtml(item.label)}</td><td>${item.count}</td></tr>`).join("");
+  return `
+    <p class="brand">Ashara Mubarakah</p>
+    <h1>Overall Progress Report</h1>
+    <div class="card">
+      <span class="metric"><strong>${metrics.overallVerifiedPercent}%</strong>Overall verified completion</span>
+      <span class="metric"><strong>${metrics.needsVerification}</strong>Pending verification</span>
+      <span class="metric"><strong>${metrics.issueFound}</strong>Issue found tasks</span>
+      <span class="metric"><strong>${metrics.pendingRequests}</strong>Pending requests</span>
+    </div>
+    <div class="card"><h2>Area-Wise Progress</h2><table><thead><tr><th>Area</th><th>Zone Type</th><th>Verified %</th><th>Verified Tasks</th></tr></thead><tbody>${areaRows}</tbody></table></div>
+    <div class="card"><h2>Attention Required</h2><table><thead><tr><th>Item</th><th>Count</th></tr></thead><tbody>${attentionRows}</tbody></table></div>`;
+}
+
+async function exportAdminWorkbook(state: EventPrepState, allowedAreaIds: string[], includeUsers: boolean) {
+  const XLSX = await import("xlsx");
+  const latest = latestUpdateMap(state.taskUpdates);
+  const workbook = XLSX.utils.book_new();
+  const scopedTasks = state.liveTasks.filter((task) => allowedAreaIds.includes(task.areaId));
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(scopedTasks.map((task) => {
+    const details = taskDetails(state, task);
+    const update = latest.get(task.id);
+    return {
+      Area: areaName(state, task.areaId),
+      "Zone Type": zoneName(state, state.areas.find((area) => area.id === task.areaId)?.zoneTypeId || ""),
+      Day: task.prepDay,
+      Workstream: details.workstream,
+      Task: details.taskDetails,
+      Type: task.taskType,
+      Priority: task.priority,
+      Status: update?.status || "Pending",
+      Verification: update?.verificationStatus || "Not Submitted",
+      "Required Quantity": task.requiredQuantity || "",
+      Unit: task.unit || "",
+      Due: task.dueDate
+    };
+  })), "Master Tasks");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(state.taskUpdates.filter((update) => scopedTasks.some((task) => task.id === update.liveTaskId))), "Task Update History");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(state.requests.filter((request) => allowedAreaIds.includes(request.areaId))), "Requests");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(state.verificationLogs.filter((log) => scopedTasks.some((task) => task.id === log.liveTaskId))), "Verification Logs");
+  XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(state.areas.filter((area) => allowedAreaIds.includes(area.id))), "Areas");
+  if (includeUsers) XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(state.profiles.map((profile) => ({ Name: profile.fullName, Login: profile.email, Role: profile.role, Status: profile.status }))), "Users Access");
+  XLSX.writeFile(workbook, `ashara-event-prep-export-${todayIso()}.xlsx`);
+}
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[char] || char));
+}
+
 function tabIcon(tab: AnyTab) {
   const props = { size: 18 };
   if (tab.includes("Dashboard")) return <BarChart3 {...props} />;
@@ -2765,6 +3126,17 @@ function buildMetrics(state: EventPrepState): DashboardMetrics {
   };
 }
 
+function buildMetricsForAreas(state: EventPrepState, allowedAreaIds: string[]): DashboardMetrics {
+  const scopedState = {
+    ...state,
+    areas: state.areas.filter((area) => allowedAreaIds.includes(area.id)),
+    liveTasks: state.liveTasks.filter((task) => allowedAreaIds.includes(task.areaId)),
+    dailyReports: state.dailyReports.filter((report) => allowedAreaIds.includes(report.areaId)),
+    requests: state.requests.filter((request) => allowedAreaIds.includes(request.areaId))
+  };
+  return buildMetrics(scopedState);
+}
+
 function buildAttention(state: EventPrepState) {
   const latest = latestUpdateMap(state.taskUpdates);
   const tasks = state.liveTasks.filter((task) => task.active && !task.notApplicable);
@@ -2810,8 +3182,54 @@ function taskDetails(state: EventPrepState, task: LiveTask) {
 
 function getAllowedAreas(state: EventPrepState, profile: Profile) {
   if (["super_admin", "admin"].includes(profile.role)) return state.areas;
+  if (profile.role === "viewer") return dashboardAllowedAreas(state, profile);
   const accessAreaIds = state.areaAccess.filter((access) => access.profileId === profile.id).map((access) => access.areaId);
   return state.areas.filter((area) => accessAreaIds.includes(area.id));
+}
+
+function viewerAccessFor(profile: Profile, state: Pick<EventPrepState, "areas" | "zoneTypes">) {
+  const allZoneIds = state.zoneTypes.map((zone) => zone.id);
+  const allAreaIds = state.areas.map((area) => area.id);
+  if (profile.role !== "viewer") {
+    return {
+      canSeeDashboard: true,
+      zoneTypeIds: allZoneIds,
+      areaIds: allAreaIds,
+      reportTypes: ["Daily Area Report PDF", "Overall Progress Report PDF"],
+      canExportPdf: true,
+      canExportExcel: ["super_admin", "admin"].includes(profile.role)
+    };
+  }
+  if (profile.viewerAccess) return profile.viewerAccess;
+  return {
+    canSeeDashboard: true,
+    zoneTypeIds: allZoneIds,
+    areaIds: allAreaIds,
+    reportTypes: ["Daily Area Report PDF", "Overall Progress Report PDF"],
+    canExportPdf: false,
+    canExportExcel: false
+  };
+}
+
+function dashboardAllowedAreas(state: EventPrepState, profile: Profile) {
+  if (["super_admin", "admin"].includes(profile.role)) return state.areas;
+  if (profile.role !== "viewer") return getAllowedAreas(state, profile);
+  const access = viewerAccessFor(profile, state);
+  return state.areas.filter((area) => access.areaIds.includes(area.id) && access.zoneTypeIds.includes(area.zoneTypeId));
+}
+
+function dashboardAllowedAreaIds(state: EventPrepState, profile: Profile) {
+  return dashboardAllowedAreas(state, profile).map((area) => area.id);
+}
+
+function viewerTabsFor(state?: EventPrepState, profile?: Profile): AnyTab[] {
+  if (!state || !profile) return VIEWER_TABS;
+  const access = viewerAccessFor(profile, state);
+  const tabs: AnyTab[] = [];
+  if (access.canSeeDashboard) tabs.push("Dashboard");
+  if (access.canExportPdf || access.canExportExcel || access.reportTypes.length) tabs.push("Reports");
+  tabs.push("Profile / Access");
+  return tabs;
 }
 
 function getCurrentProfile(state: EventPrepState, currentProfileId: string, sessionEmail: string, sessionUserId = "") {

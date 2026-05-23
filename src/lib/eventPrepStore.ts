@@ -15,6 +15,7 @@ import type {
   InAppNotification,
   LiveTask,
   Profile,
+  ReportExport,
   Reminder,
   RequestReview,
   TaskFile,
@@ -164,6 +165,7 @@ async function loadFromSupabase(db: SupabaseClient): Promise<EventPrepState> {
     reminders,
     notifications,
     activityLogs,
+    reportExports,
     globalOptions,
     formFields,
     settings
@@ -182,6 +184,7 @@ async function loadFromSupabase(db: SupabaseClient): Promise<EventPrepState> {
     selectTable<Reminder>(db, "reminders"),
     selectTable<InAppNotification>(db, "in_app_notifications"),
     isAdmin ? selectTable<ActivityLog>(db, "activity_logs") : Promise.resolve([]),
+    isAdmin ? selectTable<ReportExport>(db, "report_exports") : Promise.resolve([]),
     selectTable<GlobalOption>(db, "global_options"),
     selectTable<FormField>(db, "form_fields"),
     selectSettings(db)
@@ -204,6 +207,7 @@ async function loadFromSupabase(db: SupabaseClient): Promise<EventPrepState> {
     reminders,
     notifications,
     activityLogs,
+    reportExports,
     globalOptions,
     formFields
   }, false);
@@ -264,6 +268,7 @@ async function saveToSupabase(db: SupabaseClient, state: EventPrepState, profile
   await upsertRows(db, "reminders", state.reminders.map(reminderToDb));
   await upsertRows(db, "in_app_notifications", state.notifications.map(notificationToDb));
   await upsertRows(db, "activity_logs", state.activityLogs.map(activityLogToDb));
+  await upsertRows(db, "report_exports", state.reportExports.map(reportExportToDb));
   await upsertRows(db, "global_options", state.globalOptions.map(globalOptionToDb));
   await upsertRows(db, "form_fields", state.formFields.map(formFieldToDb));
 }
@@ -310,6 +315,7 @@ function mergeWithSeed(partial: Partial<EventPrepState>, includeDemoData = true)
     reminders: partial.reminders?.length ? partial.reminders : seed.reminders,
     notifications: partial.notifications || [],
     activityLogs: partial.activityLogs || [],
+    reportExports: partial.reportExports || [],
     globalOptions: partial.globalOptions?.length ? partial.globalOptions : seed.globalOptions,
     formFields: partial.formFields?.length ? partial.formFields : seed.formFields
   };
@@ -326,7 +332,8 @@ function fromDbRow<T>(row: Record<string, unknown>, table: string) {
         role: row.role,
         status: row.status,
         mustChangePassword: Boolean(row.must_change_password ?? false),
-        createdBy: row.created_by ? String(row.created_by) : undefined
+        createdBy: row.created_by ? String(row.created_by) : undefined,
+        viewerAccess: row.data && typeof row.data === "object" && "viewerAccess" in row.data ? (row.data as Partial<Profile>).viewerAccess : undefined
       } as T;
     case "zone_types":
       return { id: String(row.id || ""), name: row.name, displayOrder: Number(row.display_order || 0) } as T;
@@ -506,6 +513,16 @@ function fromDbRow<T>(row: Record<string, unknown>, table: string) {
         entityType: String(row.entity_type || ""),
         entityId: row.entity_id ? String(row.entity_id) : undefined,
         metadata: row.metadata && typeof row.metadata === "object" ? row.metadata : {},
+        createdAt: String(row.created_at || new Date().toISOString())
+      } as T;
+    case "report_exports":
+      return {
+        id: String(row.id || ""),
+        exportType: String(row.export_type || ""),
+        requestedBy: String(row.requested_by || ""),
+        areaId: row.area_id ? String(row.area_id) : undefined,
+        storagePath: row.storage_path ? String(row.storage_path) : undefined,
+        status: (row.status || "generated") as ReportExport["status"],
         createdAt: String(row.created_at || new Date().toISOString())
       } as T;
     case "global_options":
@@ -746,6 +763,20 @@ function activityLogToDb(item: ActivityLog) {
     metadata: item.metadata,
     data: item,
     created_at: item.createdAt
+  };
+}
+
+function reportExportToDb(item: ReportExport) {
+  return {
+    id: item.id,
+    export_type: item.exportType,
+    requested_by: item.requestedBy,
+    area_id: item.areaId || null,
+    storage_path: item.storagePath || null,
+    status: item.status,
+    data: item,
+    created_at: item.createdAt,
+    updated_at: new Date().toISOString()
   };
 }
 

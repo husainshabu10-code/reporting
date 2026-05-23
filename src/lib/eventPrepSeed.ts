@@ -236,6 +236,7 @@ export function createSeedState(): EventPrepState {
     reminders: seedReminders,
     notifications: [],
     activityLogs: [],
+    reportExports: [],
     globalOptions: seedGlobalOptions,
     formFields: seedFormFields
   };

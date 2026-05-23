@@ -47,6 +47,16 @@ export type Profile = {
   status: "active" | "pending_approval" | "disabled";
   mustChangePassword: boolean;
   createdBy?: string;
+  viewerAccess?: ViewerAccess;
+};
+
+export type ViewerAccess = {
+  canSeeDashboard: boolean;
+  zoneTypeIds: string[];
+  areaIds: string[];
+  reportTypes: string[];
+  canExportPdf: boolean;
+  canExportExcel: boolean;
 };
 
 export type ZoneType = {
@@ -242,6 +252,16 @@ export type ActivityLog = {
   createdAt: string;
 };
 
+export type ReportExport = {
+  id: string;
+  exportType: string;
+  requestedBy: string;
+  areaId?: string;
+  storagePath?: string;
+  status: "queued" | "generated" | "failed";
+  createdAt: string;
+};
+
 export type InAppNotification = {
   id: string;
   userId: string;
@@ -303,6 +323,7 @@ export type EventPrepState = {
   reminders: Reminder[];
   notifications: InAppNotification[];
   activityLogs: ActivityLog[];
+  reportExports: ReportExport[];
   globalOptions: GlobalOption[];
   formFields: FormField[];
 };
