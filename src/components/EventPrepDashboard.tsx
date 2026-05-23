@@ -27,6 +27,7 @@ import {
   TEAM_TYPES,
   UNIT_OPTIONS,
   USER_TASK_STATUSES,
+  VERIFICATION_STATUSES,
   ZONE_TYPES,
   type ActivityLog,
   type AreaRequest,
