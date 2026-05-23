@@ -12,8 +12,8 @@ import type {
   EventSettings,
   FormField,
   GlobalOption,
+  InAppNotification,
   LiveTask,
-  NotificationLog,
   Profile,
   Reminder,
   RequestReview,
@@ -44,17 +44,57 @@ export function eventPrepSupabase() {
   return client;
 }
 
-export async function sendMagicLink(email: string) {
+export async function signInWithPassword(loginId: string, password: string) {
   const db = eventPrepSupabase();
   if (!db) throw new Error("Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.");
-  const normalizedEmail = email.trim().toLowerCase();
-  if (!normalizedEmail) throw new Error("Enter an email address first.");
-  const origin = typeof window === "undefined" ? undefined : window.location.origin;
-  const { error } = await db.auth.signInWithOtp({
-    email: normalizedEmail,
-    options: { emailRedirectTo: origin }
-  });
+  const email = loginId.trim().toLowerCase();
+  if (!email || !password) throw new Error("Enter your login ID and password.");
+  const { error } = await db.auth.signInWithPassword({ email, password });
   if (error) throw error;
+}
+
+export async function signOutEventPrep() {
+  const db = eventPrepSupabase();
+  if (!db) return;
+  await db.auth.signOut();
+}
+
+export async function createCredentialUser(payload: {
+  fullName: string;
+  email: string;
+  role: Profile["role"];
+  areaId: string;
+  password?: string;
+}) {
+  return credentialRequest<{ profile: Profile; temporaryPassword: string }>({ action: "createUser", ...payload });
+}
+
+export async function approveCredentialUser(profileId: string) {
+  return credentialRequest<{ profile: Profile }>({ action: "approveUser", profileId });
+}
+
+export async function resetCredentialPassword(profileId: string) {
+  return credentialRequest<{ profile: Profile; temporaryPassword: string }>({ action: "resetPassword", profileId });
+}
+
+export async function changeCurrentPassword(password: string) {
+  return credentialRequest<{ profile: Profile }>({ action: "changePassword", password });
+}
+
+async function credentialRequest<T>(body: Record<string, unknown>): Promise<T> {
+  const db = eventPrepSupabase();
+  if (!db) throw new Error("Supabase is not configured.");
+  const { data } = await db.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error("You must be signed in.");
+  const response = await fetch("/api/event-prep/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body)
+  });
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(String(json.error || "Credential request failed."));
+  return json as T;
 }
 
 export async function loadEventPrepState() {
@@ -107,7 +147,7 @@ export async function uploadTaskEvidence(file: File, liveTaskId: string) {
 async function loadFromSupabase(db: SupabaseClient): Promise<EventPrepState> {
   const profiles = await selectTable<Profile>(db, "profiles");
   const { data: userData } = await db.auth.getUser();
-  const activeProfile = profiles.find((profile) => profile.email.toLowerCase() === (userData.user?.email || "").toLowerCase()) || profiles[0];
+  const activeProfile = profiles.find((profile) => profile.id === userData.user?.id || profile.email.toLowerCase() === (userData.user?.email || "").toLowerCase()) || profiles[0];
   const isAdmin = Boolean(activeProfile && ["super_admin", "admin"].includes(activeProfile.role));
   const [
     zoneTypes,
@@ -122,7 +162,7 @@ async function loadFromSupabase(db: SupabaseClient): Promise<EventPrepState> {
     requests,
     requestReviews,
     reminders,
-    notificationLogs,
+    notifications,
     activityLogs,
     globalOptions,
     formFields,
@@ -140,7 +180,7 @@ async function loadFromSupabase(db: SupabaseClient): Promise<EventPrepState> {
     selectTable<AreaRequest>(db, "requests"),
     selectTable<RequestReview>(db, "request_reviews"),
     selectTable<Reminder>(db, "reminders"),
-    isAdmin ? selectTable<NotificationLog>(db, "notification_logs") : Promise.resolve([]),
+    selectTable<InAppNotification>(db, "in_app_notifications"),
     isAdmin ? selectTable<ActivityLog>(db, "activity_logs") : Promise.resolve([]),
     selectTable<GlobalOption>(db, "global_options"),
     selectTable<FormField>(db, "form_fields"),
@@ -162,7 +202,7 @@ async function loadFromSupabase(db: SupabaseClient): Promise<EventPrepState> {
     requests,
     requestReviews,
     reminders,
-    notificationLogs,
+    notifications,
     activityLogs,
     globalOptions,
     formFields
@@ -191,28 +231,13 @@ async function saveToSupabase(db: SupabaseClient, state: EventPrepState, profile
     const allowedAreaIds = new Set(state.areaAccess.filter((access) => access.profileId === profile.id).map((access) => access.areaId));
     const allowedTaskIds = new Set(state.liveTasks.filter((task) => allowedAreaIds.has(task.areaId)).map((task) => task.id));
     const reviewRequestIds = new Set(state.requestReviews.filter((review) => review.reviewerId === profile.id).map((review) => review.requestId));
-    const managedProfileIds = new Set(
-      state.areaAccess
-        .filter((access) => allowedAreaIds.has(access.areaId))
-        .map((access) => access.profileId)
-    );
-    state.profiles.filter((item) => item.createdBy === profile.id).forEach((item) => managedProfileIds.add(item.id));
-    if (profile.role === "area_admin") {
-      await upsertRows(db, "profiles", state.profiles.filter((item) => item.createdBy === profile.id).map(profileToDb));
-    }
-    if (profile.role === "verifier") {
-      await upsertRows(db, "profiles", state.profiles.filter((item) => managedProfileIds.has(item.id) && item.role === "report_user").map(profileToDb));
-    }
-    if (profile.role === "area_admin") {
-      const createdProfileIds = new Set(state.profiles.filter((item) => item.createdBy === profile.id).map((item) => item.id));
-      await upsertRows(db, "area_access", state.areaAccess.filter((access) => createdProfileIds.has(access.profileId) && allowedAreaIds.has(access.areaId)).map(areaAccessToDb));
-    }
     await upsertRows(db, "daily_reports", state.dailyReports.filter((report) => allowedAreaIds.has(report.areaId)).map(reportToDb));
     await upsertRows(db, "task_updates", state.taskUpdates.filter((update) => allowedTaskIds.has(update.liveTaskId) && (update.updatedBy === profile.id || profile.role === "verifier")).map(updateToDb));
     await upsertRows(db, "task_files", state.taskFiles.filter((file) => allowedTaskIds.has(file.liveTaskId)).map(fileToDb));
     await upsertRows(db, "verification_logs", state.verificationLogs.filter((log) => log.verifierId === profile.id).map(verificationLogToDb));
     await upsertRows(db, "requests", state.requests.filter((request) => request.requestedBy === profile.id || reviewRequestIds.has(request.id)).map(requestToDb));
     await upsertRows(db, "request_reviews", state.requestReviews.filter((review) => review.reviewerId === profile.id).map(requestReviewToDb));
+    await upsertRows(db, "in_app_notifications", state.notifications.filter((notification) => notification.userId === profile.id).map(notificationToDb));
     return;
   }
 
@@ -237,7 +262,7 @@ async function saveToSupabase(db: SupabaseClient, state: EventPrepState, profile
   await upsertRows(db, "requests", state.requests.map(requestToDb));
   await upsertRows(db, "request_reviews", state.requestReviews.map(requestReviewToDb));
   await upsertRows(db, "reminders", state.reminders.map(reminderToDb));
-  await upsertRows(db, "notification_logs", state.notificationLogs.map(notificationToDb));
+  await upsertRows(db, "in_app_notifications", state.notifications.map(notificationToDb));
   await upsertRows(db, "activity_logs", state.activityLogs.map(activityLogToDb));
   await upsertRows(db, "global_options", state.globalOptions.map(globalOptionToDb));
   await upsertRows(db, "form_fields", state.formFields.map(formFieldToDb));
@@ -270,7 +295,7 @@ function mergeWithSeed(partial: Partial<EventPrepState>, includeDemoData = true)
     ...seed,
     ...partial,
     settings: { ...seed.settings, ...(partial.settings || {}) },
-    profiles: partial.profiles?.length ? partial.profiles : includeDemoData ? seed.profiles : [],
+    profiles: (partial.profiles?.length ? partial.profiles : includeDemoData ? seed.profiles : []).map((profile) => ({ ...profile, mustChangePassword: Boolean(profile.mustChangePassword) })),
     zoneTypes: partial.zoneTypes?.length ? partial.zoneTypes : seed.zoneTypes,
     areas: partial.areas?.length ? partial.areas : includeDemoData ? seed.areas : [],
     areaAccess: partial.areaAccess?.length ? partial.areaAccess : includeDemoData ? seed.areaAccess : [],
@@ -283,7 +308,7 @@ function mergeWithSeed(partial: Partial<EventPrepState>, includeDemoData = true)
     requests: partial.requests || [],
     requestReviews: partial.requestReviews || [],
     reminders: partial.reminders?.length ? partial.reminders : seed.reminders,
-    notificationLogs: partial.notificationLogs || [],
+    notifications: partial.notifications || [],
     activityLogs: partial.activityLogs || [],
     globalOptions: partial.globalOptions?.length ? partial.globalOptions : seed.globalOptions,
     formFields: partial.formFields?.length ? partial.formFields : seed.formFields
@@ -291,7 +316,7 @@ function mergeWithSeed(partial: Partial<EventPrepState>, includeDemoData = true)
 }
 
 function fromDbRow<T>(row: Record<string, unknown>, table: string) {
-  if (row.data && typeof row.data === "object" && "id" in row.data) return row.data as T;
+  if (row.data && typeof row.data === "object" && "id" in row.data && !["profiles", "in_app_notifications"].includes(table)) return row.data as T;
   switch (table) {
     case "profiles":
       return {
@@ -300,6 +325,7 @@ function fromDbRow<T>(row: Record<string, unknown>, table: string) {
         fullName: String(row.full_name || ""),
         role: row.role,
         status: row.status,
+        mustChangePassword: Boolean(row.must_change_password ?? false),
         createdBy: row.created_by ? String(row.created_by) : undefined
       } as T;
     case "zone_types":
@@ -423,14 +449,19 @@ function fromDbRow<T>(row: Record<string, unknown>, table: string) {
         decisionRemarks: row.decision_remarks ? String(row.decision_remarks) : undefined,
         createdAt: String(row.created_at || new Date().toISOString())
       } as T;
-    case "notification_logs":
+    case "in_app_notifications":
       return {
         id: String(row.id || ""),
-        type: String(row.type || ""),
-        recipientEmail: String(row.recipient_email || ""),
-        subject: String(row.subject || ""),
-        status: row.status || "queued",
-        createdAt: String(row.created_at || new Date().toISOString())
+        userId: String(row.user_id || ""),
+        areaId: row.area_id ? String(row.area_id) : undefined,
+        title: String(row.title || ""),
+        message: String(row.message || ""),
+        type: row.type,
+        isRead: Boolean(row.is_read),
+        createdAt: String(row.created_at || new Date().toISOString()),
+        relatedTaskId: row.related_task_id ? String(row.related_task_id) : undefined,
+        relatedRequestId: row.related_request_id ? String(row.related_request_id) : undefined,
+        relatedDailyReportId: row.related_daily_report_id ? String(row.related_daily_report_id) : undefined
       } as T;
     case "request_reviews":
       return {
@@ -488,6 +519,7 @@ function profileToDb(item: Profile) {
     full_name: item.fullName,
     role: item.role,
     status: item.status,
+    must_change_password: item.mustChangePassword,
     created_by: item.createdBy || null,
     data: item,
     updated_at: new Date().toISOString()
@@ -666,13 +698,18 @@ function reminderToDb(item: Reminder) {
   };
 }
 
-function notificationToDb(item: NotificationLog) {
+function notificationToDb(item: InAppNotification) {
   return {
     id: item.id,
+    user_id: item.userId,
+    area_id: item.areaId || null,
+    title: item.title,
+    message: item.message,
     type: item.type,
-    recipient_email: item.recipientEmail,
-    subject: item.subject,
-    status: item.status,
+    is_read: item.isRead,
+    related_task_id: item.relatedTaskId || null,
+    related_request_id: item.relatedRequestId || null,
+    related_daily_report_id: item.relatedDailyReportId || null,
     data: item,
     created_at: item.createdAt
   };

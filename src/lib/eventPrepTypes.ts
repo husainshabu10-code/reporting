@@ -45,6 +45,7 @@ export type Profile = {
   fullName: string;
   role: UserRole;
   status: "active" | "pending_approval" | "disabled";
+  mustChangePassword: boolean;
   createdBy?: string;
 };
 
@@ -232,13 +233,26 @@ export type ActivityLog = {
   createdAt: string;
 };
 
-export type NotificationLog = {
+export type InAppNotification = {
   id: string;
-  type: string;
-  recipientEmail: string;
-  subject: string;
-  status: "queued" | "sent" | "failed";
+  userId: string;
+  areaId?: string;
+  title: string;
+  message: string;
+  type:
+    | "Daily report reminder"
+    | "Missing report"
+    | "Partially updated report"
+    | "Task needs verification"
+    | "Task needs correction"
+    | "Request status changed"
+    | "Access request approved/rejected"
+    | "Overdue task";
+  isRead: boolean;
   createdAt: string;
+  relatedTaskId?: string;
+  relatedRequestId?: string;
+  relatedDailyReportId?: string;
 };
 
 export type GlobalOption = {
@@ -278,7 +292,7 @@ export type EventPrepState = {
   requests: AreaRequest[];
   requestReviews: RequestReview[];
   reminders: Reminder[];
-  notificationLogs: NotificationLog[];
+  notifications: InAppNotification[];
   activityLogs: ActivityLog[];
   globalOptions: GlobalOption[];
   formFields: FormField[];

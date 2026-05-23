@@ -1,6 +1,6 @@
 -- ASHARA MUBARAKAH IT Event Preparation Reporting Dashboard
 -- Phase 2 schema with foundations for later phases.
--- Run in the Supabase SQL editor. Auth uses Supabase email magic links.
+-- Run in the Supabase SQL editor. Auth uses Supabase email/password with email confirmation disabled.
 
 create extension if not exists "pgcrypto";
 
@@ -20,11 +20,14 @@ create table if not exists public.profiles (
   full_name text not null,
   role text not null check (role in ('super_admin','admin','area_admin','verifier','report_user','viewer')),
   status text not null default 'pending_approval' check (status in ('active','pending_approval','disabled')),
+  must_change_password boolean not null default true,
   created_by text,
   data jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.profiles add column if not exists must_change_password boolean not null default true;
 
 create table if not exists public.roles (
   id text primary key,
@@ -275,12 +278,19 @@ create table if not exists public.reminders (
   updated_at timestamptz not null default now()
 );
 
-create table if not exists public.notification_logs (
+drop table if exists public.notification_logs;
+
+create table if not exists public.in_app_notifications (
   id text primary key,
+  user_id text not null references public.profiles(id) on delete cascade,
+  area_id text references public.areas(id) on delete cascade,
+  title text not null,
+  message text not null default '',
   type text not null,
-  recipient_email text not null,
-  subject text not null,
-  status text not null default 'queued' check (status in ('queued','sent','failed')),
+  is_read boolean not null default false,
+  related_task_id text references public.live_tasks(id) on delete cascade,
+  related_request_id text references public.requests(id) on delete cascade,
+  related_daily_report_id text references public.daily_reports(id) on delete cascade,
   data jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -322,6 +332,7 @@ create index if not exists daily_reports_area_date_idx on public.daily_reports(a
 create index if not exists task_updates_live_task_idx on public.task_updates(live_task_id);
 create index if not exists requests_area_status_idx on public.requests(area_id, status);
 create index if not exists verification_logs_verifier_idx on public.verification_logs(verifier_id);
+create index if not exists in_app_notifications_user_idx on public.in_app_notifications(user_id, is_read, created_at);
 
 insert into storage.buckets (id, name, public)
 values ('task-evidence', 'task-evidence', false)
@@ -335,8 +346,7 @@ set search_path = public
 stable
 as $$
   select id from public.profiles
-  where status = 'active'
-    and (
+  where (
       id = auth.uid()::text
       or lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
     )
@@ -373,10 +383,13 @@ set search_path = public
 stable
 as $$
   select public.is_admin()
-    or exists (
+    or (
+      public.current_profile_role() is not null
+      and exists (
       select 1 from public.area_access aa
       where aa.profile_id = public.current_profile_id()
         and aa.area_id = target_area_id
+      )
     )
 $$;
 
@@ -419,7 +432,7 @@ alter table public.request_reviews enable row level security;
 alter table public.form_fields enable row level security;
 alter table public.global_options enable row level security;
 alter table public.reminders enable row level security;
-alter table public.notification_logs enable row level security;
+alter table public.in_app_notifications enable row level security;
 alter table public.activity_logs enable row level security;
 alter table public.report_exports enable row level security;
 
@@ -478,8 +491,10 @@ drop policy if exists "Admins manage form fields" on public.form_fields;
 drop policy if exists "Authenticated read global options" on public.global_options;
 drop policy if exists "Admins manage global options" on public.global_options;
 drop policy if exists "Admins manage reminders" on public.reminders;
-drop policy if exists "Admins read notifications" on public.notification_logs;
-drop policy if exists "Admins manage notifications" on public.notification_logs;
+drop policy if exists "Users read own notifications" on public.in_app_notifications;
+drop policy if exists "Users create own notifications" on public.in_app_notifications;
+drop policy if exists "Users update own notifications" on public.in_app_notifications;
+drop policy if exists "Admins manage notifications" on public.in_app_notifications;
 drop policy if exists "Admins read activity logs" on public.activity_logs;
 drop policy if exists "Admins manage activity logs" on public.activity_logs;
 drop policy if exists "Admins manage exports" on public.report_exports;
@@ -648,8 +663,10 @@ create policy "Admins manage form fields" on public.form_fields for all using (p
 create policy "Authenticated read global options" on public.global_options for select using (auth.role() = 'authenticated');
 create policy "Admins manage global options" on public.global_options for all using (public.is_admin()) with check (public.is_admin());
 create policy "Admins manage reminders" on public.reminders for all using (public.is_admin()) with check (public.is_admin());
-create policy "Admins read notifications" on public.notification_logs for select using (public.is_admin());
-create policy "Admins manage notifications" on public.notification_logs for all using (public.is_admin()) with check (public.is_admin());
+create policy "Users read own notifications" on public.in_app_notifications for select using (user_id = public.current_profile_id() or public.is_admin());
+create policy "Users create own notifications" on public.in_app_notifications for insert with check (user_id = public.current_profile_id());
+create policy "Users update own notifications" on public.in_app_notifications for update using (user_id = public.current_profile_id()) with check (user_id = public.current_profile_id());
+create policy "Admins manage notifications" on public.in_app_notifications for all using (public.is_admin()) with check (public.is_admin());
 create policy "Admins read activity logs" on public.activity_logs for select using (public.is_admin());
 create policy "Admins manage activity logs" on public.activity_logs for all using (public.is_admin()) with check (public.is_admin());
 create policy "Admins manage exports" on public.report_exports for all using (public.is_admin()) with check (public.is_admin());

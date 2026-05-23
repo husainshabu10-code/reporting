@@ -25,12 +25,12 @@ export const zoneTypes: ZoneType[] = ZONE_TYPES.map((name, index) => ({
 }));
 
 export const seedProfiles: Profile[] = [
-  { id: "profile-super-admin", email: "superadmin@example.com", fullName: "Super Admin", role: "super_admin", status: "active" },
-  { id: "profile-admin", email: "admin@example.com", fullName: "Admin User", role: "admin", status: "active" },
-  { id: "profile-area-admin", email: "area.admin@example.com", fullName: "CMZ Area Admin", role: "area_admin", status: "active" },
-  { id: "profile-verifier", email: "verifier@example.com", fullName: "Central IT Verifier", role: "verifier", status: "active" },
-  { id: "profile-report-user", email: "report.user@example.com", fullName: "CMZ Report User", role: "report_user", status: "active" },
-  { id: "profile-viewer", email: "viewer@example.com", fullName: "Viewer", role: "viewer", status: "active" }
+  { id: "profile-super-admin", email: "superadmin@example.com", fullName: "Super Admin", role: "super_admin", status: "active", mustChangePassword: false },
+  { id: "profile-admin", email: "admin@example.com", fullName: "Admin User", role: "admin", status: "active", mustChangePassword: false },
+  { id: "profile-area-admin", email: "area.admin@example.com", fullName: "CMZ Area Admin", role: "area_admin", status: "active", mustChangePassword: false },
+  { id: "profile-verifier", email: "verifier@example.com", fullName: "Central IT Verifier", role: "verifier", status: "active", mustChangePassword: false },
+  { id: "profile-report-user", email: "report.user@example.com", fullName: "CMZ Report User", role: "report_user", status: "active", mustChangePassword: false },
+  { id: "profile-viewer", email: "viewer@example.com", fullName: "Viewer", role: "viewer", status: "active", mustChangePassword: false }
 ];
 
 export const seedAreas: Area[] = [
@@ -234,7 +234,7 @@ export function createSeedState(): EventPrepState {
     requests: [],
     requestReviews: [],
     reminders: seedReminders,
-    notificationLogs: [],
+    notifications: [],
     activityLogs: [],
     globalOptions: seedGlobalOptions,
     formFields: seedFormFields

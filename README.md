@@ -4,8 +4,8 @@ Standalone Phase 2 dashboard for event IT preparation reporting.
 
 ## Phase 1 Scope Built
 
-- Supabase-ready schema for auth, roles, areas, task templates, live tasks, daily reports, uploads, verification, requests, notifications, and future exports/logs.
-- Email magic-link login shell using Supabase Auth.
+- Supabase-ready schema for password auth, roles, areas, task templates, live tasks, daily reports, uploads, verification, requests, in-app notifications, and future exports/logs.
+- Supabase email/password login with no SMTP or magic-link dependency.
 - Role and area access foundation for Super Admin, Admin, Area Admin, Verifier, Report User, and Viewer.
 - Fixed zone types: CMZ, Central Office, Relay Zone.
 - Admin area management.
@@ -14,7 +14,7 @@ Standalone Phase 2 dashboard for event IT preparation reporting.
 - User daily report screen with draft/submission, status, remarks, quantity fields, uploads, escalation points, and supporting personnel.
 - Basic verification queue and reject/needs-correction flow.
 - Basic requests tab.
-- Email notification foundation through queued `notification_logs`.
+- In-app notification foundation through `in_app_notifications`.
 - Basic admin dashboard where completion counts only `Verified Completed` tasks.
 
 ## Phase 2 Scope Built
@@ -23,7 +23,7 @@ Standalone Phase 2 dashboard for event IT preparation reporting.
 - Admin and assigned Verifier approval paths activate pending report users.
 - Request forwarding to verifiers with verifier recommendation/comment return to admin.
 - Multi-level task verification rules: one verifier, all verifiers, and sequential verification.
-- Configurable email reminder rules stored in `reminders`.
+- Configurable in-app reminder rules stored in `reminders`.
 - Editable Form Builder for task-type fields.
 - Editable Global Fields / Options, including team types, units, request/reminder types, and activity categories.
 - Activity Log settings and activity log table for key Phase 2 actions.
@@ -53,12 +53,18 @@ If Supabase variables are not configured, the app runs in local browser storage 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+SUPABASE_SERVICE_ROLE_KEY=your-server-only-service-role-key
 ```
 
 `NEXT_PUBLIC_SUPABASE_ANON_KEY` also works as a fallback.
+
+The service role key is required only on the server for admin-created users, password resets, approvals, and forced password changes. Never expose it in frontend code.
+
+In Supabase Auth settings, disable email confirmation so admin-created password users can sign in without receiving any email. Do not configure SMTP for this app.
 
 ## Important Notes
 
 - The UI is intentionally separate from the existing AM IT website, but keeps the same visual language: green/gold palette, rounded cards, compact tabs, filters, badges, progress cards, and responsive dashboards.
 - City is not part of the Phase 1 or Phase 2 workflow. The database keeps a nullable `city` column on `areas` so it can be added later without rebuilding.
 - Excel import needs the `xlsx` package. It reads the `Day Plan` sheet when present and imports only the active template fields. Dependencies and risk are stored only as hidden reference.
+- User onboarding is no-email: Admin or Area Admin creates credentials, copies the temporary password once, and the user must change that password on first login.

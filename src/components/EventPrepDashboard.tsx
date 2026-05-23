@@ -4,13 +4,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
 import {
   BarChart3,
+  Bell,
   CalendarClock,
   CheckCircle2,
   ClipboardCheck,
   FileSpreadsheet,
   FileText,
   Filter,
-  Mail,
+  KeyRound,
+  LogOut,
   Menu,
   Plus,
   ShieldCheck,
@@ -34,6 +36,7 @@ import {
   type EventPrepState,
   type FormField,
   type GlobalOption,
+  type InAppNotification,
   type LiveTask,
   type Profile,
   type Reminder,
@@ -50,10 +53,15 @@ import {
 } from "@/lib/eventPrepTypes";
 import {
   eventPrepSupabase,
+  approveCredentialUser,
+  changeCurrentPassword,
+  createCredentialUser,
   isEventPrepSupabaseConfigured,
   loadEventPrepState,
+  resetCredentialPassword,
   saveEventPrepState,
-  sendMagicLink,
+  signInWithPassword,
+  signOutEventPrep,
   uploadTaskEvidence
 } from "@/lib/eventPrepStore";
 
@@ -97,10 +105,12 @@ export default function EventPrepDashboard() {
   const [activeTab, setActiveTab] = useState<AnyTab>("Dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [syncStatus, setSyncStatus] = useState("Loading");
-  const [authEmail, setAuthEmail] = useState("");
+  const [loginId, setLoginId] = useState("");
+  const [password, setPassword] = useState("");
   const [authMessage, setAuthMessage] = useState("");
   const [authChecked, setAuthChecked] = useState(false);
   const [sessionEmail, setSessionEmail] = useState("");
+  const [sessionUserId, setSessionUserId] = useState("");
   const saveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -108,14 +118,17 @@ export default function EventPrepDashboard() {
     const boot = async () => {
       const db = eventPrepSupabase();
       let authenticatedEmail = "";
+      let authenticatedUserId = "";
       if (db) {
         const { data } = await db.auth.getUser();
         authenticatedEmail = data.user?.email || "";
+        authenticatedUserId = data.user?.id || "";
         if (cancelled) return;
         setSessionEmail(authenticatedEmail);
+        setSessionUserId(authenticatedUserId);
         setAuthChecked(true);
         if (!authenticatedEmail) {
-          setSyncStatus("Waiting for magic-link login");
+          setSyncStatus("Waiting for password login");
           return;
         }
       } else {
@@ -127,7 +140,7 @@ export default function EventPrepDashboard() {
       setState(loaded);
       setSyncStatus(isEventPrepSupabaseConfigured() ? "Supabase ready" : "Local fallback");
       if (authenticatedEmail) {
-        const match = loaded.profiles.find((profile) => profile.email.toLowerCase() === authenticatedEmail.toLowerCase() && profile.status === "active");
+        const match = loaded.profiles.find((profile) => (profile.id === authenticatedUserId || profile.email.toLowerCase() === authenticatedEmail.toLowerCase()) && profile.status === "active");
         if (match) setCurrentProfileId(match.id);
       }
     };
@@ -146,7 +159,7 @@ export default function EventPrepDashboard() {
     if (!state) return;
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
-      const activeProfile = getCurrentProfile(state, currentProfileId, sessionEmail);
+      const activeProfile = getCurrentProfile(state, currentProfileId, sessionEmail, sessionUserId);
       if (isEventPrepSupabaseConfigured() && !activeProfile) return;
       saveEventPrepState(state, activeProfile)
         .then(() => setSyncStatus(isEventPrepSupabaseConfigured() ? "Saved to Supabase" : "Saved locally"))
@@ -155,19 +168,23 @@ export default function EventPrepDashboard() {
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     };
-  }, [currentProfileId, sessionEmail, state]);
+  }, [currentProfileId, sessionEmail, sessionUserId, state]);
 
-  const handleMagicLink = async () => {
+  const handlePasswordLogin = async () => {
     try {
-      setAuthMessage("Sending magic link...");
-      await sendMagicLink(authEmail);
-      setAuthMessage("Magic link sent. Check your email.");
+      setAuthMessage("Signing in...");
+      await signInWithPassword(loginId, password);
+      window.location.reload();
     } catch (error) {
-      setAuthMessage(readError(error, "Could not send magic link."));
+      setAuthMessage(readError(error, "Could not sign in."));
     }
   };
+  const handleSignOut = async () => {
+    await signOutEventPrep();
+    window.location.reload();
+  };
 
-  const currentProfile = state ? getCurrentProfile(state, currentProfileId, sessionEmail) : undefined;
+  const currentProfile = state ? getCurrentProfile(state, currentProfileId, sessionEmail, sessionUserId) : undefined;
   const isAdmin = Boolean(currentProfile && ["super_admin", "admin"].includes(currentProfile.role));
   const isAreaAdmin = currentProfile?.role === "area_admin";
   const isVerifier = currentProfile?.role === "verifier";
@@ -179,7 +196,7 @@ export default function EventPrepDashboard() {
   }, [activeTab, isAdmin, isAreaAdmin, isVerifier, isViewer, tabs]);
 
   if (isEventPrepSupabaseConfigured() && authChecked && !sessionEmail) {
-    return <LoginScreen authEmail={authEmail} authMessage={authMessage} setAuthEmail={setAuthEmail} sendLink={handleMagicLink} />;
+    return <LoginScreen loginId={loginId} password={password} authMessage={authMessage} setLoginId={setLoginId} setPassword={setPassword} signIn={handlePasswordLogin} />;
   }
 
   if (!state) {
@@ -200,11 +217,20 @@ export default function EventPrepDashboard() {
         <div className="mx-auto flex min-h-[70vh] max-w-xl items-center justify-center">
           <div className="rounded-lg border border-[var(--color-border)] bg-white p-6 shadow-soft">
             <p className="text-sm font-bold text-[var(--color-primary)]">You are not authorized to access this dashboard.</p>
-            <p className="mt-2 text-sm text-[var(--color-text-muted)]">Ask an admin to create and activate a profile for {sessionEmail || "your email"}.</p>
+            <p className="mt-2 text-sm text-[var(--color-text-muted)]">Ask an admin to create and activate a profile for {sessionEmail || "your login ID"}.</p>
+            {isEventPrepSupabaseConfigured() ? <button className="btn-secondary mt-4" onClick={handleSignOut}>Sign out</button> : null}
           </div>
         </div>
       </main>
     );
+  }
+
+  if (isEventPrepSupabaseConfigured() && currentProfile.status !== "active") {
+    return <AccessBlockedScreen profile={currentProfile} signOut={handleSignOut} />;
+  }
+
+  if (isEventPrepSupabaseConfigured() && currentProfile.mustChangePassword) {
+    return <PasswordChangeScreen profile={currentProfile} onChanged={(profile) => setState((current) => (current ? { ...current, profiles: current.profiles.map((item) => (item.id === profile.id ? profile : item)) } : current))} signOut={handleSignOut} />;
   }
 
   const updateState = (updater: (current: EventPrepState) => EventPrepState) => setState((current) => (current ? updater(current) : current));
@@ -262,14 +288,10 @@ export default function EventPrepDashboard() {
           </nav>
 
           {!isEventPrepSupabaseConfigured() ? null : <div className="mt-5 rounded-lg border border-[var(--color-border)] p-3">
-            <p className="text-xs font-bold uppercase text-[var(--color-text-muted)]">Magic-link login</p>
-            <div className="mt-2 flex gap-2">
-              <input className="field min-w-0" type="email" placeholder="email@example.com" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} />
-              <button className="icon-btn shrink-0" onClick={handleMagicLink} title="Send magic link">
-                <Mail size={18} />
-              </button>
-            </div>
-            {authMessage ? <p className="mt-2 text-xs text-[var(--color-text-muted)]">{authMessage}</p> : null}
+            <p className="text-xs font-bold uppercase text-[var(--color-text-muted)]">Password session</p>
+            <button className="btn-secondary mt-2 w-full justify-center" onClick={handleSignOut}>
+              <LogOut size={16} /> Sign out
+            </button>
           </div>}
         </aside>
 
@@ -288,6 +310,7 @@ export default function EventPrepDashboard() {
                 </div>
               </div>
               <div className="hidden items-center gap-2 sm:flex">
+                <Badge>{unreadNotificationsFor(state, currentProfile).length + buildUserAlerts(state, currentProfile).length} alert(s)</Badge>
                 <Badge>{currentProfile.status.replace("_", " ")}</Badge>
                 <Badge>{isEventPrepSupabaseConfigured() ? "Supabase configured" : "Local mode"}</Badge>
               </div>
@@ -295,6 +318,7 @@ export default function EventPrepDashboard() {
           </header>
 
           <div className="mx-auto max-w-7xl p-4 lg:p-6">
+            <NotificationCenter state={state} currentProfile={currentProfile} updateState={updateState} />
             {activeTab === "Dashboard" ? <DashboardTab state={state} currentProfile={currentProfile} /> : null}
             {activeTab === "Daily Reports" ? <DailyReportsTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
             {activeTab === "Master Tasks" ? <MasterTasksTab state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
@@ -382,15 +406,19 @@ function DashboardTab({ state }: { state: EventPrepState; currentProfile: Profil
 }
 
 function LoginScreen({
-  authEmail,
+  loginId,
+  password,
   authMessage,
-  setAuthEmail,
-  sendLink
+  setLoginId,
+  setPassword,
+  signIn
 }: {
-  authEmail: string;
+  loginId: string;
+  password: string;
   authMessage: string;
-  setAuthEmail: (value: string) => void;
-  sendLink: () => void;
+  setLoginId: (value: string) => void;
+  setPassword: (value: string) => void;
+  signIn: () => void;
 }) {
   return (
     <main className="min-h-screen bg-[var(--color-bg)] p-4 text-[var(--color-text)]">
@@ -398,13 +426,71 @@ function LoginScreen({
         <section className="w-full rounded-lg border border-[var(--color-border)] bg-white p-5 shadow-soft">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--color-accent)]">ASHARA MUBARAKAH</p>
           <h1 className="mt-2 text-2xl font-black text-[var(--color-primary)]">IT Event Preparation</h1>
-          <p className="mt-2 text-sm text-[var(--color-text-muted)]">Sign in with your authorized email address.</p>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">Sign in with the login ID and password created by an admin.</p>
           <label className="mt-4 block">
-            <span className="field-label">Email magic link</span>
-            <input className="field mt-2" type="email" value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@example.com" />
+            <span className="field-label">Login ID / Email</span>
+            <input className="field mt-2" type="email" value={loginId} onChange={(event) => setLoginId(event.target.value)} placeholder="you@example.com" />
           </label>
-          <button className="btn-primary mt-3 w-full" onClick={sendLink}>Send Magic Link</button>
+          <label className="mt-3 block">
+            <span className="field-label">Password</span>
+            <input className="field mt-2" type="password" value={password} onChange={(event) => setPassword(event.target.value)} onKeyDown={(event) => {
+              if (event.key === "Enter") signIn();
+            }} />
+          </label>
+          <button className="btn-primary mt-3 w-full" onClick={signIn}>
+            <KeyRound size={17} /> Sign In
+          </button>
           {authMessage ? <p className="mt-3 text-sm font-bold text-[var(--color-primary)]">{authMessage}</p> : null}
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function AccessBlockedScreen({ profile, signOut }: { profile: Profile; signOut: () => void }) {
+  const message = profile.status === "pending_approval" ? "Your profile is pending approval. Ask an Admin or assigned Verifier to approve access." : "Your profile is disabled. Contact an Admin.";
+  return (
+    <main className="min-h-screen bg-[var(--color-bg)] p-4 text-[var(--color-text)]">
+      <div className="mx-auto flex min-h-[70vh] max-w-xl items-center justify-center">
+        <div className="rounded-lg border border-[var(--color-border)] bg-white p-6 shadow-soft">
+          <p className="text-sm font-bold text-[var(--color-primary)]">Access not active</p>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">{message}</p>
+          <button className="btn-secondary mt-4" onClick={signOut}>Sign out</button>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function PasswordChangeScreen({ profile, onChanged, signOut }: { profile: Profile; onChanged: (profile: Profile) => void; signOut: () => void }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [message, setMessage] = useState("");
+  const submit = async () => {
+    try {
+      if (password !== confirm) throw new Error("Passwords do not match.");
+      setMessage("Updating password...");
+      const result = await changeCurrentPassword(password);
+      onChanged(result.profile);
+      setMessage("Password changed. Loading dashboard...");
+    } catch (error) {
+      setMessage(readError(error, "Unable to change password."));
+    }
+  };
+  return (
+    <main className="min-h-screen bg-[var(--color-bg)] p-4 text-[var(--color-text)]">
+      <div className="mx-auto flex min-h-[80vh] max-w-md items-center justify-center">
+        <section className="w-full rounded-lg border border-[var(--color-border)] bg-white p-5 shadow-soft">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--color-accent)]">PASSWORD REQUIRED</p>
+          <h1 className="mt-2 text-2xl font-black text-[var(--color-primary)]">Change Temporary Password</h1>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">{profile.fullName}, set a new password before using the dashboard.</p>
+          <Input label="New password" value={password} onChange={setPassword} type="password" />
+          <div className="mt-3">
+            <Input label="Confirm password" value={confirm} onChange={setConfirm} type="password" />
+          </div>
+          <button className="btn-primary mt-4 w-full" onClick={submit}>Change Password</button>
+          <button className="btn-secondary mt-2 w-full justify-center" onClick={signOut}>Sign out</button>
+          {message ? <p className="mt-3 text-sm font-bold text-[var(--color-primary)]">{message}</p> : null}
         </section>
       </div>
     </main>
@@ -433,6 +519,46 @@ function DailyReportsTab({ state, currentProfile, updateState }: { state: EventP
       </Panel>
       {["super_admin", "admin"].includes(currentProfile.role) ? <RemindersConfig state={state} currentProfile={currentProfile} updateState={updateState} /> : null}
     </div>
+  );
+}
+
+function NotificationCenter({ state, currentProfile, updateState }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void }) {
+  const stored = unreadNotificationsFor(state, currentProfile);
+  const generated = buildUserAlerts(state, currentProfile);
+  const count = stored.length + generated.length;
+  if (!count) return null;
+  const markRead = (notificationId: string) => {
+    updateState((current) => ({
+      ...current,
+      notifications: current.notifications.map((notification) => (notification.id === notificationId ? { ...notification, isRead: true } : notification))
+    }));
+  };
+  return (
+    <Panel title="Alerts & Notifications" action={<Badge>{count} item(s)</Badge>}>
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {generated.map((notification) => (
+          <div key={notification.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+            <div className="flex items-center gap-2">
+              <Bell size={15} className="text-[var(--color-accent)]" />
+              <p className="text-xs font-black uppercase text-[var(--color-primary)]">{notification.type}</p>
+            </div>
+            <p className="mt-2 font-black text-[var(--color-primary)]">{notification.title}</p>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">{notification.message}</p>
+          </div>
+        ))}
+        {stored.map((notification) => (
+          <div key={notification.id} className="rounded-lg border border-[var(--color-border)] bg-white p-3">
+            <div className="flex items-center gap-2">
+              <Bell size={15} className="text-[var(--color-accent)]" />
+              <p className="text-xs font-black uppercase text-[var(--color-primary)]">{notification.type}</p>
+            </div>
+            <p className="mt-2 font-black text-[var(--color-primary)]">{notification.title}</p>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">{notification.message}</p>
+            <button className="btn-compact mt-3" onClick={() => markRead(notification.id)}>Mark Read</button>
+          </div>
+        ))}
+      </div>
+    </Panel>
   );
 }
 
@@ -469,7 +595,7 @@ function RemindersConfig({ state, currentProfile, updateState }: { state: EventP
     }, currentProfile, "Reminder activity", "Updated reminder rule", "reminder", reminderId, { changed: true }));
   };
   return (
-    <Panel title="Configurable Email Reminders" action={<Badge>Phase 2 config only</Badge>}>
+    <Panel title="Configurable In-App Reminders" action={<Badge>No email delivery</Badge>}>
       <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
         <Select label="Reminder type" value={reminderType} onChange={setReminderType} options={reminderTypes} />
         <Select label="Area / Zone" value={areaId} onChange={setAreaId} options={[{ label: "All areas", value: "" }, ...state.areas.map((area) => ({ label: area.name, value: area.id }))]} />
@@ -523,11 +649,7 @@ function MasterTasksTab({ state, currentProfile, updateState }: { state: EventPr
       const templates = await parsePreparationPlan(file);
       updateState((current) => ({
         ...current,
-        taskTemplates: mergeTemplates(current.taskTemplates, templates),
-        notificationLogs: [
-          createNotification("template_import", "admin@example.com", `${templates.length} task templates imported`),
-          ...current.notificationLogs
-        ]
+        taskTemplates: mergeTemplates(current.taskTemplates, templates)
       }));
       setImportMessage(`${templates.length} task templates imported into the reusable master template list.`);
     } catch (error) {
@@ -909,7 +1031,10 @@ function TaskCard({
     updateState((current) => {
       const without = current.taskUpdates.filter((update) => update.id !== next.id);
       const nextReport = current.dailyReports.some((item) => item.id === report.id) ? current.dailyReports : [report, ...current.dailyReports];
-      return withActivity({ ...current, dailyReports: nextReport, taskUpdates: [next, ...without] }, currentProfile, "Task updates", `Updated task: ${template?.taskDetails || task.id}`, "task_update", next.id, { status: next.status });
+      const verifierNotifications = next.verificationStatus === "Needs Verification"
+        ? task.assignedVerifierIds.map((verifierId) => createInAppNotification(verifierId, "Task needs verification", "Task needs verification", template?.taskDetails || "A task is ready for verification.", { areaId: task.areaId, relatedTaskId: task.id, relatedDailyReportId: report.id }))
+        : [];
+      return withActivity({ ...current, dailyReports: nextReport, taskUpdates: [next, ...without], notifications: [...verifierNotifications, ...current.notifications] }, currentProfile, "Task updates", `Updated task: ${template?.taskDetails || task.id}`, "task_update", next.id, { status: next.status });
     });
   };
 
@@ -932,7 +1057,7 @@ function TaskCard({
       return withActivity({
         ...current,
         requests: [request, ...current.requests],
-        notificationLogs: [createNotification("not_applicable_request", "admin@example.com", title), ...current.notificationLogs]
+        notifications: [...notifyAdmins(current, "Request status changed", title, "A not applicable request needs review.", { areaId: task.areaId, relatedTaskId: task.id, relatedRequestId: request.id }), ...current.notifications]
       }, currentProfile, "Requests", title, "request", request.id, { status: request.status });
     });
   };
@@ -1068,7 +1193,8 @@ function VerificationTab({ state, currentProfile, updateState }: { state: EventP
         ...current,
         taskUpdates: [updatedTaskUpdate, ...current.taskUpdates.filter((item) => item.id !== update.id)],
         verificationLogs: [log, ...current.verificationLogs],
-        taskFiles: current.taskFiles.map((file) => (file.liveTaskId === task.id ? { ...file, reviewLocked: true } : file))
+        taskFiles: current.taskFiles.map((file) => (file.liveTaskId === task.id ? { ...file, reviewLocked: true } : file)),
+        notifications: action === "rejected" ? [createInAppNotification(update.updatedBy, "Task needs correction", "Task needs correction", comment || "A verifier requested correction.", { areaId: task.areaId, relatedTaskId: task.id, relatedDailyReportId: update.dailyReportId }), ...current.notifications] : current.notifications
       }, currentProfile, "Verification actions", `${action === "verified" ? "Verified" : "Rejected"} task`, "verification_log", log.id, { status: nextStatus });
     });
   };
@@ -1142,7 +1268,7 @@ function RequestsTab({ state, currentProfile, updateState }: { state: EventPrepS
     updateState((current) => withActivity({
       ...current,
       requests: [request, ...current.requests],
-      notificationLogs: [createNotification("request_created", "admin@example.com", `New request: ${title}`), ...current.notificationLogs]
+      notifications: [...notifyAdmins(current, "Request status changed", `New request: ${title}`, "A request was created and needs review.", { areaId, relatedRequestId: request.id }), ...current.notifications]
     }, currentProfile, "Requests", `Created request: ${title}`, "request", request.id, { status: request.status }));
     setTitle("");
     setDetails("");
@@ -1152,6 +1278,7 @@ function RequestsTab({ state, currentProfile, updateState }: { state: EventPrepS
     updateState((current) => withActivity({
       ...current,
       requests: current.requests.map((item) => (item.id === request.id ? { ...item, status } : item)),
+      notifications: [createInAppNotification(request.requestedBy, "Request status changed", `Request ${status}`, request.title, { areaId: request.areaId, relatedRequestId: request.id }), ...current.notifications],
       liveTasks:
         status === "Approved" && request.requestType === "Not Applicable / Task Removal Request" && request.relatedLiveTaskId
           ? current.liveTasks.map((task) => (task.id === request.relatedLiveTaskId ? { ...task, notApplicable: true, active: false } : task))
@@ -1176,7 +1303,7 @@ function RequestsTab({ state, currentProfile, updateState }: { state: EventPrepS
         ...current,
         requests: current.requests.map((item) => (item.id === request.id ? { ...item, status: "Sent for Verification" } : item)),
         requestReviews: [review, ...current.requestReviews],
-        notificationLogs: [createNotification("request_review", state.profiles.find((profile) => profile.id === reviewerId)?.email || "verifier@example.com", `Request sent for verification: ${request.title}`), ...current.notificationLogs]
+        notifications: [createInAppNotification(reviewerId, "Request status changed", `Review request: ${request.title}`, "Admin sent this request to you for verification.", { areaId: request.areaId, relatedRequestId: request.id }), ...current.notifications]
       }, currentProfile, "Requests", "Sent request for verifier review", "request", request.id, { reviewerAssigned: true });
     });
   };
@@ -1247,6 +1374,9 @@ function UsersAccessTab({ state, currentProfile, updateState }: { state: EventPr
   const [name, setName] = useState("");
   const [role, setRole] = useState<UserRole>("report_user");
   const [areaId, setAreaId] = useState(managedAreas[0]?.id || "");
+  const [temporaryPassword, setTemporaryPassword] = useState("");
+  const [customPassword, setCustomPassword] = useState("");
+  const [accessMessage, setAccessMessage] = useState("");
   const shownProfiles = isAdmin
     ? state.profiles
     : state.profiles.filter((profile) => {
@@ -1254,25 +1384,40 @@ function UsersAccessTab({ state, currentProfile, updateState }: { state: EventPr
       return access.some((item) => managedAreas.some((area) => area.id === item.areaId)) || profile.createdBy === currentProfile.id;
     });
   const canAddUsers = isAdmin || isAreaAdmin;
-  const addUser = () => {
+  const addUser = async () => {
     if (!email.trim() || !name.trim()) return;
     const assignedRole = isAreaAdmin ? "report_user" : role;
-    const profile: Profile = {
-      id: id("profile"),
-      email: email.trim().toLowerCase(),
-      fullName: name.trim(),
-      role: assignedRole,
-      status: assignedRole === "report_user" ? "pending_approval" : "active",
-      createdBy: currentProfile.id
-    };
-    updateState((current) => ({
-      ...withActivity(current, currentProfile, "Access changes", `Created ${roleLabel(assignedRole)} profile`, "profile", profile.id, { pendingApproval: profile.status === "pending_approval" }),
-      profiles: [profile, ...current.profiles],
-      areaAccess: areaId ? [{ id: id("access"), profileId: profile.id, areaId, role: assignedRole }, ...current.areaAccess] : current.areaAccess,
-      notificationLogs: [createNotification("access_invite_pending", profile.email, "Your access is pending approval"), ...current.notificationLogs]
-    }));
-    setEmail("");
-    setName("");
+    try {
+      setAccessMessage("Creating user credentials...");
+      const result = isEventPrepSupabaseConfigured()
+        ? await createCredentialUser({ fullName: name, email, role: assignedRole, areaId, password: customPassword || undefined })
+        : {
+          profile: {
+            id: id("profile"),
+            email: email.trim().toLowerCase(),
+            fullName: name.trim(),
+            role: assignedRole,
+            status: assignedRole === "report_user" ? "pending_approval" as const : "active" as const,
+            mustChangePassword: true,
+            createdBy: currentProfile.id
+          },
+          temporaryPassword: customPassword || generateTemporaryPassword()
+        };
+      const profile = result.profile;
+      updateState((current) => ({
+        ...withActivity(current, currentProfile, "Access changes", `Created ${roleLabel(profile.role)} credentials`, "profile", profile.id, { pendingApproval: profile.status === "pending_approval" }),
+        profiles: [profile, ...current.profiles.filter((item) => item.id !== profile.id)],
+        areaAccess: areaId ? [{ id: `access-${profile.id}-${areaId}-${profile.role}`, profileId: profile.id, areaId, role: profile.role }, ...current.areaAccess.filter((access) => !(access.profileId === profile.id && access.areaId === areaId && access.role === profile.role))] : current.areaAccess,
+        notifications: [createInAppNotification(profile.id, "Access request approved/rejected", "User created / pending approval", "Your credentials were created. Use the temporary password and change it on first login.", { areaId }), ...current.notifications]
+      }));
+      setTemporaryPassword(result.temporaryPassword);
+      setAccessMessage(profile.status === "pending_approval" ? "User created / pending approval." : "User credentials created.");
+      setEmail("");
+      setName("");
+      setCustomPassword("");
+    } catch (error) {
+      setAccessMessage(readError(error, "Unable to create user credentials."));
+    }
   };
   const canApprove = (profile: Profile) => {
     if (isAdmin) return true;
@@ -1280,34 +1425,65 @@ function UsersAccessTab({ state, currentProfile, updateState }: { state: EventPr
     const profileAreaIds = state.areaAccess.filter((access) => access.profileId === profile.id).map((access) => access.areaId);
     return profileAreaIds.some((profileAreaId) => managedAreas.some((area) => area.id === profileAreaId));
   };
-  const approve = (profile: Profile) => updateState((current) => withActivity({
-    ...current,
-    profiles: current.profiles.map((item) => (item.id === profile.id ? { ...item, status: "active" } : item)),
-    notificationLogs: [createNotification("access_approved", profile.email, "Your dashboard access is approved"), ...current.notificationLogs]
-  }, currentProfile, "Access changes", `Approved access for ${profile.fullName}`, "profile", profile.id, { approved: true }));
+  const approve = async (profile: Profile) => {
+    try {
+      setAccessMessage("Approving user...");
+      const result = isEventPrepSupabaseConfigured() ? await approveCredentialUser(profile.id) : { profile: { ...profile, status: "active" as const } };
+      updateState((current) => withActivity({
+        ...current,
+        profiles: current.profiles.map((item) => (item.id === profile.id ? result.profile : item)),
+        notifications: [createInAppNotification(profile.id, "Access request approved/rejected", "Access approved", "Your dashboard access is active.", {}), ...current.notifications]
+      }, currentProfile, "Access changes", `Approved access for ${profile.fullName}`, "profile", profile.id, { approved: true }));
+      setAccessMessage("User approved.");
+    } catch (error) {
+      setAccessMessage(readError(error, "Unable to approve user."));
+    }
+  };
+  const resetPassword = async (profile: Profile) => {
+    try {
+      setAccessMessage("Resetting password...");
+      const result = isEventPrepSupabaseConfigured() ? await resetCredentialPassword(profile.id) : { profile: { ...profile, mustChangePassword: true }, temporaryPassword: generateTemporaryPassword() };
+      updateState((current) => withActivity({
+        ...current,
+        profiles: current.profiles.map((item) => (item.id === profile.id ? result.profile : item)),
+        notifications: [createInAppNotification(profile.id, "Access request approved/rejected", "Password reset", "An admin generated a new temporary password. Change it on next login.", {}), ...current.notifications]
+      }, currentProfile, "Access changes", `Reset password for ${profile.fullName}`, "profile", profile.id, { passwordReset: true }));
+      setTemporaryPassword(result.temporaryPassword);
+      setAccessMessage("Temporary password generated. It is shown below once.");
+    } catch (error) {
+      setAccessMessage(readError(error, "Unable to reset password."));
+    }
+  };
 
   return (
     <div className="space-y-4">
-      {canAddUsers ? <Panel title={isAreaAdmin ? "Add Report User For My Area" : "Add User / Access"}>
+      {canAddUsers ? <Panel title={isAreaAdmin ? "Create Report User Credentials" : "Create User Credentials"}>
         <div className="grid gap-3 lg:grid-cols-5">
           <Input label="Full name" value={name} onChange={setName} />
-          <Input label="Email" value={email} onChange={setEmail} type="email" />
+          <Input label="Login ID / Email" value={email} onChange={setEmail} type="email" />
           <Select label="Role" value={isAreaAdmin ? "report_user" : role} onChange={(value) => setRole(value as UserRole)} disabled={isAreaAdmin} options={["super_admin", "admin", "area_admin", "verifier", "report_user", "viewer"].map((value) => ({ label: roleLabel(value as UserRole), value }))} />
           <Select label="Area access" value={areaId} onChange={setAreaId} options={managedAreas.map((area) => ({ label: area.name, value: area.id }))} />
-          <button className="btn-primary self-end" onClick={addUser}>Add User</button>
+          <Input label="Temporary password (optional)" value={customPassword} onChange={setCustomPassword} type="text" />
+          <button className="btn-primary self-end" onClick={addUser}>Create Credentials</button>
         </div>
-        <p className="mt-3 text-xs text-[var(--color-text-muted)]">Report users are created as Pending Approval. Admins or assigned verifiers activate them before login works.</p>
+        <p className="mt-3 text-xs text-[var(--color-text-muted)]">No email is sent. Share the temporary password manually and only with the correct user.</p>
+        {temporaryPassword ? <p className="mt-3 rounded-lg bg-[var(--color-accent-light)] p-3 text-sm font-black text-[var(--color-primary)]">Temporary password shown once: {temporaryPassword}</p> : null}
+        {accessMessage ? <p className="mt-3 text-sm font-bold text-[var(--color-primary)]">{accessMessage}</p> : null}
       </Panel> : null}
       <Panel title="Users & Access">
         <ResponsiveTable
-          headers={["Name", "Email", "Role", "Status", "Areas", "Action"]}
+          headers={["Name", "Login ID", "Role", "Status", "Areas", "Action"]}
           rows={shownProfiles.map((profile) => [
             profile.fullName,
             profile.email,
             roleLabel(profile.role),
             <StatusBadge key="status" value={profile.status.replace("_", " ")} />,
             state.areaAccess.filter((access) => access.profileId === profile.id).map((access) => areaName(state, access.areaId)).join(", ") || "All / not restricted",
-            profile.status === "pending_approval" && canApprove(profile) ? <button key="approve" className="btn-compact" onClick={() => approve(profile)}>Approve</button> : "-"
+            <div key="actions" className="flex flex-col gap-2">
+              {profile.status === "pending_approval" && canApprove(profile) ? <button className="btn-compact" onClick={() => approve(profile)}>Approve</button> : null}
+              {isAdmin ? <button className="btn-compact" onClick={() => resetPassword(profile)}>Reset Password</button> : null}
+              {profile.status !== "pending_approval" && !isAdmin ? "-" : null}
+            </div>
           ])}
         />
       </Panel>
@@ -1337,7 +1513,7 @@ function ProfileTab({ state, currentProfile }: { state: EventPrepState; currentP
     <Panel title="Profile / Access">
       <div className="grid gap-3 sm:grid-cols-2">
         <MiniStat label="Name" value={currentProfile.fullName} />
-        <MiniStat label="Email" value={currentProfile.email} />
+        <MiniStat label="Login ID" value={currentProfile.email} />
         <MiniStat label="Role" value={roleLabel(currentProfile.role)} />
         <MiniStat label="Status" value={currentProfile.status.replace("_", " ")} />
       </div>
@@ -1494,8 +1670,8 @@ function ActivityLogTab({ state, currentProfile, updateState }: { state: EventPr
           ])}
         />
       </Panel>
-      <Panel title="Email Notification Queue">
-        <ResponsiveTable headers={["Type", "Recipient", "Subject", "Status"]} rows={state.notificationLogs.map((log) => [log.type, log.recipientEmail, log.subject, log.status])} />
+      <Panel title="In-App Notifications">
+        <ResponsiveTable headers={["User", "Type", "Title", "Read"]} rows={state.notifications.map((notification) => [state.profiles.find((profile) => profile.id === notification.userId)?.fullName || "User", notification.type, notification.title, notification.isRead ? "Yes" : "No"])} />
       </Panel>
     </div>
   );
@@ -1775,6 +1951,98 @@ function withActivity(
   return { ...state, activityLogs: [log, ...state.activityLogs].slice(0, 500) };
 }
 
+function unreadNotificationsFor(state: EventPrepState, profile: Profile) {
+  return state.notifications.filter((notification) => notification.userId === profile.id && !notification.isRead);
+}
+
+function buildUserAlerts(state: EventPrepState, profile: Profile): InAppNotification[] {
+  const latest = latestUpdateMap(state.taskUpdates);
+  const today = todayIso();
+  const allowedAreas = getAllowedAreas(state, profile);
+  const allowedAreaIds = allowedAreas.map((area) => area.id);
+  const notifications: InAppNotification[] = [];
+  const push = (type: InAppNotification["type"], title: string, message: string, extra: Partial<InAppNotification> = {}) => {
+    notifications.push({
+      id: `generated-${type}-${slug(title)}-${extra.relatedTaskId || extra.relatedRequestId || extra.relatedDailyReportId || ""}`,
+      userId: profile.id,
+      type,
+      title,
+      message,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+      ...extra
+    });
+  };
+
+  if (["super_admin", "admin"].includes(profile.role)) {
+    buildAttention(state).forEach((item) => {
+      if (item.count > 0) push(item.type, item.label, `${item.count} item(s) need attention.`);
+    });
+    return notifications;
+  }
+
+  if (profile.role === "verifier") {
+    const queueCount = state.liveTasks.filter((task) => {
+      const update = latest.get(task.id);
+      return update && ["Needs Verification", "Partially Verified"].includes(update.verificationStatus) && task.assignedVerifierIds.includes(profile.id) && allowedAreaIds.includes(task.areaId);
+    }).length;
+    if (queueCount) push("Task needs verification", "Verification Queue", `${queueCount} task(s) are waiting for your verification.`);
+  }
+
+  if (profile.role === "report_user" || profile.role === "area_admin") {
+    allowedAreas.forEach((area) => {
+      const report = state.dailyReports.find((item) => item.areaId === area.id && item.reportDate === today);
+      if (!report) push("Daily report reminder", "Today's report pending", `${area.name} has no submitted report for today.`, { areaId: area.id });
+      if (report?.status === "Draft Saved") push("Partially updated report", "Draft saved but not submitted", `${area.name} has a draft report waiting for submission.`, { areaId: area.id, relatedDailyReportId: report.id });
+    });
+  }
+
+  const assignedTasks = state.liveTasks.filter((task) => allowedAreaIds.includes(task.areaId) && (profile.role !== "report_user" || task.assignedProfileIds.includes(profile.id)));
+  assignedTasks.forEach((task) => {
+    const update = latest.get(task.id);
+    const template = state.taskTemplates.find((item) => item.id === task.templateId);
+    if (update?.verificationStatus === "Rejected / Needs Correction") push("Task needs correction", "Task needs correction", template?.taskDetails || "A task needs correction.", { areaId: task.areaId, relatedTaskId: task.id });
+    if (task.dueDate < today && update?.verificationStatus !== "Verified Completed") push("Overdue task", "Overdue assigned task", template?.taskDetails || "An assigned task is overdue.", { areaId: task.areaId, relatedTaskId: task.id });
+  });
+
+  state.requests
+    .filter((request) => request.requestedBy === profile.id && request.status === "Need More Info")
+    .forEach((request) => push("Request status changed", "Request needs more info", request.title, { areaId: request.areaId, relatedRequestId: request.id }));
+
+  return notifications;
+}
+
+function createInAppNotification(
+  userId: string,
+  type: InAppNotification["type"],
+  title: string,
+  message: string,
+  extra: Partial<Pick<InAppNotification, "areaId" | "relatedTaskId" | "relatedRequestId" | "relatedDailyReportId">>
+): InAppNotification {
+  return {
+    id: id("notification"),
+    userId,
+    type,
+    title,
+    message,
+    isRead: false,
+    createdAt: new Date().toISOString(),
+    ...extra
+  };
+}
+
+function notifyAdmins(
+  state: EventPrepState,
+  type: InAppNotification["type"],
+  title: string,
+  message: string,
+  extra: Partial<Pick<InAppNotification, "areaId" | "relatedTaskId" | "relatedRequestId" | "relatedDailyReportId">>
+) {
+  return state.profiles
+    .filter((profile) => ["super_admin", "admin"].includes(profile.role) && profile.status === "active")
+    .map((profile) => createInAppNotification(profile.id, type, title, message, extra));
+}
+
 function buildMetrics(state: EventPrepState): DashboardMetrics {
   const tasks = state.liveTasks.filter((task) => task.active && !task.notApplicable);
   const latest = latestUpdateMap(state.taskUpdates);
@@ -1802,13 +2070,15 @@ function buildAttention(state: EventPrepState) {
   const todayReports = state.dailyReports.filter((report) => report.reportDate === todayIso());
   const missingReports = state.areas.filter((area) => area.active).length - todayReports.filter((report) => ["Submitted", "Late Submitted", "Closed", "Draft Saved", "Partially Updated"].includes(report.status)).length;
   return [
-    { label: "Missing Daily Reports", count: Math.max(0, missingReports) },
-    { label: "Partially Updated Reports", count: todayReports.filter((report) => ["Draft Saved", "Partially Updated"].includes(report.status)).length },
-    { label: "Issue Found Tasks", count: tasks.filter((task) => latest.get(task.id)?.status === "Issue Found").length },
-    { label: "Tasks Needing Verification", count: tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Needs Verification").length },
-    { label: "Rejected / Needs Correction", count: tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Rejected / Needs Correction").length },
-    { label: "Pending Requests", count: state.requests.filter((request) => request.status === "Under Review").length },
-    { label: "Overdue Tasks", count: tasks.filter((task) => task.dueDate < todayIso() && latest.get(task.id)?.verificationStatus !== "Verified Completed").length }
+    { label: "Missing Daily Reports", count: Math.max(0, missingReports), type: "Missing report" as const },
+    { label: "Partially Updated Reports", count: todayReports.filter((report) => ["Draft Saved", "Partially Updated"].includes(report.status)).length, type: "Partially updated report" as const },
+    { label: "Late Submitted Reports", count: todayReports.filter((report) => report.status === "Late Submitted").length, type: "Partially updated report" as const },
+    { label: "Escalated Reports", count: todayReports.filter((report) => report.status === "Escalated").length, type: "Missing report" as const },
+    { label: "Issue Found Tasks", count: tasks.filter((task) => latest.get(task.id)?.status === "Issue Found").length, type: "Overdue task" as const },
+    { label: "Tasks Needing Verification", count: tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Needs Verification").length, type: "Task needs verification" as const },
+    { label: "Rejected / Needs Correction", count: tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Rejected / Needs Correction").length, type: "Task needs correction" as const },
+    { label: "Pending Requests", count: state.requests.filter((request) => request.status === "Under Review").length, type: "Request status changed" as const },
+    { label: "Overdue Tasks", count: tasks.filter((task) => task.dueDate < todayIso() && latest.get(task.id)?.verificationStatus !== "Verified Completed").length, type: "Overdue task" as const }
   ];
 }
 
@@ -1829,9 +2099,9 @@ function getAllowedAreas(state: EventPrepState, profile: Profile) {
   return state.areas.filter((area) => accessAreaIds.includes(area.id));
 }
 
-function getCurrentProfile(state: EventPrepState, currentProfileId: string, sessionEmail: string) {
+function getCurrentProfile(state: EventPrepState, currentProfileId: string, sessionEmail: string, sessionUserId = "") {
   if (isEventPrepSupabaseConfigured()) {
-    return state.profiles.find((profile) => profile.email.toLowerCase() === sessionEmail.toLowerCase() && profile.status === "active");
+    return state.profiles.find((profile) => profile.id === sessionUserId || profile.email.toLowerCase() === sessionEmail.toLowerCase());
   }
   return state.profiles.find((profile) => profile.id === currentProfileId) || state.profiles[0];
 }
@@ -1969,10 +2239,6 @@ function mergeTemplates(existing: TaskTemplate[], imported: TaskTemplate[]) {
   return Array.from(byId.values()).sort((a, b) => a.day - b.day || a.workstream.localeCompare(b.workstream));
 }
 
-function createNotification(type: string, recipientEmail: string, subject: string) {
-  return { id: id("notification"), type, recipientEmail, subject, status: "queued" as const, createdAt: new Date().toISOString() };
-}
-
 function areaName(state: EventPrepState, areaId: string) {
   return state.areas.find((area) => area.id === areaId)?.name || "Unknown area";
 }
@@ -2026,6 +2292,13 @@ function slug(value: string) {
 
 function id(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function generateTemporaryPassword() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+  let value = "Am#";
+  for (let index = 0; index < 11; index += 1) value += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return value;
 }
 
 function toCamel(value: string) {
