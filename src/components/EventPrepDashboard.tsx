@@ -21,6 +21,7 @@ import {
   Presentation,
   Settings2,
   ShieldCheck,
+  Trash2,
   Upload,
   Users,
   X
@@ -1365,7 +1366,7 @@ function DailyReportTab({ state, currentProfile, updateState, showToast }: { sta
   const workstreamOptions = unique(tasks.map((task) => taskDetails(state, task).workstream));
 
   useEffect(() => {
-    setAreaId((current) => current || allowedAreas[0]?.id || "");
+    setAreaId((current: string) => current || allowedAreas[0]?.id || "");
   }, [allowedAreas]);
 
   useEffect(() => {
@@ -1501,6 +1502,9 @@ function TaskCard({
   const showSupport = isFormFieldVisible(state, task.taskType, "supporting_personnel");
   const showUpload = isFormFieldVisible(state, task.taskType, "file_upload");
   const teamTypeOptions = activeOptions(state, "Team Types", TEAM_TYPES);
+  const previousUserUpdates = state.taskUpdates.filter((update) => update.updatedBy === currentProfile.id && update.id !== draft.id);
+  const escalationSuggestions = uniquePeopleRows(previousUserUpdates.flatMap((update) => update.escalationPoints));
+  const supportSuggestions = uniquePeopleRows(previousUserUpdates.flatMap((update) => update.supportingPersonnel));
 
   useEffect(() => {
     setDraft(existing || createTaskUpdate(task, report, currentProfile.id, latest));
@@ -1643,6 +1647,7 @@ function TaskCard({
         addLabel="Add escalation point"
         onChange={(rows) => setDraft({ ...draft, escalationPoints: rows })}
         kind="escalation"
+        suggestions={escalationSuggestions}
       /> : null}
       {showSupport ? <PeopleEditor
         title="Supporting Personnel"
@@ -1651,6 +1656,7 @@ function TaskCard({
         onChange={(rows) => setDraft({ ...draft, supportingPersonnel: rows })}
         kind="support"
         teamTypeOptions={teamTypeOptions}
+        suggestions={supportSuggestions}
       /> : null}
 
       {showUpload ? <div className="mt-3 rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-bg)] p-3">
@@ -2730,7 +2736,8 @@ function PeopleEditor<T extends EscalationPoint | SupportingPerson>({
   onChange,
   addLabel,
   kind,
-  teamTypeOptions = TEAM_TYPES
+  teamTypeOptions = TEAM_TYPES,
+  suggestions = []
 }: {
   title: string;
   rows: T[];
@@ -2738,6 +2745,7 @@ function PeopleEditor<T extends EscalationPoint | SupportingPerson>({
   addLabel: string;
   kind: "escalation" | "support";
   teamTypeOptions?: readonly string[];
+  suggestions?: T[];
 }) {
   const add = () =>
     onChange([
@@ -2746,15 +2754,49 @@ function PeopleEditor<T extends EscalationPoint | SupportingPerson>({
         ? { id: id("escalation"), name: "", contactNumber: "", emailOrWhatsapp: "", roleStanding: "", teamOrganization: "", reason: "" }
         : { id: id("support"), name: "", contactNumber: "", roleStanding: "", teamTypes: [], responsibility: "" }
     ] as T[]);
+  const remove = (rowId: string) => onChange(rows.filter((row) => row.id !== rowId));
+  const useSuggestion = (index: number, suggestionId: string) => {
+    const suggestion = suggestions.find((item) => item.id === suggestionId);
+    if (!suggestion) return;
+    onChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...suggestion, id: row.id } : row)) as T[]);
+  };
   return (
     <div className="mt-3 rounded-lg border border-[var(--color-border)] p-3">
       <div className="flex items-center justify-between gap-3">
         <p className="field-label">{title}</p>
         <button className="btn-compact" onClick={add} type="button">{addLabel}</button>
       </div>
+      {suggestions.length ? (
+        <details className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+          <summary className="cursor-pointer text-xs font-black uppercase text-[var(--color-primary)]">Previous details / recommendations</summary>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {suggestions.slice(0, 6).map((suggestion) => (
+              <div key={suggestion.id} className="rounded-lg border border-[var(--color-border)] bg-white p-2 text-xs">
+                <p className="font-black text-[var(--color-primary)]">{suggestion.name || "Unnamed contact"}</p>
+                <p className="mt-1 text-[var(--color-text-muted)]">{peopleSummary(suggestion)}</p>
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : null}
       <div className="mt-2 grid gap-2">
         {rows.map((row, index) => (
           <div key={row.id} className="grid gap-2 rounded-lg bg-[var(--color-bg)] p-2 md:grid-cols-4">
+            <div className="flex items-center gap-2 md:col-span-4">
+              {suggestions.length ? (
+                <select className="field min-h-10 flex-1" value="" onChange={(event) => useSuggestion(index, event.target.value)} aria-label={`Use previous ${kind} details`}>
+                  <option value="">Use previous details...</option>
+                  {suggestions.map((suggestion) => (
+                    <option key={suggestion.id} value={suggestion.id}>
+                      {(suggestion.name || "Unnamed contact")} - {suggestion.contactNumber || suggestion.roleStanding || "saved details"}
+                    </option>
+                  ))}
+                </select>
+              ) : <p className="flex-1 text-xs font-bold text-[var(--color-text-muted)]">Add details manually. Saved recommendations will appear after previous submissions.</p>}
+              <button className="mini-icon-btn text-[var(--color-important)]" onClick={() => remove(row.id)} type="button" aria-label={`Delete ${kind} row`}>
+                <Trash2 size={14} />
+              </button>
+            </div>
             <input className="field" placeholder="Name" value={row.name} onChange={(event) => updatePeopleRow(rows, index, "name", event.target.value, onChange)} />
             <input className="field" placeholder="Contact number" value={row.contactNumber} onChange={(event) => updatePeopleRow(rows, index, "contactNumber", event.target.value, onChange)} />
             <input className="field" placeholder="Role / Standing" value={row.roleStanding} onChange={(event) => updatePeopleRow(rows, index, "roleStanding", event.target.value, onChange)} />
@@ -2785,6 +2827,7 @@ function PeopleEditor<T extends EscalationPoint | SupportingPerson>({
             ) : null}
           </div>
         ))}
+        {!rows.length ? <p className="rounded-lg bg-[var(--color-bg)] p-3 text-sm text-[var(--color-text-muted)]">No {title.toLowerCase()} added yet. Use the add button above to add one or more entries.</p> : null}
       </div>
     </div>
   );
@@ -2792,6 +2835,31 @@ function PeopleEditor<T extends EscalationPoint | SupportingPerson>({
 
 function updatePeopleRow<T extends EscalationPoint | SupportingPerson>(rows: T[], index: number, key: string, value: unknown, onChange: (rows: T[]) => void) {
   onChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, [key]: value } : row)) as T[]);
+}
+
+function uniquePeopleRows<T extends EscalationPoint | SupportingPerson>(rows: T[]) {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    if (!hasPeopleData(row)) return false;
+    const key = [row.name, row.contactNumber, row.roleStanding, "teamOrganization" in row ? row.teamOrganization : "", "teamTypes" in row ? row.teamTypes.join("|") : ""].join("|").toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function hasPeopleData(row: EscalationPoint | SupportingPerson) {
+  return Boolean(row.name.trim() || row.contactNumber.trim() || row.roleStanding.trim());
+}
+
+function peopleSummary(row: EscalationPoint | SupportingPerson) {
+  const parts = [
+    row.contactNumber,
+    row.roleStanding,
+    "teamOrganization" in row ? row.teamOrganization : row.teamTypes.join(", "),
+    "reason" in row ? row.reason : row.responsibility
+  ].filter(Boolean);
+  return parts.join(" / ") || "Saved contact details";
 }
 
 function exportLiveTasksCsv(state: EventPrepState) {
