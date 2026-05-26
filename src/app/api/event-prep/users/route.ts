@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import type { Profile, UserRole } from "@/lib/eventPrepTypes";
+import type { AreaAccess, Profile, UserRole } from "@/lib/eventPrepTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,8 @@ type ActionBody =
   | { action: "createUser"; fullName: string; email: string; role: UserRole; areaId: string; password?: string }
   | { action: "approveUser"; profileId: string }
   | { action: "resetPassword"; profileId: string }
-  | { action: "changePassword"; password: string };
+  | { action: "changePassword"; password: string }
+  | { action: "updateAccess"; profileId: string; role: UserRole; status: Profile["status"]; areaIds: string[]; viewerAccess?: Profile["viewerAccess"] };
 
 type ServerDb = ReturnType<typeof serverSupabase>;
 
@@ -27,6 +28,8 @@ export async function POST(request: Request) {
         return NextResponse.json(await resetPassword(db, actor, body.profileId), { headers: noStoreHeaders() });
       case "changePassword":
         return NextResponse.json(await changePassword(db, actor, body.password), { headers: noStoreHeaders() });
+      case "updateAccess":
+        return NextResponse.json(await updateAccess(db, actor, body), { headers: noStoreHeaders() });
       default:
         return NextResponse.json({ error: "Unsupported credential action." }, { status: 400, headers: noStoreHeaders() });
     }
@@ -107,6 +110,23 @@ async function changePassword(db: ServerDb, actor: Profile & { authUserId?: stri
   return { profile };
 }
 
+async function updateAccess(db: ServerDb, actor: Profile & { authUserId?: string }, body: Extract<ActionBody, { action: "updateAccess" }>) {
+  if (actor.role !== "super_admin") throw new Error("Only Super Admin can update active user access.");
+  if (body.profileId === actor.id) throw new Error("You cannot change your own access from this panel.");
+  const target = await getProfile(db, body.profileId);
+  if (!target) throw new Error("Profile not found.");
+  const areaIds = Array.from(new Set(body.areaIds || []));
+  const profile: Profile = {
+    ...target,
+    role: body.role,
+    status: body.status,
+    viewerAccess: body.role === "viewer" ? body.viewerAccess : undefined
+  };
+  await upsertProfile(db, profile);
+  await replaceAreaAccess(db, profile, areaIds);
+  return { profile, areaAccess: ["super_admin", "admin"].includes(profile.role) ? [] : areaIds.map((areaId) => areaAccessRow(profile.id, areaId, profile.role)) };
+}
+
 async function getActorProfile(db: ServerDb, request: Request) {
   const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) throw new Error("Missing signed-in session.");
@@ -171,16 +191,33 @@ async function upsertProfile(db: ServerDb, profile: Profile) {
 }
 
 async function upsertAreaAccess(db: ServerDb, profileId: string, areaId: string, role: UserRole) {
-  const id = `access-${profileId}-${areaId}-${role}`;
-  const { error } = await db.from("area_access").upsert({
-    id,
-    profile_id: profileId,
-    area_id: areaId,
-    role,
-    data: { id, profileId, areaId, role },
-    updated_at: new Date().toISOString()
-  }, { onConflict: "id" });
+  const row = areaAccessRow(profileId, areaId, role);
+  const { error } = await db.from("area_access").upsert(areaAccessToDb(row), { onConflict: "id" });
   if (error) throw new Error(error.message);
+}
+
+async function replaceAreaAccess(db: ServerDb, profile: Profile, areaIds: string[]) {
+  const { error: deleteError } = await db.from("area_access").delete().eq("profile_id", profile.id);
+  if (deleteError) throw new Error(deleteError.message);
+  if (["super_admin", "admin"].includes(profile.role) || !areaIds.length) return;
+  const rows = areaIds.map((areaId) => areaAccessToDb(areaAccessRow(profile.id, areaId, profile.role)));
+  const { error } = await db.from("area_access").insert(rows);
+  if (error) throw new Error(error.message);
+}
+
+function areaAccessRow(profileId: string, areaId: string, role: UserRole): AreaAccess {
+  return { id: `access-${profileId}-${areaId}-${role}`, profileId, areaId, role };
+}
+
+function areaAccessToDb(item: AreaAccess) {
+  return {
+    id: item.id,
+    profile_id: item.profileId,
+    area_id: item.areaId,
+    role: item.role,
+    data: item,
+    updated_at: new Date().toISOString()
+  };
 }
 
 async function resolveAuthUserId(db: ServerDb, profile: Profile) {

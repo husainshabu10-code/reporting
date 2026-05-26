@@ -72,6 +72,7 @@ import {
   signInWithPassword,
   signOutEventPrep,
   subscribeToEventPrepChanges,
+  updateCredentialAccess,
   uploadTaskEvidence
 } from "@/lib/eventPrepStore";
 
@@ -2000,25 +2001,33 @@ function UsersAccessTab({ state, currentProfile, updateState, showToast }: { sta
       showToast("Password reset failed", readError(error, "Please try again."), "error");
     }
   };
-  const saveUserAccess = (profile: Profile, nextRole: UserRole, nextStatus: Profile["status"], nextAreaIds: string[], viewerAccess?: Profile["viewerAccess"]) => {
+  const saveUserAccess = async (profile: Profile, nextRole: UserRole, nextStatus: Profile["status"], nextAreaIds: string[], viewerAccess?: Profile["viewerAccess"]) => {
     if (profile.id === currentProfile.id) {
       showToast("Own access protected", "Edit another Super Admin if you need to change your own access.", "warning");
       return;
     }
-    updateState((current) => {
-      const areaAccess = ["super_admin", "admin"].includes(nextRole)
-        ? current.areaAccess.filter((access) => access.profileId !== profile.id)
-        : [
-          ...current.areaAccess.filter((access) => access.profileId !== profile.id),
-          ...nextAreaIds.map((nextAreaId) => ({ id: `access-${profile.id}-${nextAreaId}-${nextRole}`, profileId: profile.id, areaId: nextAreaId, role: nextRole }))
-        ];
-      return withActivity({
-        ...current,
-        profiles: current.profiles.map((item) => (item.id === profile.id ? { ...item, role: nextRole, status: nextStatus, viewerAccess: nextRole === "viewer" ? viewerAccess : undefined } : item)),
-        areaAccess
-      }, currentProfile, "Access changes", `Updated access for ${profile.fullName}`, "profile", profile.id, { role: nextRole, status: nextStatus });
-    });
-    showToast("Access updated", `${profile.fullName}'s role and area access were updated.`);
+    try {
+      setAccessMessage("Saving access...");
+      const uniqueAreaIds = Array.from(new Set(nextAreaIds));
+      const result = isEventPrepSupabaseConfigured()
+        ? await updateCredentialAccess({ profileId: profile.id, role: nextRole, status: nextStatus, areaIds: uniqueAreaIds, viewerAccess: nextRole === "viewer" ? viewerAccess : undefined })
+        : {
+          profile: { ...profile, role: nextRole, status: nextStatus, viewerAccess: nextRole === "viewer" ? viewerAccess : undefined },
+          areaAccess: ["super_admin", "admin"].includes(nextRole) ? [] : uniqueAreaIds.map((nextAreaId) => ({ id: `access-${profile.id}-${nextAreaId}-${nextRole}`, profileId: profile.id, areaId: nextAreaId, role: nextRole }))
+        };
+      updateState((current) => {
+        return withActivity({
+          ...current,
+          profiles: current.profiles.map((item) => (item.id === profile.id ? result.profile : item)),
+          areaAccess: [...current.areaAccess.filter((access) => access.profileId !== profile.id), ...result.areaAccess]
+        }, currentProfile, "Access changes", `Updated access for ${profile.fullName}`, "profile", profile.id, { role: nextRole, status: nextStatus });
+      });
+      setAccessMessage("Access saved to Supabase.");
+      showToast("Access updated", `${profile.fullName}'s role and area access were updated.`);
+    } catch (error) {
+      setAccessMessage(readError(error, "Unable to save access."));
+      showToast("Access update failed", readError(error, "Please try again."), "error");
+    }
   };
 
   return (
@@ -2085,7 +2094,7 @@ function AccessEditor({
   areas: EventPrepState["areas"];
   zoneTypes: EventPrepState["zoneTypes"];
   currentAreaIds: string[];
-  onSave: (profile: Profile, nextRole: UserRole, nextStatus: Profile["status"], nextAreaIds: string[], viewerAccess?: Profile["viewerAccess"]) => void;
+  onSave: (profile: Profile, nextRole: UserRole, nextStatus: Profile["status"], nextAreaIds: string[], viewerAccess?: Profile["viewerAccess"]) => void | Promise<void>;
 }) {
   const [role, setRole] = useState<UserRole>(profile.role);
   const [status, setStatus] = useState<Profile["status"]>(profile.status);

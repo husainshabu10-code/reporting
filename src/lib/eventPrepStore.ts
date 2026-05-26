@@ -82,6 +82,16 @@ export async function changeCurrentPassword(password: string) {
   return credentialRequest<{ profile: Profile }>({ action: "changePassword", password });
 }
 
+export async function updateCredentialAccess(payload: {
+  profileId: string;
+  role: Profile["role"];
+  status: Profile["status"];
+  areaIds: string[];
+  viewerAccess?: Profile["viewerAccess"];
+}) {
+  return credentialRequest<{ profile: Profile; areaAccess: AreaAccess[] }>({ action: "updateAccess", ...payload });
+}
+
 async function credentialRequest<T>(body: Record<string, unknown>): Promise<T> {
   const db = eventPrepSupabase();
   if (!db) throw new Error("Supabase is not configured.");

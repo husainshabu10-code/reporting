@@ -68,6 +68,7 @@ async function saveState(db: ServerDb, state: EventPrepState, actor: Profile) {
   if (settingsError) throw new Error(`event_settings: ${settingsError.message}`);
 
   await deleteMissingRows(db, "areas", state.areas.map((area) => area.id));
+  await deleteMissingRows(db, "area_access", state.areaAccess.map((access) => access.id));
   await upsertRows(db, "profiles", state.profiles.map(profileToDb));
   await upsertRows(db, "zone_types", state.zoneTypes.map(zoneTypeToDb));
   await upsertRows(db, "areas", state.areas.map(areaToDb));
