@@ -1024,10 +1024,14 @@ table {
 
   .task-group-card {
     overflow: visible;
-    border-radius: 0.5rem;
-    border: 1px solid var(--color-border);
-    background: var(--color-card);
-    box-shadow: 0 10px 28px rgba(11, 79, 58, 0.045);
+    border-radius: 0.78rem;
+    border: 1px solid rgba(201, 162, 39, 0.46);
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(250, 247, 239, 0.92));
+    box-shadow:
+      0 18px 42px rgba(11, 79, 58, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.96),
+      inset 0 -1px 0 rgba(201, 162, 39, 0.16);
   }
 
   .task-group-main-header {
@@ -1035,20 +1039,27 @@ table {
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    border-bottom: 1px solid rgba(232, 221, 197, 0.72);
-    border-radius: 0.5rem 0.5rem 0 0;
-    background: var(--color-card);
-    padding: 1.05rem 1rem;
-    box-shadow: 0 8px 22px rgba(11, 79, 58, 0.05);
+    border-bottom: 1px solid rgba(201, 162, 39, 0.28);
+    border-radius: 0.78rem 0.78rem 0 0;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 247, 239, 0.78));
+    padding: 1.15rem 1rem 1rem;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      0 10px 26px rgba(11, 79, 58, 0.055);
   }
 
   .task-workstream-block {
-    margin: 0.85rem 0.85rem 0;
+    margin: 1.05rem 0.9rem 0;
     overflow: hidden;
-    border: 1px solid rgba(232, 221, 197, 0.86);
-    border-radius: 0.55rem;
-    background: var(--color-card);
-    box-shadow: 0 8px 18px rgba(11, 79, 58, 0.035);
+    border: 1px solid rgba(232, 221, 197, 0.98);
+    border-radius: 0.68rem;
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(250, 247, 239, 0.68));
+    box-shadow:
+      0 10px 22px rgba(11, 79, 58, 0.045),
+      inset 0 1px 0 rgba(255, 255, 255, 0.92),
+      inset 0 -1px 0 rgba(232, 221, 197, 0.58);
   }
 
   .task-workstream-header {
@@ -1057,16 +1068,24 @@ table {
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    background: white;
-    padding: 0.95rem 1rem;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(250, 247, 239, 0.58));
+    padding: 1rem 1.05rem;
     text-align: left;
-    box-shadow: 0 1px 0 rgba(232, 221, 197, 0.84), 0 8px 18px rgba(11, 79, 58, 0.035);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -1px 0 rgba(232, 221, 197, 0.72),
+      0 4px 14px rgba(11, 79, 58, 0.03);
     transition: background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
   }
 
   .task-workstream-header:hover {
-    background: rgba(243, 231, 195, 0.26);
-    box-shadow: 0 1px 0 rgba(232, 221, 197, 0.84), 0 10px 24px rgba(11, 79, 58, 0.055);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(243, 231, 195, 0.34));
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.94),
+      inset 0 -1px 0 rgba(201, 162, 39, 0.25),
+      0 8px 20px rgba(11, 79, 58, 0.052);
     transform: translateY(-1px);
   }
 
@@ -1091,7 +1110,10 @@ table {
   .task-summary-list {
     display: grid;
     gap: 0;
-    padding: 0.9rem;
+    padding: 0.85rem;
+    background:
+      linear-gradient(180deg, rgba(250, 247, 239, 0.62), rgba(255, 255, 255, 0.84));
+    box-shadow: inset 0 7px 18px rgba(11, 79, 58, 0.026);
   }
 
   .task-summary-head,
@@ -1103,27 +1125,35 @@ table {
   }
 
   .task-summary-head {
-    border: 1px solid var(--color-border);
+    border: 1px solid rgba(232, 221, 197, 0.94);
     border-bottom: 0;
-    background: var(--color-accent-light);
+    border-radius: 0.48rem 0.48rem 0 0;
+    background:
+      linear-gradient(180deg, rgba(243, 231, 195, 0.98), rgba(243, 231, 195, 0.82));
     padding: 0;
     color: var(--color-primary);
     font-size: 0.72rem;
     font-weight: 900;
     text-transform: uppercase;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
   }
 
   .task-summary-row {
     width: 100%;
     min-height: 4.25rem;
-    border: 1px solid var(--color-border);
+    border: 1px solid rgba(232, 221, 197, 0.86);
     border-top: 0;
     border-radius: 0;
-    background: var(--color-card);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.92));
     padding: 0;
     text-align: left;
-    box-shadow: none;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
     transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease, background-color 180ms ease;
+  }
+
+  .task-summary-row:last-child {
+    border-radius: 0 0 0.48rem 0.48rem;
   }
 
   .task-summary-head > span,
@@ -1139,8 +1169,12 @@ table {
 
   .task-summary-row:hover {
     border-color: rgba(201, 162, 39, 0.58);
-    background: rgba(243, 231, 195, 0.12);
-    box-shadow: inset 3px 0 0 var(--color-accent);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(243, 231, 195, 0.2));
+    box-shadow:
+      inset 3px 0 0 var(--color-accent),
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      0 5px 14px rgba(11, 79, 58, 0.035);
     transform: none;
   }
 
