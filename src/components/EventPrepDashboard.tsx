@@ -863,13 +863,6 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
     showToast("Custom task added", `${template.taskDetails} was added to ${areaName(state, applyAreaId)}.`);
   };
 
-  const updateLiveTask = (taskId: string, patch: Partial<LiveTask>) => {
-    updateState((current) => ({
-      ...current,
-      liveTasks: current.liveTasks.map((task) => (task.id === taskId ? { ...task, ...patch } : task))
-    }));
-  };
-
   return (
     <div className="space-y-4">
       <Panel title="Excel Import Into Reference Suggestions" action={<Badge>Day Plan sheet preferred</Badge>}>
@@ -928,8 +921,6 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
       <Panel title="Live Tasks Area Configuration" action={<Badge>{state.liveTasks.length} live tasks</Badge>}>
         <LiveTasksConfigTable
           state={state}
-          priorityOptions={priorityOptions}
-          updateLiveTask={updateLiveTask}
           openTask={setSelectedTaskId}
         />
       </Panel>
@@ -940,120 +931,100 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
 
 function LiveTasksConfigTable({
   state,
-  priorityOptions,
-  updateLiveTask,
   openTask
 }: {
   state: EventPrepState;
-  priorityOptions: string[];
-  updateLiveTask: (taskId: string, patch: Partial<LiveTask>) => void;
   openTask: (taskId: string) => void;
 }) {
+  const latestUpdates = latestUpdateMap(state.taskUpdates);
+  const [search, setSearch] = useState("");
+  const [areaFilter, setAreaFilter] = useState("All");
+  const [workstreamFilter, setWorkstreamFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [priorityFilter, setPriorityFilter] = useState("All");
+  const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
+  const workstreamOptions = unique(state.liveTasks.map((task) => taskDetails(state, task).workstream || "General"));
+  const visibleTasks = state.liveTasks.filter((task) => {
+    const details = taskDetails(state, task);
+    const update = latestUpdates.get(task.id);
+    const taskStatus = update?.status || "Pending";
+    const verificationStatus = update?.verificationStatus || "Not Submitted";
+    const taskSearch = [details.taskDetails, details.workstream, areaName(state, task.areaId), task.priority, taskStatus, verificationStatus].join(" ").toLowerCase();
+    return (
+      (!search.trim() || taskSearch.includes(search.trim().toLowerCase())) &&
+      (areaFilter === "All" || task.areaId === areaFilter) &&
+      (workstreamFilter === "All" || (details.workstream || "General") === workstreamFilter) &&
+      (statusFilter === "All" || taskStatus === statusFilter || verificationStatus === statusFilter) &&
+      (priorityFilter === "All" || task.priority === priorityFilter)
+    );
+  });
   const grouped = state.areas
     .map((area) => {
-      const tasks = state.liveTasks.filter((task) => task.areaId === area.id);
+      const tasks = visibleTasks.filter((task) => task.areaId === area.id);
       const workstreams = unique(tasks.map((task) => taskDetails(state, task).workstream || "General"));
       return { area, tasks, workstreams };
     })
     .filter((group) => group.tasks.length);
 
-  if (!grouped.length) return <EmptyState title="No live tasks yet" body="Add a custom task or apply reference templates to an area." />;
+  const toggleGroup = (groupKey: string) => setCollapsedGroups((current) => (current.includes(groupKey) ? current.filter((item) => item !== groupKey) : [...current, groupKey]));
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
+      <div className="task-filter-bar">
+        <label className="task-search">
+          <span className="field-label">Search tasks</span>
+          <input className="field mt-2" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by task name, workstream, area..." />
+        </label>
+        <Select label="Area" value={areaFilter} onChange={setAreaFilter} options={["All", ...state.areas.map((area) => ({ label: area.name, value: area.id }))]} />
+        <Select label="Workstream" value={workstreamFilter} onChange={setWorkstreamFilter} options={["All", ...workstreamOptions]} />
+        <Select label="Status" value={statusFilter} onChange={setStatusFilter} options={["All", ...unique([...USER_TASK_STATUSES, ...VERIFICATION_STATUSES])]} />
+        <Select label="Priority" value={priorityFilter} onChange={setPriorityFilter} options={["All", ...activeOptions(state, "Priority options", PRIORITY_OPTIONS)]} />
+      </div>
+      {!grouped.length ? <EmptyState title="No live tasks found" body="Adjust filters or add a custom live task to an area." /> : null}
       {grouped.map(({ area, workstreams }) => (
-        <section key={area.id} className="live-task-group motion-card animate-fade-in">
-          <h3 className="text-lg font-black text-[var(--color-primary)]">Area: {area.name}</h3>
+        <section key={area.id} className="task-group-card motion-card animate-fade-in">
+          <div className="task-group-main-header">
+            <div>
+              <p className="text-xs font-black uppercase text-[var(--color-accent)]">Area</p>
+              <h3 className="text-lg font-black text-[var(--color-primary)]">{area.name}</h3>
+            </div>
+            <Badge>{visibleTasks.filter((task) => task.areaId === area.id).length} task(s)</Badge>
+          </div>
           {workstreams.map((workstream) => {
-            const tasks = state.liveTasks.filter((task) => task.areaId === area.id && (taskDetails(state, task).workstream || "General") === workstream);
+            const groupKey = `${area.id}-${workstream}`;
+            const tasks = visibleTasks.filter((task) => task.areaId === area.id && (taskDetails(state, task).workstream || "General") === workstream);
+            const completedCount = tasks.filter((task) => latestUpdates.get(task.id)?.verificationStatus === "Verified Completed").length;
+            const progress = tasks.length ? Math.round((completedCount / tasks.length) * 100) : 0;
+            const collapsed = collapsedGroups.includes(groupKey);
             return (
-              <div key={`${area.id}-${workstream}`} className="mt-4">
-                <p className="mb-3 text-sm font-black text-[var(--color-primary)]">Workstream: {workstream}</p>
-                <div className="overflow-x-auto">
-                  <table className="live-task-table min-w-[1180px]">
-                    <thead>
-                      <tr>
-                        <th>Task</th>
-                        <th>Type</th>
-                        <th>Qty</th>
-                        <th>Unit</th>
-                        <th>Start</th>
-                        <th>Due</th>
-                        <th>Priority</th>
-                        <th>Verifier</th>
-                        <th>Rule</th>
-                        <th>Active</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tasks.map((task) => {
-                        const details = taskDetails(state, task);
-                        const areaVerifierOptions = state.areaAccess
-                          .filter((access) => access.areaId === task.areaId && access.role === "verifier")
-                          .map((access) => state.profiles.find((profile) => profile.id === access.profileId))
-                          .filter(Boolean) as Profile[];
-                        return (
-                          <tr key={task.id}>
-                            <td className="w-[28rem]">
-                              <button className="task-title-link" onClick={() => openTask(task.id)} title="Open task details">
-                                <span>{details.taskDetails}</span>
-                                <small>{[details.expectedOutput, details.requiredEquipment].filter(Boolean).join(" / ") || "Click task to edit full details"}</small>
-                              </button>
-                            </td>
-                            <td>
-                              <select className="field min-w-44" value={task.taskType} onChange={(event) => updateLiveTask(task.id, { taskType: event.target.value as LiveTask["taskType"] })}>
-                                {TASK_TYPES.map((type) => <option key={type}>{type}</option>)}
-                              </select>
-                            </td>
-                            <td>
-                              <input className="field w-24" type="number" value={task.requiredQuantity || ""} onChange={(event) => updateLiveTask(task.id, { requiredQuantity: Number(event.target.value || 0) })} />
-                            </td>
-                            <td>
-                              <input className="field w-28" value={task.unit || ""} onChange={(event) => updateLiveTask(task.id, { unit: event.target.value })} />
-                            </td>
-                            <td>
-                              <input className="field min-w-36" type="date" value={task.startDate} onChange={(event) => updateLiveTask(task.id, { startDate: event.target.value })} />
-                            </td>
-                            <td>
-                              <input className="field min-w-36" type="date" value={task.dueDate} onChange={(event) => updateLiveTask(task.id, { dueDate: event.target.value })} />
-                            </td>
-                            <td>
-                              <select className="field min-w-32" value={task.priority} onChange={(event) => updateLiveTask(task.id, { priority: event.target.value as LiveTask["priority"] })}>
-                                {priorityOptions.map((priority) => <option key={priority}>{priority}</option>)}
-                              </select>
-                            </td>
-                            <td>
-                              <div className="grid min-w-40 gap-2">
-                                {areaVerifierOptions.length ? areaVerifierOptions.map((profile) => (
-                                  <label key={profile.id} className="flex items-center gap-2 text-xs font-bold text-[var(--color-primary)]">
-                                    <input
-                                      type="checkbox"
-                                      checked={task.assignedVerifierIds.includes(profile.id)}
-                                      onChange={(event) => {
-                                        const next = event.target.checked ? [...task.assignedVerifierIds, profile.id] : task.assignedVerifierIds.filter((idValue) => idValue !== profile.id);
-                                        updateLiveTask(task.id, { assignedVerifierIds: next });
-                                      }}
-                                    />
-                                    {profile.fullName}
-                                  </label>
-                                )) : <span className="text-xs text-[var(--color-text-muted)]">No verifier</span>}
-                              </div>
-                            </td>
-                            <td>
-                              <select className="field min-w-40" value={task.verificationRule} onChange={(event) => updateLiveTask(task.id, { verificationRule: event.target.value as LiveTask["verificationRule"] })}>
-                                <option value="one_verifier">One verifier enough</option>
-                                <option value="all_verifiers">All verifiers required</option>
-                                <option value="sequential">Sequential</option>
-                              </select>
-                            </td>
-                            <td className="text-center">
-                              <input type="checkbox" checked={task.active} onChange={(event) => updateLiveTask(task.id, { active: event.target.checked })} aria-label={`Toggle ${details.taskDetails}`} />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+              <div key={groupKey} className="task-workstream-block">
+                <button className="task-workstream-header" onClick={() => toggleGroup(groupKey)} aria-expanded={!collapsed}>
+                  <div className="min-w-0">
+                    <p className="font-black text-[var(--color-primary)]">Workstream: {workstream}</p>
+                    <p className="mt-1 text-xs font-bold text-[var(--color-text-muted)]">{completedCount}/{tasks.length} verified completed</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="hidden w-28 sm:block">
+                      <div className="h-2 overflow-hidden rounded-full bg-[var(--color-accent-light)]">
+                        <div className="progress-fill h-full rounded-full bg-[var(--color-accent)]" style={{ width: `${progress}%` }} />
+                      </div>
+                    </div>
+                    <Badge>{progress}%</Badge>
+                    <span className="text-xs font-black text-[var(--color-primary)]">{collapsed ? "Show" : "Hide"}</span>
+                  </div>
+                </button>
+                <div className={collapsed ? "hidden" : "task-summary-list"}>
+                  <div className="task-summary-head">
+                    <span>Task</span>
+                    <span>Status</span>
+                    <span>Priority</span>
+                    <span>Due</span>
+                    <span>Progress</span>
+                    <span>Edit</span>
+                  </div>
+                  {tasks.map((task) => (
+                    <TaskSummaryRow key={task.id} state={state} task={task} update={latestUpdates.get(task.id)} openTask={openTask} />
+                  ))}
                 </div>
               </div>
             );
@@ -1061,6 +1032,39 @@ function LiveTasksConfigTable({
         </section>
       ))}
     </div>
+  );
+}
+
+function TaskSummaryRow({ state, task, update, openTask }: { state: EventPrepState; task: LiveTask; update?: TaskUpdate; openTask: (taskId: string) => void }) {
+  const details = taskDetails(state, task);
+  const status = update?.verificationStatus === "Verified Completed" ? "Verified Completed" : update?.status || "Pending";
+  const progress = task.taskType === "Quantity-Based Task" && task.requiredQuantity
+    ? Math.min(100, Math.round(((update?.completedQuantity || 0) / task.requiredQuantity) * 100))
+    : update?.verificationStatus === "Verified Completed"
+      ? 100
+      : update?.status === "Completed"
+        ? 75
+        : update?.status === "In Progress"
+          ? 45
+          : 0;
+
+  return (
+    <button className="task-summary-row" onClick={() => openTask(task.id)} title="Open task detail drawer">
+      <span className="task-summary-title-cell">
+        <span className="task-summary-title">{details.taskDetails}</span>
+        <span className="task-summary-meta">{areaName(state, task.areaId)} | {details.workstream || "General"} | {task.taskType}</span>
+      </span>
+      <span><StatusBadge value={status} /></span>
+      <span><StatusBadge value={task.priority} /></span>
+      <span className="task-summary-muted">{task.dueDate || "No due date"}</span>
+      <span className="task-summary-progress">
+        <span className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--color-accent-light)]">
+          <span className="progress-fill block h-full rounded-full bg-[var(--color-secondary)]" style={{ width: `${progress}%` }} />
+        </span>
+        <strong>{progress}%</strong>
+      </span>
+      <span className="task-summary-edit">Edit</span>
+    </button>
   );
 }
 
@@ -1077,75 +1081,95 @@ function LiveTaskEditorModal({
   close: () => void;
   showToast: ShowToast;
 }) {
-  const details = taskDetails(state, task);
+  const [draft, setDraft] = useState<LiveTask>(task);
+  const details = taskDetails(state, draft);
   const priorityOptions = activeOptions(state, "Priority options", PRIORITY_OPTIONS);
   const unitOptions = activeOptions(state, "Units", UNIT_OPTIONS);
   const areaUsers = state.areaAccess
-    .filter((access) => access.areaId === task.areaId && access.role === "report_user")
+    .filter((access) => access.areaId === draft.areaId && access.role === "report_user")
     .map((access) => state.profiles.find((profile) => profile.id === access.profileId))
     .filter(Boolean) as Profile[];
   const areaVerifiers = state.areaAccess
-    .filter((access) => access.areaId === task.areaId && access.role === "verifier")
+    .filter((access) => access.areaId === draft.areaId && access.role === "verifier")
     .map((access) => state.profiles.find((profile) => profile.id === access.profileId))
     .filter(Boolean) as Profile[];
 
-  const updateTask = (patch: Partial<LiveTask>) => {
+  useEffect(() => {
+    setDraft(task);
+  }, [task.id]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [close]);
+
+  const updateDraft = (patch: Partial<LiveTask>) => setDraft((current) => ({ ...current, ...patch }));
+  const saveTask = () => {
     updateState((current) => ({
       ...current,
-      liveTasks: current.liveTasks.map((item) => (item.id === task.id ? { ...item, ...patch } : item))
+      liveTasks: current.liveTasks.map((item) => (item.id === task.id ? draft : item))
     }));
+    showToast("Task details saved", "The live task details are updated.");
+    close();
   };
   const toggleProfile = (field: "assignedProfileIds" | "assignedVerifierIds", profileId: string, checked: boolean) => {
-    const current = task[field];
-    updateTask({ [field]: checked ? unique([...current, profileId]) : current.filter((idValue) => idValue !== profileId) } as Partial<LiveTask>);
+    const current = draft[field];
+    updateDraft({ [field]: checked ? unique([...current, profileId]) : current.filter((idValue) => idValue !== profileId) } as Partial<LiveTask>);
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/30 p-3 sm:items-center">
-      <section className="motion-modal max-h-[92vh] w-full max-w-5xl overflow-auto rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-2xl">
-        <div className="flex flex-col gap-3 border-b border-[var(--color-border)] pb-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="task-drawer-overlay" onMouseDown={close}>
+      <section className="task-drawer motion-drawer" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Task detail edit">
+        <header className="task-drawer-header">
           <div>
-            <p className="text-xs font-black uppercase text-[var(--color-accent)]">Live Task Details</p>
+            <p className="text-xs font-black uppercase text-[var(--color-accent)]">Task Detail / Edit</p>
             <h2 className="mt-1 text-xl font-black text-[var(--color-primary)]">{details.taskDetails}</h2>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">{areaName(state, task.areaId)} / Day {task.prepDay} / {task.taskType}</p>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">{areaName(state, draft.areaId)} / Day {draft.prepDay} / {draft.taskType}</p>
           </div>
-          <button className="btn-secondary" onClick={() => {
-            showToast("Task details saved", "The live task details are updated.");
-            close();
-          }}>Done</button>
-        </div>
+          <button className="mini-icon-btn" onClick={close} aria-label="Close task drawer"><X size={18} /></button>
+        </header>
 
-        <div className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="space-y-4">
-            <Panel title="Task Description">
+        <div className="task-drawer-body">
+          <section className="drawer-form-section">
+            <div className="drawer-section-heading">
+              <h3>Task Description</h3>
+              <p>Core imported/custom task details.</p>
+            </div>
               <div className="grid gap-3">
-                <Input label="Task title" value={details.taskDetails} onChange={(value) => updateTask({ taskDetails: value })} />
-                <Input label="Main objective" value={details.mainObjective} onChange={(value) => updateTask({ mainObjective: value })} />
+              <Input label="Task title" value={details.taskDetails} onChange={(value) => updateDraft({ taskDetails: value })} />
+              <Input label="Main objective" value={details.mainObjective} onChange={(value) => updateDraft({ mainObjective: value })} />
                 <div className="grid gap-3 md:grid-cols-2">
-                  <Input label="Workstream" value={details.workstream} onChange={(value) => updateTask({ workstream: value })} />
-                  <Input label="Responsible team" value={details.responsibleTeam} onChange={(value) => updateTask({ responsibleTeam: value })} />
-                  <Input label="Required equipment" value={details.requiredEquipment} onChange={(value) => updateTask({ requiredEquipment: value })} />
-                  <Input label="Testing required" value={details.testingRequired} onChange={(value) => updateTask({ testingRequired: value })} />
+                <Input label="Workstream" value={details.workstream} onChange={(value) => updateDraft({ workstream: value })} />
+                <Input label="Responsible team" value={details.responsibleTeam} onChange={(value) => updateDraft({ responsibleTeam: value })} />
+                <Input label="Required equipment" value={details.requiredEquipment} onChange={(value) => updateDraft({ requiredEquipment: value })} />
+                <Input label="Testing required" value={details.testingRequired} onChange={(value) => updateDraft({ testingRequired: value })} />
                 </div>
                 <label className="block">
                   <span className="field-label">Expected output</span>
-                  <textarea className="field mt-2 min-h-20" value={details.expectedOutput} onChange={(event) => updateTask({ expectedOutput: event.target.value })} />
+                <textarea className="field mt-2 min-h-20" value={details.expectedOutput} onChange={(event) => updateDraft({ expectedOutput: event.target.value })} />
                 </label>
                 <label className="block">
                   <span className="field-label">Local follow-up questions</span>
-                  <textarea className="field mt-2 min-h-20" value={details.followUpQuestions} onChange={(event) => updateTask({ followUpQuestions: event.target.value })} />
+                <textarea className="field mt-2 min-h-20" value={details.followUpQuestions} onChange={(event) => updateDraft({ followUpQuestions: event.target.value })} />
                 </label>
               </div>
-            </Panel>
+          </section>
 
-            <Panel title="Assignments">
+          <section className="drawer-form-section">
+            <div className="drawer-section-heading">
+              <h3>Assignments</h3>
+              <p>Assigned report users and verifiers.</p>
+            </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <p className="field-label">Report users</p>
                   <div className="mt-2 grid gap-2">
                     {areaUsers.map((profile) => (
                       <label key={profile.id} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-2 text-sm font-bold text-[var(--color-primary)]">
-                        <input type="checkbox" checked={task.assignedProfileIds.includes(profile.id)} onChange={(event) => toggleProfile("assignedProfileIds", profile.id, event.target.checked)} />
+                      <input type="checkbox" checked={draft.assignedProfileIds.includes(profile.id)} onChange={(event) => toggleProfile("assignedProfileIds", profile.id, event.target.checked)} />
                         {profile.fullName}
                       </label>
                     ))}
@@ -1157,7 +1181,7 @@ function LiveTaskEditorModal({
                   <div className="mt-2 grid gap-2">
                     {areaVerifiers.map((profile) => (
                       <label key={profile.id} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-2 text-sm font-bold text-[var(--color-primary)]">
-                        <input type="checkbox" checked={task.assignedVerifierIds.includes(profile.id)} onChange={(event) => toggleProfile("assignedVerifierIds", profile.id, event.target.checked)} />
+                      <input type="checkbox" checked={draft.assignedVerifierIds.includes(profile.id)} onChange={(event) => toggleProfile("assignedVerifierIds", profile.id, event.target.checked)} />
                         {profile.fullName}
                       </label>
                     ))}
@@ -1165,45 +1189,49 @@ function LiveTaskEditorModal({
                   </div>
                 </div>
               </div>
-            </Panel>
-          </div>
+          </section>
 
-          <div className="space-y-4">
-            <Panel title="Live Settings">
-              <div className="grid gap-3">
-                <Select label="Area" value={task.areaId} onChange={(value) => updateTask({ areaId: value })} options={state.areas.map((area) => ({ label: area.name, value: area.id }))} />
-                <Select label="Task type" value={task.taskType} onChange={(value) => updateTask({ taskType: value as LiveTask["taskType"] })} options={[...TASK_TYPES]} />
-                <Input label="Prep day" value={String(task.prepDay)} onChange={(value) => {
+          <section className="drawer-form-section">
+            <div className="drawer-section-heading">
+              <h3>Live Settings</h3>
+              <p>Area, dates, quantity, and verification rules.</p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              <Select label="Area" value={draft.areaId} onChange={(value) => updateDraft({ areaId: value })} options={state.areas.map((area) => ({ label: area.name, value: area.id }))} />
+              <Select label="Task type" value={draft.taskType} onChange={(value) => updateDraft({ taskType: value as LiveTask["taskType"] })} options={[...TASK_TYPES]} />
+              <Input label="Prep day" value={String(draft.prepDay)} onChange={(value) => {
                   const prepDay = Math.min(20, Math.max(1, Number(value || 1)));
-                  updateTask({ prepDay });
+                updateDraft({ prepDay });
                 }} type="number" />
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Input label="Start date" value={task.startDate} onChange={(value) => updateTask({ startDate: value })} type="date" />
-                  <Input label="Due date" value={task.dueDate} onChange={(value) => updateTask({ dueDate: value })} type="date" />
-                </div>
-                <Select label="Priority" value={task.priority} onChange={(value) => {
-                  updateTask({ priority: value as LiveTask["priority"] });
+              <Input label="Start date" value={draft.startDate} onChange={(value) => updateDraft({ startDate: value })} type="date" />
+              <Input label="Due date" value={draft.dueDate} onChange={(value) => updateDraft({ dueDate: value })} type="date" />
+              <Select label="Priority" value={draft.priority} onChange={(value) => {
+                updateDraft({ priority: value as LiveTask["priority"] });
                 }} options={priorityOptions} />
-                {task.taskType === "Quantity-Based Task" ? (
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Input label="Required quantity" value={String(task.requiredQuantity || "")} onChange={(value) => updateTask({ requiredQuantity: Number(value || 0) })} type="number" />
-                    <Select label="Unit" value={task.unit || "Item"} onChange={(value) => updateTask({ unit: value })} options={unitOptions} />
-                  </div>
-                ) : null}
-                <Input label="Evidence note" value={task.evidenceNote || ""} onChange={(value) => updateTask({ evidenceNote: value })} />
-                <Select label="Verification rule" value={task.verificationRule} onChange={(value) => updateTask({ verificationRule: value as LiveTask["verificationRule"] })} options={[{ label: "One verifier enough", value: "one_verifier" }, { label: "All verifiers required", value: "all_verifiers" }, { label: "Sequential", value: "sequential" }]} />
-                <label className="flex items-center gap-2 text-sm font-bold text-[var(--color-primary)]">
-                  <input type="checkbox" checked={task.verificationRequired} onChange={(event) => updateTask({ verificationRequired: event.target.checked })} />
+              {draft.taskType === "Quantity-Based Task" ? (
+                <>
+                  <Input label="Required quantity" value={String(draft.requiredQuantity || "")} onChange={(value) => updateDraft({ requiredQuantity: Number(value || 0) })} type="number" />
+                  <Select label="Unit" value={draft.unit || "Item"} onChange={(value) => updateDraft({ unit: value })} options={unitOptions} />
+                </>
+              ) : null}
+              <Input label="Evidence note" value={draft.evidenceNote || ""} onChange={(value) => updateDraft({ evidenceNote: value })} />
+              <Select label="Verification rule" value={draft.verificationRule} onChange={(value) => updateDraft({ verificationRule: value as LiveTask["verificationRule"] })} options={[{ label: "One verifier enough", value: "one_verifier" }, { label: "All verifiers required", value: "all_verifiers" }, { label: "Sequential", value: "sequential" }]} />
+              <label className="drawer-toggle-field">
+                <input type="checkbox" checked={draft.verificationRequired} onChange={(event) => updateDraft({ verificationRequired: event.target.checked })} />
                   Verification required
                 </label>
-                <label className="flex items-center gap-2 text-sm font-bold text-[var(--color-primary)]">
-                  <input type="checkbox" checked={task.active} onChange={(event) => updateTask({ active: event.target.checked })} />
+              <label className="drawer-toggle-field">
+                <input type="checkbox" checked={draft.active} onChange={(event) => updateDraft({ active: event.target.checked })} />
                   Active
                 </label>
               </div>
-            </Panel>
-          </div>
+          </section>
         </div>
+
+        <footer className="task-drawer-footer">
+          <button className="btn-secondary" onClick={close}>Cancel</button>
+          <button className="btn-primary" onClick={saveTask}>Save Changes</button>
+        </footer>
       </section>
     </div>
   );
