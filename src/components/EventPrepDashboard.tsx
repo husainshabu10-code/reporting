@@ -1239,9 +1239,10 @@ function TaskSummaryRow({ state, task, update, openTask }: { state: EventPrepSta
         : update?.status === "In Progress"
           ? 45
           : 0;
+  const isOverdue = Boolean(task.dueDate && task.dueDate < todayIso() && update?.verificationStatus !== "Verified Completed");
 
   return (
-    <button className="task-summary-row" onClick={() => openTask(task.id)} title="Open task detail drawer">
+    <button className={`task-summary-row ${isOverdue ? "is-overdue" : ""}`} onClick={() => openTask(task.id)} title="Open task detail drawer">
       <span className="task-summary-title-cell">
         <span className="task-summary-title">{details.taskDetails}</span>
         <span className="task-summary-meta">{areaName(state, task.areaId)} | {details.workstream || "General"} | {task.taskType}</span>

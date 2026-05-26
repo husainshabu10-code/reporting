@@ -1190,6 +1190,22 @@ table {
     border-radius: 0 0 0.48rem 0.48rem;
   }
 
+  .task-summary-row.is-overdue {
+    border-color: rgba(122, 31, 43, 0.34);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(122, 31, 43, 0.055));
+    box-shadow:
+      inset 4px 0 0 rgba(122, 31, 43, 0.62),
+      inset 0 1px 0 rgba(255, 255, 255, 0.86),
+      0 0 0 1px rgba(122, 31, 43, 0.055),
+      0 0 18px rgba(122, 31, 43, 0.12);
+  }
+
+  .task-summary-row.is-overdue .task-summary-muted {
+    color: var(--color-important);
+    font-weight: 900;
+  }
+
   .task-summary-head > span,
   .task-summary-row > span {
     min-height: 100%;
@@ -1210,6 +1226,17 @@ table {
       inset 0 1px 0 rgba(255, 255, 255, 0.95),
       0 5px 14px rgba(11, 79, 58, 0.035);
     transform: none;
+  }
+
+  .task-summary-row.is-overdue:hover {
+    border-color: rgba(122, 31, 43, 0.48);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(122, 31, 43, 0.08));
+    box-shadow:
+      inset 4px 0 0 var(--color-important),
+      inset 0 1px 0 rgba(255, 255, 255, 0.95),
+      0 0 0 1px rgba(122, 31, 43, 0.08),
+      0 0 24px rgba(122, 31, 43, 0.16);
   }
 
   .task-summary-title-cell {
