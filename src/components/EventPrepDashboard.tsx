@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   BarChart3,
   Bell,
@@ -1266,6 +1267,7 @@ function LiveTaskEditorModal({
   close: () => void;
   showToast: ShowToast;
 }) {
+  const [mounted, setMounted] = useState(false);
   const [draft, setDraft] = useState<LiveTask>(task);
   const details = taskDetails(state, draft);
   const priorityOptions = activeOptions(state, "Priority options", PRIORITY_OPTIONS);
@@ -1282,6 +1284,9 @@ function LiveTaskEditorModal({
   useEffect(() => {
     setDraft(task);
   }, [task.id]);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -1312,7 +1317,7 @@ function LiveTaskEditorModal({
     updateDraft({ [field]: checked ? unique([...current, profileId]) : current.filter((idValue) => idValue !== profileId) } as Partial<LiveTask>);
   };
 
-  return (
+  const drawer = (
     <div className="task-drawer-overlay" onMouseDown={close}>
       <section className="task-drawer motion-drawer" onMouseDown={(event) => event.stopPropagation()} onWheel={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Task detail edit">
         <header className="task-drawer-header">
@@ -1427,6 +1432,9 @@ function LiveTaskEditorModal({
       </section>
     </div>
   );
+
+  if (!mounted) return null;
+  return createPortal(drawer, document.body);
 }
 
 function ZonesAreasTab({ state, updateState, showToast }: { state: EventPrepState; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
