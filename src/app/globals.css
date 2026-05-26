@@ -1188,14 +1188,20 @@ table {
   .task-summary-edit {
     align-self: center;
     justify-self: center;
-    min-height: 2rem !important;
-    border-radius: 999px;
-    border: 1px solid var(--color-border);
-    background: var(--color-accent-light);
+    min-height: auto !important;
+    border: 0;
+    background: transparent;
     color: var(--color-primary);
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 900;
-    padding: 0.42rem 0.7rem !important;
+    opacity: 0.7;
+    padding: 0 !important;
+    text-decoration: underline;
+    text-underline-offset: 0.18rem;
+  }
+
+  .task-summary-row:hover .task-summary-edit {
+    opacity: 1;
   }
 
   .task-drawer-overlay {
