@@ -91,9 +91,27 @@ type AdminTab =
 type UserTab = "Daily Report" | "My Area" | "Requests" | "Profile / Access";
 type AnyTab = AdminTab | UserTab;
 type TaskView = "all" | "today" | "pending" | "issue" | "correction" | "overdue";
+type DashboardChartKind = "Progress bars" | "Compact bars" | "Donut chart" | "Score cards";
+type AttentionChartKind = "Score cards" | "Compact list";
+type DashboardChartSettings = {
+  zoneType: DashboardChartKind;
+  area: DashboardChartKind;
+  day: DashboardChartKind;
+  workstream: DashboardChartKind;
+  attention: AttentionChartKind;
+};
+type PublicAreaOption = { id: string; name: string; zoneName: string };
 type ToastTone = "success" | "info" | "warning" | "error";
 type ToastMessage = { id: string; title: string; message?: string; tone: ToastTone };
 type ShowToast = (title: string, message?: string, tone?: ToastTone) => void;
+
+const DEFAULT_DASHBOARD_CHARTS: DashboardChartSettings = {
+  zoneType: "Progress bars",
+  area: "Progress bars",
+  day: "Compact bars",
+  workstream: "Progress bars",
+  attention: "Score cards"
+};
 
 const ADMIN_TABS: AdminTab[] = [
   "Dashboard",
@@ -120,6 +138,8 @@ export default function EventPrepDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [presentationMode, setPresentationMode] = useState(false);
+  const [chartSettingsOpen, setChartSettingsOpen] = useState(false);
+  const [dashboardCharts, setDashboardCharts] = useState<DashboardChartSettings>(DEFAULT_DASHBOARD_CHARTS);
   const [syncStatus, setSyncStatus] = useState("Loading");
   const [loginId, setLoginId] = useState("");
   const [password, setPassword] = useState("");
@@ -393,7 +413,7 @@ export default function EventPrepDashboard() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {activeTab === "Dashboard" ? <button className="top-action-btn" onClick={() => showToast("Dashboard settings", "Dashboard cards are using verified-completion data only.", "info")}><Settings2 size={16} /> Chart Settings</button> : null}
+                {activeTab === "Dashboard" ? <button className="top-action-btn" onClick={() => setChartSettingsOpen(true)}><Settings2 size={16} /> Chart Settings</button> : null}
                 {activeTab === "Dashboard" ? <button className="top-action-btn" onClick={() => setPresentationMode(true)}><Presentation size={16} /> Presentation</button> : null}
                 {isAdmin ? <button className="top-action-btn" onClick={() => openWorkspace("Zones / Areas", "Area setup opened", "Create or update event areas from this tab.")}><Plus size={16} /> Add Area</button> : null}
                 {isAdmin ? <button className="top-action-btn top-action-primary" onClick={() => openWorkspace("Master Tasks", "Task setup opened", "Add a custom live task or use a reference suggestion.")}><Plus size={16} /> Add Task</button> : null}
@@ -406,7 +426,7 @@ export default function EventPrepDashboard() {
 
           <div className="animate-fade-in mx-auto max-w-[96rem] p-4 lg:p-6">
             <NotificationCenter state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} />
-            {activeTab === "Dashboard" ? <DashboardTab state={state} currentProfile={currentProfile} /> : null}
+            {activeTab === "Dashboard" ? <DashboardTab state={state} currentProfile={currentProfile} chartSettings={dashboardCharts} /> : null}
             {activeTab === "Daily Reports" ? <DailyReportsTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
             {activeTab === "Master Tasks" ? <MasterTasksTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
             {activeTab === "Zones / Areas" ? <ZonesAreasTab state={state} updateState={updateState} showToast={showToast} /> : null}
@@ -421,12 +441,20 @@ export default function EventPrepDashboard() {
           </div>
         </section>
       </div>
+      {chartSettingsOpen ? (
+        <ChartSettingsModal
+          settings={dashboardCharts}
+          onChange={setDashboardCharts}
+          onClose={() => setChartSettingsOpen(false)}
+          showToast={showToast}
+        />
+      ) : null}
       <ToastStack toasts={toasts} dismissToast={dismissToast} />
     </main>
   );
 }
 
-function DashboardTab({ state, currentProfile, presentationMode = false }: { state: EventPrepState; currentProfile: Profile; presentationMode?: boolean }) {
+function DashboardTab({ state, currentProfile, presentationMode = false, chartSettings = DEFAULT_DASHBOARD_CHARTS }: { state: EventPrepState; currentProfile: Profile; presentationMode?: boolean; chartSettings?: DashboardChartSettings }) {
   const allowedAreaIds = dashboardAllowedAreaIds(state, currentProfile);
   const metrics = useMemo(() => buildMetricsForAreas(state, allowedAreaIds), [state, allowedAreaIds.join("|")]);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -470,6 +498,18 @@ function DashboardTab({ state, currentProfile, presentationMode = false }: { sta
     const verified = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
     return { label: `Day ${day}`, value: percent(verified, tasks.length), helper: `${verified}/${tasks.length} verified` };
   }).filter((row) => row.helper !== "0/0 verified");
+  const areaProgressRows = allowedAreas.map((area) => {
+    if (zoneFilter !== "All" && area.zoneTypeId !== zoneFilter) return null;
+    if (areaFilter !== "All" && area.id !== areaFilter) return null;
+    const tasks = scopedTasks.filter((task) => task.areaId === area.id);
+    const verified = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
+    return { label: area.name, value: percent(verified, tasks.length), helper: zoneName(state, area.zoneTypeId) };
+  }).filter((row): row is { label: string; value: number; helper: string } => Boolean(row));
+  const workstreamRows = unique(scopedTasks.map((task) => taskDetails(state, task).workstream).filter(Boolean)).map((workstream) => {
+    const tasks = scopedTasks.filter((task) => taskDetails(state, task).workstream === workstream);
+    const verified = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
+    return { label: workstream, value: percent(verified, tasks.length), helper: `${tasks.length} live tasks` };
+  });
 
   return (
     <div className="space-y-5">
@@ -508,45 +548,103 @@ function DashboardTab({ state, currentProfile, presentationMode = false }: { sta
 
       <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
         <Panel title="Zone Type Progress" action={<Badge>Verified completed only</Badge>}>
-          <DashboardBarChart rows={zoneRows.map((row) => ({ label: row.label, value: row.percent, helper: `${row.verified}/${row.total} tasks` }))} />
+          <DashboardChartVisual rows={zoneRows.map((row) => ({ label: row.label, value: row.percent, helper: `${row.verified}/${row.total} tasks` }))} type={chartSettings.zoneType} />
         </Panel>
         <Panel title="Attention Required">
-          <div className="grid gap-2 sm:grid-cols-2">
-            {attention.map((item) => (
-              <div key={item.label} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-                <p className="text-xl font-black text-[var(--color-primary)]">{item.count}</p>
-                <p className="text-xs font-bold text-[var(--color-text-muted)]">{item.label}</p>
-              </div>
-            ))}
-          </div>
+          <DashboardAttentionVisual rows={attention} type={chartSettings.attention} />
         </Panel>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
         <Panel title="Area-Wise Progress">
-          <div className="space-y-3">
-            {allowedAreas.map((area) => {
-              if (zoneFilter !== "All" && area.zoneTypeId !== zoneFilter) return null;
-              if (areaFilter !== "All" && area.id !== areaFilter) return null;
-              const tasks = scopedTasks.filter((task) => task.areaId === area.id);
-              const verified = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
-              return <ProgressRow key={area.id} label={area.name} value={percent(verified, tasks.length)} helper={zoneName(state, area.zoneTypeId)} />;
-            })}
-          </div>
+          <DashboardChartVisual rows={areaProgressRows} type={chartSettings.area} />
         </Panel>
         <Panel title="Day-Wise Progress">
-          <DashboardBarChart rows={dayRows} compact />
+          <DashboardChartVisual rows={dayRows} type={chartSettings.day} />
         </Panel>
         <Panel title="Workstream Progress">
-          <div className="space-y-3">
-            {unique(scopedTasks.map((task) => taskDetails(state, task).workstream).filter(Boolean)).map((workstream) => {
-              const tasks = scopedTasks.filter((task) => taskDetails(state, task).workstream === workstream);
-              const verified = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
-              return <ProgressRow key={workstream} label={workstream} value={percent(verified, tasks.length)} helper={`${tasks.length} live tasks`} />;
-            })}
-          </div>
+          <DashboardChartVisual rows={workstreamRows} type={chartSettings.workstream} />
         </Panel>
       </div>
+    </div>
+  );
+}
+
+function DashboardChartVisual({ rows, type }: { rows: Array<{ label: string; value: number; helper: string }>; type: DashboardChartKind }) {
+  const visibleRows = rows.filter((row) => row.label);
+  if (!visibleRows.length) return <EmptyState title="No chart data" body="Adjust filters or add live tasks to populate this chart." />;
+  if (type === "Donut chart") {
+    const colors = ["#0B4F3A", "#2E7D5B", "#C9A227", "#F3E7C3", "#7A1F2B"];
+    return <DonutChart rows={visibleRows.map((row, index) => ({ label: row.label, value: row.value, color: colors[index % colors.length] }))} />;
+  }
+  if (type === "Score cards") {
+    return (
+      <div className="grid gap-2 sm:grid-cols-2">
+        {visibleRows.map((row) => (
+          <div key={row.label} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+            <p className="text-xl font-black text-[var(--color-primary)]">{row.value}%</p>
+            <p className="mt-1 text-sm font-black text-[var(--color-primary)]">{row.label}</p>
+            <p className="mt-1 text-xs font-bold text-[var(--color-text-muted)]">{row.helper}</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (type === "Compact bars") return <DashboardBarChart rows={visibleRows} compact />;
+  return <div className="space-y-3">{visibleRows.map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} helper={row.helper} />)}</div>;
+}
+
+function DashboardAttentionVisual({ rows, type }: { rows: ReturnType<typeof buildAttention>; type: AttentionChartKind }) {
+  if (!rows.length) return <EmptyState title="No attention items" body="Nothing needs attention in this view." />;
+  if (type === "Compact list") {
+    return (
+      <div className="report-attention-list">
+        {rows.map((item) => <div key={item.label}><span>{item.label}</span><strong>{item.count}</strong></div>)}
+      </div>
+    );
+  }
+  return (
+    <div className="grid gap-2 sm:grid-cols-2">
+      {rows.map((item) => (
+        <div key={item.label} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+          <p className="text-xl font-black text-[var(--color-primary)]">{item.count}</p>
+          <p className="text-xs font-bold text-[var(--color-text-muted)]">{item.label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ChartSettingsModal({ settings, onChange, onClose, showToast }: { settings: DashboardChartSettings; onChange: (settings: DashboardChartSettings) => void; onClose: () => void; showToast: ShowToast }) {
+  const chartTypes: DashboardChartKind[] = ["Progress bars", "Compact bars", "Donut chart", "Score cards"];
+  const update = <K extends keyof DashboardChartSettings>(key: K, value: DashboardChartSettings[K]) => onChange({ ...settings, [key]: value });
+  const apply = () => {
+    showToast("Chart settings applied", "Dashboard charts now use your selected visual types.", "success");
+    onClose();
+  };
+  return (
+    <div className="settings-modal-overlay" onMouseDown={onClose}>
+      <section className="settings-modal motion-modal" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Dashboard chart settings">
+        <header className="settings-modal-header">
+          <div>
+            <p className="text-xs font-black uppercase text-[var(--color-accent)]">Dashboard</p>
+            <h2>Chart Settings</h2>
+            <p>Choose how each dashboard chart should look. The data and calculations stay the same.</p>
+          </div>
+          <button className="mini-icon-btn" onClick={onClose} aria-label="Close chart settings"><X size={18} /></button>
+        </header>
+        <div className="settings-modal-body">
+          <Select label="Zone Type Progress" value={settings.zoneType} onChange={(value) => update("zoneType", value as DashboardChartKind)} options={chartTypes} />
+          <Select label="Area-Wise Progress" value={settings.area} onChange={(value) => update("area", value as DashboardChartKind)} options={chartTypes} />
+          <Select label="Day-Wise Progress" value={settings.day} onChange={(value) => update("day", value as DashboardChartKind)} options={chartTypes} />
+          <Select label="Workstream Progress" value={settings.workstream} onChange={(value) => update("workstream", value as DashboardChartKind)} options={chartTypes} />
+          <Select label="Attention Required" value={settings.attention} onChange={(value) => update("attention", value as AttentionChartKind)} options={["Score cards", "Compact list"]} />
+        </div>
+        <footer className="settings-modal-footer">
+          <button className="btn-secondary" onClick={() => onChange(DEFAULT_DASHBOARD_CHARTS)}>Reset</button>
+          <button className="btn-primary" onClick={apply}>Apply Settings</button>
+        </footer>
+      </section>
     </div>
   );
 }
@@ -566,27 +664,115 @@ function LoginScreen({
   setPassword: (value: string) => void;
   signIn: () => void;
 }) {
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestName, setRequestName] = useState("");
+  const [requestPost, setRequestPost] = useState("");
+  const [requestPhone, setRequestPhone] = useState("");
+  const [requestNotes, setRequestNotes] = useState("");
+  const [requestAreas, setRequestAreas] = useState<string[]>([]);
+  const [areaOptions, setAreaOptions] = useState<PublicAreaOption[]>([]);
+  const [requestMessage, setRequestMessage] = useState("");
+
+  useEffect(() => {
+    fetch("/api/event-prep/access-request")
+      .then((response) => response.json())
+      .then((json) => setAreaOptions(Array.isArray(json.areas) ? json.areas : []))
+      .catch(() => setAreaOptions([]));
+  }, []);
+
+  const toggleAreaRequest = (areaId: string, checked: boolean) => {
+    setRequestAreas((current) => checked ? unique([...current, areaId]) : current.filter((idValue) => idValue !== areaId));
+  };
+  const submitAccessRequest = async () => {
+    try {
+      setRequestMessage("Submitting access request...");
+      const response = await fetch("/api/event-prep/access-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: requestName,
+          loginId,
+          post: requestPost,
+          phone: requestPhone,
+          areaIds: requestAreas,
+          notes: requestNotes
+        })
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(String(json.error || "Could not submit access request."));
+      setRequestMessage("Access request submitted. An admin can review it inside Requests.");
+      setRequestName("");
+      setRequestPost("");
+      setRequestPhone("");
+      setRequestNotes("");
+      setRequestAreas([]);
+    } catch (error) {
+      setRequestMessage(readError(error, "Unable to submit access request."));
+    }
+  };
+
   return (
-    <main className="min-h-screen bg-[var(--color-bg)] p-4 text-[var(--color-text)]">
-      <div className="mx-auto flex min-h-[80vh] max-w-md items-center justify-center">
-        <section className="w-full rounded-lg border border-[var(--color-border)] bg-white p-5 shadow-soft">
-          <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--color-accent)]">ASHARA MUBARAKAH</p>
-          <h1 className="mt-2 text-2xl font-black text-[var(--color-primary)]">IT Event Preparation</h1>
-          <p className="mt-2 text-sm text-[var(--color-text-muted)]">Sign in with the login ID and password created by an admin.</p>
-          <label className="mt-4 block">
+    <main className="login-page text-[var(--color-text)]">
+      <div className="login-shell">
+        <section className="login-card">
+          <p className="login-eyebrow">ASHARA MUBARAKAH</p>
+          <h1>IT Event Preparation</h1>
+          <p className="login-helper">Sign in with your Login ID and password.</p>
+          <label className="mt-5 block">
             <span className="field-label">Login ID / Email</span>
-            <input className="field mt-2" type="email" value={loginId} onChange={(event) => setLoginId(event.target.value)} placeholder="you@example.com" />
+            <input className="field mt-2 bg-white/70" type="email" value={loginId} onChange={(event) => setLoginId(event.target.value)} placeholder="you@example.com" />
           </label>
           <label className="mt-3 block">
             <span className="field-label">Password</span>
-            <input className="field mt-2" type="password" value={password} onChange={(event) => setPassword(event.target.value)} onKeyDown={(event) => {
-              if (event.key === "Enter") signIn();
-            }} />
+            <span className="login-password-field mt-2">
+              <input value={password} type={passwordVisible ? "text" : "password"} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" onKeyDown={(event) => {
+                if (event.key === "Enter") signIn();
+              }} />
+              <button type="button" onClick={() => setPasswordVisible((current) => !current)} aria-label={passwordVisible ? "Hide password" : "Show password"}>
+                <Eye size={15} />
+              </button>
+            </span>
           </label>
-          <button className="btn-primary mt-3 w-full" onClick={signIn}>
+          <div className="mt-3 flex items-center justify-between gap-3 text-xs font-bold text-[var(--color-primary)]">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" />
+              Remember me
+            </label>
+            <button className="login-link" type="button" onClick={() => setRequestMessage("Ask the Super Admin to reset your password from Users & Access.")}>Forgot password?</button>
+          </div>
+          <button className="btn-primary mt-4 w-full justify-center" onClick={signIn}>
             <KeyRound size={17} /> Sign In
           </button>
+          <button className="login-access-toggle" type="button" onClick={() => setRequestOpen((current) => !current)}>
+            {requestOpen ? "Hide access request" : "Need access? Request from admin"}
+          </button>
           {authMessage ? <p className="mt-3 text-sm font-bold text-[var(--color-primary)]">{authMessage}</p> : null}
+          {requestMessage ? <p className="mt-3 rounded-lg bg-white/55 p-2 text-xs font-bold text-[var(--color-primary)]">{requestMessage}</p> : null}
+          {requestOpen ? (
+            <div className="login-access-panel">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input label="Name" value={requestName} onChange={setRequestName} />
+                <Input label="Post" value={requestPost} onChange={setRequestPost} placeholder="Area Coordinator" />
+                <Input label="Phone number" value={requestPhone} onChange={setRequestPhone} />
+                <Input label="Notes" value={requestNotes} onChange={setRequestNotes} placeholder="Why access is needed" />
+              </div>
+              <div className="mt-3">
+                <p className="field-label">Area access requested</p>
+                <div className="login-area-grid mt-2">
+                  {areaOptions.map((area) => (
+                    <label key={area.id}>
+                      <input type="checkbox" checked={requestAreas.includes(area.id)} onChange={(event) => toggleAreaRequest(area.id, event.target.checked)} />
+                      <span>{area.name}<small>{area.zoneName}</small></span>
+                    </label>
+                  ))}
+                  {!areaOptions.length ? <p className="text-xs font-bold text-[var(--color-text-muted)]">Area list is unavailable. Check Supabase server settings.</p> : null}
+                </div>
+              </div>
+              <button className="btn-secondary mt-3 w-full justify-center" type="button" onClick={submitAccessRequest}>Submit Access Request</button>
+            </div>
+          ) : null}
+          <p className="login-trust">Secure - Reliable - Trusted</p>
         </section>
       </div>
     </main>
@@ -886,7 +1072,7 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
             options={[
               { label: "Start blank custom task", value: "" },
               ...referenceTemplates.map((template) => ({
-                label: `Day ${template.day} - ${template.taskDetails.length > 70 ? `${template.taskDetails.slice(0, 70)}...` : template.taskDetails}`,
+                label: template.taskDetails.length > 90 ? `${template.taskDetails.slice(0, 90)}...` : template.taskDetails,
                 value: template.id
               }))
             ]}
@@ -910,7 +1096,7 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
           <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-accent-light)]/60 p-3 text-sm">
             <p className="font-black text-[var(--color-primary)]">Reference suggestion preview</p>
             <p className="mt-1 text-[var(--color-text)]">{selectedSuggestion.taskDetails}</p>
-            <p className="mt-1 text-xs font-bold text-[var(--color-text-muted)]">{selectedSuggestion.workstream || "General"} | {selectedSuggestion.responsibleTeam || "No team specified"} | Day {selectedSuggestion.day}</p>
+            <p className="mt-1 text-xs font-bold text-[var(--color-text-muted)]">{selectedSuggestion.workstream || "General"} | {selectedSuggestion.responsibleTeam || "No team specified"}</p>
           </div>
         ) : null}
         <button className="btn-primary mt-3" onClick={addCustomTask}>
@@ -1105,6 +1291,13 @@ function LiveTaskEditorModal({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [close]);
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
 
   const updateDraft = (patch: Partial<LiveTask>) => setDraft((current) => ({ ...current, ...patch }));
   const saveTask = () => {
@@ -1122,7 +1315,7 @@ function LiveTaskEditorModal({
 
   return (
     <div className="task-drawer-overlay" onMouseDown={close}>
-      <section className="task-drawer motion-drawer" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Task detail edit">
+      <section className="task-drawer motion-drawer" onMouseDown={(event) => event.stopPropagation()} onWheel={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Task detail edit">
         <header className="task-drawer-header">
           <div>
             <p className="text-xs font-black uppercase text-[var(--color-accent)]">Task Detail / Edit</p>
@@ -2968,11 +3161,6 @@ function taskProgressPercent(task: LiveTask, update?: TaskUpdate) {
   if (update?.status === "In Progress") return 45;
   if (update?.status === "Issue Found") return 25;
   return 0;
-}
-
-function prepDayForDate(preparationStartDate: string, date: string) {
-  const diff = Math.floor((new Date(`${date}T00:00:00`).getTime() - new Date(`${preparationStartDate}T00:00:00`).getTime()) / 86400000) + 1;
-  return Math.min(20, Math.max(1, diff || 1));
 }
 
 function uniqueBy<T>(items: T[], getKey: (item: T) => string) {

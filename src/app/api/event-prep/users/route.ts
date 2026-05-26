@@ -48,6 +48,7 @@ async function createUser(db: ServerDb, actor: Profile & { authUserId?: string }
   if (isAreaAdmin && !(await canManageArea(db, actor.id, body.areaId))) throw new Error("Area Admin can only create users for assigned areas.");
 
   const email = body.email.trim().toLowerCase();
+  const existingProfile = await getProfileByEmail(db, email);
   const temporaryPassword = body.password?.trim() || generateTemporaryPassword();
   const { data, error } = await db.auth.admin.createUser({
     email,
@@ -59,7 +60,7 @@ async function createUser(db: ServerDb, actor: Profile & { authUserId?: string }
 
   const role = isAreaAdmin ? "report_user" : body.role;
   const profile: Profile = {
-    id: data.user.id,
+    id: existingProfile?.id || data.user.id,
     email,
     fullName: body.fullName.trim(),
     role,
@@ -150,6 +151,12 @@ async function getProfile(db: ServerDb, id: string, email?: string) {
     error = fallback.error;
     if (error) throw new Error(error.message);
   }
+  return data ? profileFromRow(data as Record<string, unknown>) : null;
+}
+
+async function getProfileByEmail(db: ServerDb, email: string) {
+  const { data, error } = await db.from("profiles").select("*").eq("email", email.toLowerCase()).maybeSingle();
+  if (error) throw new Error(error.message);
   return data ? profileFromRow(data as Record<string, unknown>) : null;
 }
 

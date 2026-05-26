@@ -281,6 +281,158 @@ table {
 }
 
 @layer components {
+  .login-page {
+    min-height: 100dvh;
+    background-image:
+      linear-gradient(120deg, rgba(11, 79, 58, 0.20), rgba(250, 247, 239, 0.22)),
+      url("/ashara-login-bg.svg");
+    background-position: center;
+    background-size: cover;
+    padding: 1rem;
+  }
+
+  .login-shell {
+    display: flex;
+    min-height: calc(100dvh - 2rem);
+    align-items: center;
+    justify-content: center;
+  }
+
+  .login-card {
+    width: min(100%, 26.5rem);
+    border: 1px solid rgba(255, 255, 255, 0.62);
+    border-radius: 1.05rem;
+    background: rgba(255, 255, 255, 0.52);
+    padding: 1.45rem;
+    box-shadow: 0 28px 70px rgba(11, 79, 58, 0.22);
+    backdrop-filter: blur(18px) saturate(1.18);
+  }
+
+  .login-eyebrow {
+    color: var(--color-accent);
+    font-size: 0.68rem;
+    font-weight: 900;
+    letter-spacing: 0.18em;
+    text-align: center;
+  }
+
+  .login-card h1 {
+    margin-top: 0.45rem;
+    color: var(--color-primary);
+    font-size: 1.55rem;
+    font-weight: 900;
+    text-align: center;
+  }
+
+  .login-helper {
+    margin-top: 0.45rem;
+    color: var(--color-text-muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .login-password-field {
+    display: flex;
+    min-height: 2.75rem;
+    align-items: center;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.72);
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  .login-password-field:focus-within {
+    border-color: var(--color-secondary);
+    box-shadow: 0 0 0 2px rgba(46, 125, 91, 0.18);
+    transform: translateY(-1px);
+  }
+
+  .login-password-field input {
+    min-height: 2.75rem;
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    background: transparent;
+    padding: 0.5rem 0.75rem;
+    color: var(--color-text);
+    outline: none;
+  }
+
+  .login-password-field button {
+    min-height: 2.75rem;
+    width: 2.75rem;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+  }
+
+  .login-link,
+  .login-access-toggle {
+    border: 0;
+    background: transparent;
+    color: var(--color-primary);
+    font-weight: 800;
+  }
+
+  .login-access-toggle {
+    margin-top: 0.9rem;
+    min-height: auto;
+    width: 100%;
+    padding: 0.25rem;
+    text-align: center;
+    text-decoration: underline;
+    text-underline-offset: 0.2rem;
+  }
+
+  .login-access-panel {
+    margin-top: 0.9rem;
+    max-height: min(42vh, 25rem);
+    overflow-y: auto;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(232, 221, 197, 0.9);
+    background: rgba(255, 255, 255, 0.48);
+    padding: 0.85rem;
+    overscroll-behavior: contain;
+  }
+
+  .login-area-grid {
+    display: grid;
+    gap: 0.45rem;
+    max-height: 10rem;
+    overflow-y: auto;
+  }
+
+  .login-area-grid label {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    border-radius: 0.5rem;
+    border: 1px solid rgba(232, 221, 197, 0.92);
+    background: rgba(255, 255, 255, 0.58);
+    padding: 0.55rem;
+    color: var(--color-primary);
+    font-size: 0.8rem;
+    font-weight: 900;
+  }
+
+  .login-area-grid small {
+    display: block;
+    margin-top: 0.08rem;
+    color: var(--color-text-muted);
+    font-size: 0.68rem;
+    font-weight: 800;
+  }
+
+  .login-trust {
+    margin-top: 0.8rem;
+    color: rgba(31, 41, 51, 0.62);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-align: center;
+  }
+
   .app-sidebar {
     max-height: 100vh;
     overflow-y: auto;
@@ -1011,16 +1163,20 @@ table {
     justify-content: flex-end;
     background: rgba(31, 41, 51, 0.32);
     backdrop-filter: blur(5px);
+    overscroll-behavior: contain;
   }
 
   .task-drawer {
     display: flex;
-    height: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
     width: min(42rem, 100vw);
     flex-direction: column;
     border-left: 1px solid var(--color-border);
     background: var(--color-card);
     box-shadow: -24px 0 60px rgba(11, 79, 58, 0.16);
+    overflow: hidden;
+    overscroll-behavior: contain;
   }
 
   .task-drawer-header,
@@ -1043,7 +1199,9 @@ table {
 
   .task-drawer-body {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 1rem;
   }
 
@@ -1094,6 +1252,71 @@ table {
 
   .task-drawer-footer {
     bottom: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    border-top: 1px solid var(--color-border);
+    padding: 1rem;
+  }
+
+  .settings-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 95;
+    display: grid;
+    place-items: center;
+    background: rgba(31, 41, 51, 0.36);
+    padding: 1rem;
+    backdrop-filter: blur(5px);
+  }
+
+  .settings-modal {
+    width: min(34rem, 100%);
+    overflow: hidden;
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-border);
+    background: var(--color-card);
+    box-shadow: 0 28px 80px rgba(11, 79, 58, 0.22);
+  }
+
+  .settings-modal-header,
+  .settings-modal-footer {
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(12px);
+  }
+
+  .settings-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    border-bottom: 1px solid var(--color-border);
+    padding: 1.1rem;
+  }
+
+  .settings-modal-header h2 {
+    margin-top: 0.25rem;
+    color: var(--color-primary);
+    font-size: 1.35rem;
+    font-weight: 900;
+  }
+
+  .settings-modal-header p:not(:first-child) {
+    margin-top: 0.3rem;
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  .settings-modal-body {
+    display: grid;
+    gap: 0.9rem;
+    max-height: min(62vh, 32rem);
+    overflow-y: auto;
+    padding: 1.1rem;
+  }
+
+  .settings-modal-footer {
     display: flex;
     justify-content: flex-end;
     gap: 0.75rem;
