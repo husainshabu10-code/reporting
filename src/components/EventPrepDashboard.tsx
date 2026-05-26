@@ -1463,10 +1463,30 @@ function TaskCardList({
   showToast: ShowToast;
 }) {
   if (!tasks.length) return <EmptyState title="No tasks in this view" body="Change the task view filter or ask admin to apply task templates to this area." />;
+  const area = state.areas.find((item) => item.id === report.areaId);
+  const groupedTasks = tasks.reduce<Array<{ workstream: string; tasks: LiveTask[] }>>((groups, task) => {
+    const details = taskDetails(state, task);
+    const workstream = details.workstream || "General";
+    const existingGroup = groups.find((group) => group.workstream === workstream);
+    if (existingGroup) {
+      existingGroup.tasks.push(task);
+      return groups;
+    }
+    return [...groups, { workstream, tasks: [task] }];
+  }, []);
+
   return (
-    <div className="grid gap-3">
-      {tasks.map((task) => (
-        <TaskCard key={task.id} state={state} task={task} report={report} currentProfile={currentProfile} updateState={updateState} missing={missingIds.includes(task.id)} showToast={showToast} />
+    <div className="reference-task-section">
+      <div className="reference-area-heading">Area: {area?.name || "Selected Area"}</div>
+      {groupedTasks.map((group) => (
+        <section key={group.workstream} className="reference-workstream-group">
+          <div className="reference-workstream-heading">Workstream: {group.workstream}</div>
+          <div className="grid gap-3">
+            {group.tasks.map((task) => (
+              <TaskCard key={task.id} state={state} task={task} report={report} currentProfile={currentProfile} updateState={updateState} missing={missingIds.includes(task.id)} showToast={showToast} />
+            ))}
+          </div>
+        </section>
       ))}
     </div>
   );
@@ -1505,6 +1525,7 @@ function TaskCard({
   const previousUserUpdates = state.taskUpdates.filter((update) => update.updatedBy === currentProfile.id && update.id !== draft.id);
   const escalationSuggestions = uniquePeopleRows(previousUserUpdates.flatMap((update) => update.escalationPoints));
   const supportSuggestions = uniquePeopleRows(previousUserUpdates.flatMap((update) => update.supportingPersonnel));
+  const ownerLabel = draft.userRoleStanding || details.responsibleTeam || "Assigned team";
 
   useEffect(() => {
     setDraft(existing || createTaskUpdate(task, report, currentProfile.id, latest));
@@ -1585,90 +1606,98 @@ function TaskCard({
   const files = state.taskFiles.filter((file) => file.liveTaskId === task.id);
 
   return (
-    <article className={`rounded-lg border bg-white p-4 shadow-sm ${missing ? "border-[var(--color-important)]" : "border-[var(--color-border)]"}`}>
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge>Day {task.prepDay}</Badge>
-            <StatusBadge value={task.taskType} />
-            <StatusBadge value={draft.verificationStatus} />
+    <article className={`reference-task-card ${missing ? "reference-task-card-missing" : ""}`}>
+      <div className="reference-task-scroll">
+        <div className="reference-task-grid reference-task-header-row">
+          <span>Task</span>
+          <span>Status</span>
+          <span>Verification</span>
+          <span>Priority</span>
+          <span>Task Type</span>
+          <span>Ownership</span>
+        </div>
+        <div className="reference-task-grid reference-task-data-row">
+          <div className="reference-task-cell">
+            <p className="reference-task-title">{details.taskDetails}</p>
+            <p className="reference-task-meta">Day {task.prepDay} | Due {task.dueDate || "Not set"} | {details.expectedOutput || "Expected output not specified"}</p>
+            {draft.correctionComment ? <p className="mt-2 rounded-lg bg-[#7A1F2B]/10 p-2 text-xs font-black text-[var(--color-important)]">Correction: {draft.correctionComment}</p> : null}
           </div>
-          <h3 className="mt-2 text-base font-black text-[var(--color-primary)]">{details.taskDetails}</h3>
-          <p className="mt-1 text-sm text-[var(--color-text-muted)]">{[details.workstream, details.expectedOutput].filter(Boolean).join(" | ")}</p>
-          {draft.correctionComment ? <p className="mt-2 rounded-lg bg-[#7A1F2B]/10 p-2 text-sm font-bold text-[var(--color-important)]">Correction: {draft.correctionComment}</p> : null}
-        </div>
-        <div className="text-sm text-[var(--color-text-muted)]">
-          <p>Due: <strong>{task.dueDate}</strong></p>
-          <p>Priority: <strong>{task.priority}</strong></p>
+          <div className="reference-task-cell"><StatusBadge value={draft.status} /></div>
+          <div className="reference-task-cell"><StatusBadge value={draft.verificationStatus} /></div>
+          <div className="reference-task-cell"><StatusBadge value={task.priority} /></div>
+          <div className="reference-task-cell"><StatusBadge value={task.taskType} /></div>
+          <div className="reference-task-cell"><span className="reference-soft-pill">{ownerLabel}</span></div>
         </div>
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <MiniStat label="Workstream" value={details.workstream || "General"} />
-        <MiniStat label="Responsible" value={details.responsibleTeam || "Not assigned"} />
-        <MiniStat label="Expected Output" value={details.expectedOutput || "Not specified"} />
-        <MiniStat label="Equipment" value={details.requiredEquipment || "Not specified"} />
-      </div>
-
-      <details className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-        <summary className="cursor-pointer text-sm font-black text-[var(--color-primary)]">View task details</summary>
-        <div className="mt-3 grid gap-3 text-sm text-[var(--color-text-muted)] md:grid-cols-2">
-          <p><strong className="text-[var(--color-primary)]">Objective:</strong> {details.mainObjective || "Not specified"}</p>
-          <p><strong className="text-[var(--color-primary)]">Testing:</strong> {details.testingRequired || "Not specified"}</p>
-          <p><strong className="text-[var(--color-primary)]">Follow-up:</strong> {details.followUpQuestions || "None"}</p>
-          <p><strong className="text-[var(--color-primary)]">Evidence:</strong> {task.evidenceNote || "Optional in Phase 1"}</p>
+      <div className="reference-task-body">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <MiniStat label="Workstream" value={details.workstream || "General"} />
+          <MiniStat label="Responsible" value={details.responsibleTeam || "Not assigned"} />
+          <MiniStat label="Expected Output" value={details.expectedOutput || "Not specified"} />
+          <MiniStat label="Equipment" value={details.requiredEquipment || "Not specified"} />
         </div>
-      </details>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-3">
-        {showStatus ? <Select label="Status" value={draft.status} onChange={(value) => setDraft({ ...draft, status: value as TaskUpdate["status"] })} options={[...USER_TASK_STATUSES]} /> : null}
-        {showRole ? <Input label="User role / standing" value={draft.userRoleStanding} onChange={(value) => setDraft({ ...draft, userRoleStanding: value })} placeholder="Local IT SPOC" /> : null}
-        {showQuantity ? <Input label={`Completed / installed quantity (${task.unit || "unit"})`} value={String(draft.completedQuantity || "")} onChange={(value) => setDraft({ ...draft, completedQuantity: Number(value || 0) })} type="number" /> : null}
-      </div>
+        <details className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+          <summary className="cursor-pointer text-sm font-black text-[var(--color-primary)]">View task details</summary>
+          <div className="mt-3 grid gap-3 text-sm text-[var(--color-text-muted)] md:grid-cols-2">
+            <p><strong className="text-[var(--color-primary)]">Objective:</strong> {details.mainObjective || "Not specified"}</p>
+            <p><strong className="text-[var(--color-primary)]">Testing:</strong> {details.testingRequired || "Not specified"}</p>
+            <p><strong className="text-[var(--color-primary)]">Follow-up:</strong> {details.followUpQuestions || "None"}</p>
+            <p><strong className="text-[var(--color-primary)]">Evidence:</strong> {task.evidenceNote || "Optional in Phase 1"}</p>
+          </div>
+        </details>
 
-      {showQuantity ? (
-        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-          <MiniStat label="Required" value={`${task.requiredQuantity || 0} ${task.unit || ""}`} />
-          <MiniStat label="Completed" value={String(draft.completedQuantity || 0)} />
-          <MiniStat label="Remaining" value={String(remaining)} />
+        <div className="mt-4 grid gap-3 lg:grid-cols-3">
+          {showStatus ? <Select label="Status" value={draft.status} onChange={(value) => setDraft({ ...draft, status: value as TaskUpdate["status"] })} options={[...USER_TASK_STATUSES]} /> : null}
+          {showRole ? <Input label="User role / standing" value={draft.userRoleStanding} onChange={(value) => setDraft({ ...draft, userRoleStanding: value })} placeholder="Local IT SPOC" /> : null}
+          {showQuantity ? <Input label={`Completed / installed quantity (${task.unit || "unit"})`} value={String(draft.completedQuantity || "")} onChange={(value) => setDraft({ ...draft, completedQuantity: Number(value || 0) })} type="number" /> : null}
         </div>
-      ) : null}
 
-      {showRemarks ? (
-        <label className="mt-3 block">
-          <span className="field-label">Remarks</span>
-          <textarea className="field mt-2 min-h-20" value={draft.remarks} onChange={(event) => setDraft({ ...draft, remarks: event.target.value })} />
-        </label>
-      ) : null}
+        {showQuantity ? (
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <MiniStat label="Required" value={`${task.requiredQuantity || 0} ${task.unit || ""}`} />
+            <MiniStat label="Completed" value={String(draft.completedQuantity || 0)} />
+            <MiniStat label="Remaining" value={String(remaining)} />
+          </div>
+        ) : null}
 
-      {showEscalations ? <PeopleEditor
-        title="Escalation Points"
-        rows={draft.escalationPoints}
-        addLabel="Add escalation point"
-        onChange={(rows) => setDraft({ ...draft, escalationPoints: rows })}
-        kind="escalation"
-        suggestions={escalationSuggestions}
-      /> : null}
-      {showSupport ? <PeopleEditor
-        title="Supporting Personnel"
-        rows={draft.supportingPersonnel}
-        addLabel="Add supporting person"
-        onChange={(rows) => setDraft({ ...draft, supportingPersonnel: rows })}
-        kind="support"
-        teamTypeOptions={teamTypeOptions}
-        suggestions={supportSuggestions}
-      /> : null}
+        {showRemarks ? (
+          <label className="mt-3 block">
+            <span className="field-label">Remarks</span>
+            <textarea className="field mt-2 min-h-20" value={draft.remarks} onChange={(event) => setDraft({ ...draft, remarks: event.target.value })} />
+          </label>
+        ) : null}
 
-      {showUpload ? <div className="mt-3 rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-        <label className="field-label">Upload evidence</label>
-        <input className="field mt-2" type="file" multiple onChange={addFile} />
-        <p className="mt-2 text-xs text-[var(--color-text-muted)]">{task.evidenceNote || "Uploads are optional in Phase 1. Files lock when review starts."}</p>
-        {files.length ? <p className="mt-2 text-xs font-bold text-[var(--color-primary)]">{files.map((file) => file.fileName).join(", ")}</p> : null}
-      </div> : null}
+        {showEscalations ? <PeopleEditor
+          title="Escalation Points"
+          rows={draft.escalationPoints}
+          addLabel="Add escalation point"
+          onChange={(rows) => setDraft({ ...draft, escalationPoints: rows })}
+          kind="escalation"
+          suggestions={escalationSuggestions}
+        /> : null}
+        {showSupport ? <PeopleEditor
+          title="Supporting Personnel"
+          rows={draft.supportingPersonnel}
+          addLabel="Add supporting person"
+          onChange={(rows) => setDraft({ ...draft, supportingPersonnel: rows })}
+          kind="support"
+          teamTypeOptions={teamTypeOptions}
+          suggestions={supportSuggestions}
+        /> : null}
 
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-        <button className="btn-secondary" onClick={requestNotApplicable}>Request Not Applicable</button>
-        <button className="btn-primary" onClick={saveTask}>Save Task Update</button>
+        {showUpload ? <div className="mt-3 rounded-lg border border-dashed border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+          <label className="field-label">Upload evidence</label>
+          <input className="field mt-2" type="file" multiple onChange={addFile} />
+          <p className="mt-2 text-xs text-[var(--color-text-muted)]">{task.evidenceNote || "Uploads are optional in Phase 1. Files lock when review starts."}</p>
+          {files.length ? <p className="mt-2 text-xs font-bold text-[var(--color-primary)]">{files.map((file) => file.fileName).join(", ")}</p> : null}
+        </div> : null}
+
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <button className="btn-secondary" onClick={requestNotApplicable}>Request Not Applicable</button>
+          <button className="btn-primary" onClick={saveTask}>Save Task Update</button>
+        </div>
       </div>
     </article>
   );

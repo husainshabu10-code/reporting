@@ -840,6 +840,122 @@ table {
     color: var(--color-secondary);
   }
 
+  .reference-task-section {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .reference-area-heading {
+    color: var(--color-primary);
+    font-size: 1.05rem;
+    font-weight: 900;
+  }
+
+  .reference-workstream-group {
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .reference-workstream-heading {
+    color: var(--color-primary);
+    font-size: 0.95rem;
+    font-weight: 900;
+  }
+
+  .reference-task-card {
+    overflow: hidden;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-border);
+    background: var(--color-card);
+    box-shadow: 0 12px 28px rgba(11, 79, 58, 0.06);
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  .reference-task-card:hover {
+    border-color: rgba(201, 162, 39, 0.58);
+    box-shadow: 0 18px 38px rgba(11, 79, 58, 0.09);
+    transform: translateY(-1px);
+  }
+
+  .reference-task-card-missing {
+    border-color: var(--color-important);
+    box-shadow: 0 12px 30px rgba(122, 31, 43, 0.08);
+  }
+
+  .reference-task-scroll {
+    overflow-x: auto;
+  }
+
+  .reference-task-grid {
+    display: grid;
+    min-width: 1040px;
+    grid-template-columns: minmax(24rem, 2.25fr) minmax(8.5rem, 0.75fr) minmax(11rem, 0.95fr) minmax(8rem, 0.7fr) minmax(11rem, 0.95fr) minmax(11rem, 0.9fr);
+  }
+
+  .reference-task-header-row {
+    background: var(--color-accent-light);
+    color: var(--color-primary);
+    font-size: 0.73rem;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .reference-task-header-row span,
+  .reference-task-cell {
+    border-right: 1px solid rgba(232, 221, 197, 0.86);
+    padding: 0.8rem 0.95rem;
+  }
+
+  .reference-task-header-row span:last-child,
+  .reference-task-cell:last-child {
+    border-right: 0;
+  }
+
+  .reference-task-data-row {
+    align-items: center;
+    border-bottom: 1px solid rgba(232, 221, 197, 0.86);
+    background: var(--color-card);
+    color: var(--color-text);
+    transition: background-color 180ms ease;
+  }
+
+  .reference-task-data-row:hover {
+    background: rgba(243, 231, 195, 0.24);
+  }
+
+  .reference-task-title {
+    color: var(--color-primary);
+    font-size: 0.95rem;
+    font-weight: 900;
+    line-height: 1.45;
+  }
+
+  .reference-task-meta {
+    margin-top: 0.35rem;
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+
+  .reference-soft-pill {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    border-radius: 999px;
+    background: rgba(243, 231, 195, 0.46);
+    color: var(--color-text-muted);
+    font-size: 0.76rem;
+    font-weight: 900;
+    line-height: 1.15;
+    padding: 0.42rem 0.8rem;
+  }
+
+  .reference-task-body {
+    padding: 1rem;
+  }
+
   .task-face-card {
     background-image: linear-gradient(180deg, rgba(243, 231, 195, 0.18), rgba(255, 255, 255, 0) 42%);
   }
