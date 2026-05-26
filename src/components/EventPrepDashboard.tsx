@@ -2314,13 +2314,53 @@ function ReportsTab({ state, currentProfile, updateState, showToast }: { state: 
   const isAdmin = ["super_admin", "admin"].includes(currentProfile.role);
   const viewerAccess = viewerAccessFor(currentProfile, state);
   const allowedAreas = dashboardAllowedAreas(state, currentProfile);
-  const [areaId, setAreaId] = useState(allowedAreas[0]?.id || "");
+  const [reportType, setReportType] = useState("Overall Progress Report");
+  const [zoneFilter, setZoneFilter] = useState("All");
+  const [areaId, setAreaId] = useState("All");
+  const [workstreamFilter, setWorkstreamFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+  const [priorityFilter, setPriorityFilter] = useState("All");
+  const [verificationFilter, setVerificationFilter] = useState("All");
+  const [requestStatusFilter, setRequestStatusFilter] = useState("All");
+  const [dueFrom, setDueFrom] = useState("");
+  const [dueTo, setDueTo] = useState("");
   const [reportDate, setReportDate] = useState(todayIso());
   const canPdf = isAdmin || viewerAccess.canExportPdf;
   const canExcel = isAdmin || viewerAccess.canExportExcel;
   const canDaily = isAdmin || viewerAccess.reportTypes.includes("Daily Area Report PDF");
   const canOverall = isAdmin || viewerAccess.reportTypes.includes("Overall Progress Report PDF");
   const exportHistory = isAdmin ? state.reportExports : state.reportExports.filter((reportExport) => reportExport.requestedBy === currentProfile.id);
+  const reportTypes = useMemo(() => {
+    const options = [
+      "Overall Progress Report",
+      "Area-wise Daily Report",
+      "Workstream Report",
+      "Task Status Report",
+      "Verification Report",
+      "Requests Report",
+      "Issues / Attention Required Report",
+      "Printable Project Status Report"
+    ];
+    return isAdmin ? options : options.filter((type) => type === "Area-wise Daily Report" ? canDaily : canOverall);
+  }, [isAdmin, canDaily, canOverall]);
+  useEffect(() => {
+    if (reportTypes.length && !reportTypes.includes(reportType)) setReportType(reportTypes[0]);
+  }, [reportType, reportTypes]);
+  const visibleAreaOptions = allowedAreas.filter((area) => zoneFilter === "All" || area.zoneTypeId === zoneFilter);
+  const workstreamOptions = unique(state.liveTasks.filter((task) => allowedAreas.some((area) => area.id === task.areaId)).map((task) => taskDetails(state, task).workstream || "General"));
+  const previewData = buildReportPreviewData(state, {
+    allowedAreaIds: allowedAreas.map((area) => area.id),
+    zoneTypeId: zoneFilter,
+    areaId,
+    workstream: workstreamFilter,
+    status: statusFilter,
+    priority: priorityFilter,
+    verificationStatus: verificationFilter,
+    requestStatus: requestStatusFilter,
+    dueFrom,
+    dueTo,
+    reportDate
+  });
 
   const recordExport = (exportType: string, selectedAreaId?: string) => {
     const createdAt = new Date().toISOString();
@@ -2338,32 +2378,14 @@ function ReportsTab({ state, currentProfile, updateState, showToast }: { state: 
     }, currentProfile, "Daily reports", `Generated ${exportType}`, "report_export", reportExport.id, { exportType }));
   };
 
-  const exportDailyPdf = () => {
-    if (!canPdf || !canDaily || !areaId) {
+  const printReport = () => {
+    if (!canPdf || (!canOverall && reportType !== "Area-wise Daily Report") || (reportType === "Area-wise Daily Report" && !canDaily)) {
       showToast("Export not allowed", "Your access does not allow this PDF report.", "warning");
       return;
     }
-    try {
-      openPrintableReport("Daily Area Report", dailyAreaReportHtml(state, areaId, reportDate));
-      recordExport("Daily Area Report PDF", areaId);
-      showToast("PDF report opened", "Use the browser print dialog to save it as PDF.", "success");
-    } catch (error) {
-      showToast("PDF report blocked", readError(error, "Allow popups and try again."), "error");
-    }
-  };
-
-  const exportOverallPdf = () => {
-    if (!canPdf || !canOverall) {
-      showToast("Export not allowed", "Your access does not allow this PDF report.", "warning");
-      return;
-    }
-    try {
-      openPrintableReport("Overall Progress Report", overallProgressReportHtml(state, allowedAreas.map((area) => area.id)));
-      recordExport("Overall Progress Report PDF");
-      showToast("PDF report opened", "Use the browser print dialog to save it as PDF.", "success");
-    } catch (error) {
-      showToast("PDF report blocked", readError(error, "Allow popups and try again."), "error");
-    }
+    recordExport(`${reportType} PDF`, areaId === "All" ? undefined : areaId);
+    showToast("Print dialog opening", "Choose Save as PDF in the browser print dialog.", "info");
+    window.setTimeout(() => window.print(), 120);
   };
 
   const exportExcel = async () => {
@@ -2381,48 +2403,586 @@ function ReportsTab({ state, currentProfile, updateState, showToast }: { state: 
   };
 
   return (
-    <div className="space-y-4">
-      <Panel title="Phase 3 Reports & Exports" action={<Badge>{exportHistory.length} export(s)</Badge>}>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
-            <FileDown className="text-[var(--color-accent)]" size={22} />
-            <h3 className="mt-3 font-black text-[var(--color-primary)]">Daily Area Report PDF</h3>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">Includes task updates, remarks, quantity progress, evidence list, issues, submission time, and verification status.</p>
-            <div className="mt-3 grid gap-3">
-              <Select label="Area" value={areaId} onChange={setAreaId} options={allowedAreas.map((area) => ({ label: area.name, value: area.id }))} />
-              <Input label="Report date" value={reportDate} onChange={setReportDate} type="date" />
-              <button className="btn-primary" disabled={!canPdf || !canDaily || !areaId} onClick={exportDailyPdf}>Open PDF Report</button>
-            </div>
-          </div>
-          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
-            <BarChart3 className="text-[var(--color-accent)]" size={22} />
-            <h3 className="mt-3 font-black text-[var(--color-primary)]">Overall Progress Report PDF</h3>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">Shows verified completion, zone, area, day, workstream progress, and attention counts.</p>
-            <button className="btn-primary mt-3" disabled={!canPdf || !canOverall} onClick={exportOverallPdf}>Open PDF Report</button>
-          </div>
-          <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-4">
-            <FileSpreadsheet className="text-[var(--color-accent)]" size={22} />
-            <h3 className="mt-3 font-black text-[var(--color-primary)]">Excel Workbook Export</h3>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">{isAdmin ? "Includes master tasks, update history, requests, verification logs, areas, and user access." : "Only available when admin grants Excel export permission."}</p>
-            <button className="btn-primary mt-3" disabled={!canExcel} onClick={exportExcel}>Download Excel</button>
+    <div className="reports-workspace">
+      <aside className="reports-control-panel no-print">
+        <div>
+          <p className="text-xs font-black uppercase text-[var(--color-accent)]">Reports Module</p>
+          <h2 className="mt-1 text-xl font-black text-[var(--color-primary)]">Generate Report</h2>
+          <p className="mt-1 text-sm text-[var(--color-text-muted)]">Preview uses current website data and prints as the final report.</p>
+        </div>
+        <div className="grid gap-3">
+          <Select label="Report Type" value={reportType} onChange={setReportType} options={reportTypes} />
+          <Select label="Zone Type" value={zoneFilter} onChange={(value) => {
+            setZoneFilter(value);
+            setAreaId("All");
+          }} options={["All", ...state.zoneTypes.map((zone) => ({ label: zone.name, value: zone.id }))]} />
+          <Select label="Area" value={areaId} onChange={setAreaId} options={["All", ...visibleAreaOptions.map((area) => ({ label: area.name, value: area.id }))]} />
+          <Select label="Workstream" value={workstreamFilter} onChange={setWorkstreamFilter} options={["All", ...workstreamOptions]} />
+          <Select label="Status" value={statusFilter} onChange={setStatusFilter} options={["All", ...USER_TASK_STATUSES]} />
+          <Select label="Verification Status" value={verificationFilter} onChange={setVerificationFilter} options={["All", ...VERIFICATION_STATUSES]} />
+          <Select label="Priority" value={priorityFilter} onChange={setPriorityFilter} options={["All", ...activeOptions(state, "Priority options", PRIORITY_OPTIONS)]} />
+          <Select label="Request Status" value={requestStatusFilter} onChange={setRequestStatusFilter} options={["All", ...REQUEST_STATUSES]} />
+          <Input label="Report date" value={reportDate} onChange={setReportDate} type="date" />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input label="Due from" value={dueFrom} onChange={setDueFrom} type="date" />
+            <Input label="Due to" value={dueTo} onChange={setDueTo} type="date" />
           </div>
         </div>
-      </Panel>
+        <div className="grid gap-2">
+          <button className="btn-primary" disabled={!canPdf} onClick={printReport}><FileDown size={16} /> Export PDF / Print</button>
+          <button className="btn-secondary" disabled={!canPdf} onClick={printReport}><Download size={16} /> Print Preview</button>
+          <button className="btn-secondary" disabled={!canExcel} onClick={exportExcel}><FileSpreadsheet size={16} /> Export Data CSV / Excel</button>
+          <button className="btn-secondary" disabled={!canExcel} onClick={() => exportLiveTasksCsv({ ...state, liveTasks: previewData.tasks })}><Download size={16} /> Export Task CSV</button>
+        </div>
+        <div className="hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-accent-light)]/60 p-3 text-xs font-bold text-[var(--color-primary)]">
+          Browser print is the PDF engine. Choose “Save as PDF” from the print dialog.
+        </div>
+        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-accent-light)]/60 p-3 text-xs font-bold text-[var(--color-primary)]">
+          Browser print is the PDF engine. Choose "Save as PDF" from the print dialog.
+        </div>
+      </aside>
 
-      <Panel title="Export History">
-        <ResponsiveTable
-          headers={["Type", "Requested By", "Area", "Status", "Created"]}
-          rows={exportHistory.map((reportExport) => [
-            reportExport.exportType,
-            state.profiles.find((profile) => profile.id === reportExport.requestedBy)?.fullName || "User",
-            reportExport.areaId ? areaName(state, reportExport.areaId) : "Overall",
-            <StatusBadge key="status" value={reportExport.status} />,
-            new Date(reportExport.createdAt).toLocaleString()
-          ])}
-        />
-      </Panel>
+      <section className="reports-preview-column">
+        <ReportPreview state={state} data={previewData} reportType={reportType} reportDate={reportDate} currentProfile={currentProfile} />
+        <div className="no-print mt-4">
+          <Panel title="Export History" action={<Badge>{exportHistory.length} export(s)</Badge>}>
+            <ResponsiveTable
+              headers={["Type", "Requested By", "Area", "Status", "Created"]}
+              rows={exportHistory.map((reportExport) => [
+                reportExport.exportType,
+                state.profiles.find((profile) => profile.id === reportExport.requestedBy)?.fullName || "User",
+                reportExport.areaId ? areaName(state, reportExport.areaId) : "Overall",
+                <StatusBadge key="status" value={reportExport.status} />,
+                new Date(reportExport.createdAt).toLocaleString()
+              ])}
+            />
+          </Panel>
+        </div>
+      </section>
     </div>
   );
+}
+
+type ReportPreviewData = ReturnType<typeof buildReportPreviewData>;
+
+function ReportPreview({ state, data, reportType, reportDate, currentProfile }: { state: EventPrepState; data: ReportPreviewData; reportType: string; reportDate: string; currentProfile: Profile }) {
+  const isDaily = reportType === "Area-wise Daily Report";
+  const isProject = reportType === "Printable Project Status Report";
+  const isRequests = reportType === "Requests Report";
+  const isAttention = reportType === "Issues / Attention Required Report";
+  const isVerification = reportType === "Verification Report";
+  const title = isProject ? "Ashara Mubarakah IT Preparation Project Status" : "Ashara Mubarakah IT Preparation Report";
+
+  return (
+    <article className="report-preview-shell">
+      <ReportHeader title={title} reportType={reportType} generatedBy={currentProfile.fullName} filters={data.filterLabel} daysToEvent={data.metrics.daysToEvent} />
+      {data.tasks.length || data.requests.length || data.dailyReports.length ? (
+        <>
+          <ReportKpiCards data={data} />
+          {isDaily ? <AreaDailyReportPreview state={state} data={data} reportDate={reportDate} /> : null}
+          {isProject ? <ProjectStatusReportPreview state={state} data={data} /> : null}
+          {!isDaily && !isProject ? (
+            <>
+              <ReportChartGrid data={data} />
+              {isRequests ? <RequestsReportPreview state={state} data={data} /> : null}
+              {isAttention ? <AttentionReportPreview state={state} data={data} /> : null}
+              {isVerification ? <VerificationReportPreview state={state} data={data} /> : null}
+              {!isRequests && !isAttention && !isVerification ? <ProgressReportPreview state={state} data={data} /> : null}
+            </>
+          ) : null}
+          <ReportSummaryNotes data={data} />
+        </>
+      ) : <EmptyState title="No data available for the selected filters" body="Adjust report filters or add event preparation data first." />}
+    </article>
+  );
+}
+
+function ReportHeader({ title, reportType, generatedBy, filters, daysToEvent }: { title: string; reportType: string; generatedBy: string; filters: string; daysToEvent: number }) {
+  return (
+    <header className="report-template-header">
+      <div>
+        <p className="report-brand">Ashara Mubarakah</p>
+        <h1>{title}</h1>
+        <p>{reportType} | Generated {new Date().toLocaleString()} | Prepared by {generatedBy}</p>
+        <p className="mt-1">{filters}</p>
+      </div>
+      <div className="report-countdown">
+        <span>{daysToEvent}</span>
+        <small>days to event</small>
+      </div>
+    </header>
+  );
+}
+
+function ReportKpiCards({ data }: { data: ReportPreviewData }) {
+  const cards = [
+    ["Overall Progress", `${data.metrics.overallVerifiedPercent}%`, "Verified completed"],
+    ["Total Tasks", String(data.tasks.length), "Filtered task count"],
+    ["Verified Tasks", String(data.verifiedTasks.length), "Counts as complete"],
+    ["In Progress", String(data.inProgressTasks.length), "Currently active"],
+    ["Pending", String(data.pendingTasks.length), "Not complete"],
+    ["Issues", String(data.issueTasks.length), "Needs attention"],
+    ["Overdue", String(data.overdueTasks.length), "Past due date"],
+    ["Requests Pending", String(data.pendingRequests.length), "Open requests"],
+    ["Reports Submitted", String(data.metrics.submittedReports), "Selected report date"],
+    ["Missing / Partial", String(data.metrics.missingOrPartialReports), "Daily report attention"]
+  ];
+  return (
+    <section className="report-kpi-grid">
+      {cards.map(([label, value, helper]) => (
+        <div key={label} className="report-kpi-card">
+          <p>{label}</p>
+          <strong>{value}</strong>
+          <span>{helper}</span>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function ReportChartGrid({ data }: { data: ReportPreviewData }) {
+  return (
+    <section className="report-chart-grid">
+      <div className="report-card">
+        <h2>Task Status Distribution</h2>
+        <DonutChart rows={data.statusRows} />
+      </div>
+      <div className="report-card">
+        <h2>Area-wise Progress</h2>
+        <BarList rows={data.areaRows.slice(0, 10).map((row) => ({ label: row.area, value: row.progress, helper: `${row.verified}/${row.total} verified` }))} />
+      </div>
+      <div className="report-card">
+        <h2>Workstream Progress</h2>
+        <BarList rows={data.workstreamRows.slice(0, 10).map((row) => ({ label: row.workstream, value: row.progress, helper: `${row.verified}/${row.total} verified` }))} />
+      </div>
+      <div className="report-card report-attention-card">
+        <h2>Attention Required</h2>
+        <AttentionList rows={data.attentionRows} />
+      </div>
+      <div className="report-card">
+        <h2>Daily Report Trend</h2>
+        <LineTrendChart rows={data.dailyReportTrendRows} />
+      </div>
+    </section>
+  );
+}
+
+function ProgressReportPreview({ data }: { state: EventPrepState; data: ReportPreviewData }) {
+  return (
+    <section className="report-card report-page-break">
+      <h2>Area Progress Summary</h2>
+      <PrintableTable
+        headers={["Area", "Zone Type", "Total Tasks", "Verified", "In Progress", "Pending", "Issues", "Progress"]}
+        rows={data.areaRows.map((row) => [row.area, row.zone, row.total, row.verified, row.inProgress, row.pending, row.issues, `${row.progress}%`])}
+      />
+    </section>
+  );
+}
+
+function AreaDailyReportPreview({ state, data, reportDate }: { state: EventPrepState; data: ReportPreviewData; reportDate: string }) {
+  const area = data.areas[0] || data.areas.find(Boolean);
+  const report = area ? state.dailyReports.find((item) => item.areaId === area.id && item.reportDate === reportDate) : undefined;
+  const submittedBy = state.profiles.find((profile) => profile.id === report?.submittedBy)?.fullName || "-";
+  const dayTasks = area ? data.tasks.filter((task) => task.areaId === area.id && task.prepDay === prepDayForDate(state.settings.preparationStartDate, reportDate)) : data.tasks;
+  const updatedTaskIds = new Set(data.updates.map((update) => update.liveTaskId));
+  const issueUpdates = data.updates.filter((update) => update.status === "Issue Found" || update.escalationPoints.length);
+  return (
+    <>
+      <section className="report-card">
+        <h2>Daily Area Summary</h2>
+        <div className="report-info-grid">
+          <MiniReportFact label="Area" value={area?.name || "All selected areas"} />
+          <MiniReportFact label="Zone Type" value={area ? zoneName(state, area.zoneTypeId) : "Multiple"} />
+          <MiniReportFact label="Report Date" value={reportDate} />
+          <MiniReportFact label="Submitted Status" value={report?.status || "Not Started"} />
+          <MiniReportFact label="Submitted By" value={submittedBy} />
+          <MiniReportFact label="Submitted Time" value={report?.submittedAt ? new Date(report.submittedAt).toLocaleString() : "-"} />
+        </div>
+        <div className="mt-4 rounded-lg bg-[var(--color-bg)] p-3">
+          <p className="field-label">General Daily Remark</p>
+          <p className="mt-1 text-sm text-[var(--color-text)]">{report?.generalRemark || "No general remark available for the selected report date."}</p>
+        </div>
+      </section>
+      <section className="report-card report-page-break">
+        <h2>Task Updates</h2>
+        <PrintableTable
+          headers={["Task", "Workstream", "Priority", "Status", "Progress", "Due Date", "Remarks", "Supporting / POC"]}
+          rows={dayTasks.map((task) => {
+            const details = taskDetails(state, task);
+            const update = data.latest.get(task.id);
+            return [
+              details.taskDetails,
+              details.workstream,
+              task.priority,
+              update?.status || "Pending",
+              `${taskProgressPercent(task, update)}%`,
+              task.dueDate || "-",
+              update?.remarks || "-",
+              update?.supportingPersonnel.map((person) => person.name || person.roleStanding).filter(Boolean).join(", ") || details.responsibleTeam || "-"
+            ];
+          })}
+        />
+      </section>
+      <section className="report-card">
+        <h2>Issues / Escalations</h2>
+        <PrintableTable
+          headers={["Task", "Status", "Escalation / Remark", "Verification"]}
+          rows={issueUpdates.map((update) => {
+            const task = state.liveTasks.find((item) => item.id === update.liveTaskId);
+            const escalation = update.escalationPoints.map((point) => `${point.name || "Escalation"}: ${point.reason}`).join("; ");
+            return [task ? taskDetails(state, task).taskDetails : "Task", update.status, escalation || update.remarks || "-", update.verificationStatus];
+          })}
+        />
+      </section>
+      <section className="report-card">
+        <h2>Evidence / Attachments</h2>
+        <PrintableTable
+          headers={["Task", "Files"]}
+          rows={dayTasks.filter((task) => updatedTaskIds.has(task.id)).map((task) => [taskDetails(state, task).taskDetails, state.taskFiles.filter((file) => file.liveTaskId === task.id).map((file) => file.fileName).join(", ") || "No evidence uploaded"])}
+        />
+      </section>
+    </>
+  );
+}
+
+function ProjectStatusReportPreview({ state, data }: { state: EventPrepState; data: ReportPreviewData }) {
+  const completed = data.verifiedTasks.slice(0, 8);
+  const upcoming = data.tasks.filter((task) => task.dueDate >= todayIso() && data.latest.get(task.id)?.verificationStatus !== "Verified Completed").slice(0, 8);
+  return (
+    <>
+      <section className="report-card">
+        <h2>Project Description</h2>
+        <p className="report-body-text">This report gives an overview of IT preparation progress across CMZ, Central Office, and Relay Zones using the current dashboard data.</p>
+      </section>
+      <ReportChartGrid data={data} />
+      <section className="report-card report-page-break">
+        <h2>Work Completed</h2>
+        <PrintableTable headers={["Task", "Area", "Target Date", "Status"]} rows={completed.map((task) => [taskDetails(state, task).taskDetails, areaName(state, task.areaId), task.dueDate || "-", "Verified Completed"])} />
+      </section>
+      <section className="report-card">
+        <h2>Work Planned / Upcoming</h2>
+        <PrintableTable headers={["Task", "Area", "Target Date", "Status", "Progress"]} rows={upcoming.map((task) => [taskDetails(state, task).taskDetails, areaName(state, task.areaId), task.dueDate || "-", data.latest.get(task.id)?.status || "Pending", `${taskProgressPercent(task, data.latest.get(task.id))}%`])} />
+      </section>
+      <section className="report-card">
+        <h2>Risks / Issues</h2>
+        <PrintableTable headers={["Issue / Task", "Area", "Impact / Remarks", "Owner / POC", "Due", "Status"]} rows={data.riskTasks.map((task) => {
+          const update = data.latest.get(task.id);
+          const details = taskDetails(state, task);
+          return [details.taskDetails, areaName(state, task.areaId), update?.remarks || task.delayReason || "Requires attention", details.responsibleTeam || "-", task.dueDate || "-", update?.status || "Pending"];
+        })} />
+      </section>
+    </>
+  );
+}
+
+function RequestsReportPreview({ state, data }: { state: EventPrepState; data: ReportPreviewData }) {
+  return (
+    <section className="report-card report-page-break">
+      <h2>Requests Summary</h2>
+      <PrintableTable headers={["Request", "Type", "Area", "Priority", "Required By", "Status", "Decision"]} rows={data.requests.map((request) => [request.title, request.requestType, areaName(state, request.areaId), request.priority, request.requiredByDate, request.status, request.decisionRemarks || "-"])} />
+    </section>
+  );
+}
+
+function VerificationReportPreview({ state, data }: { state: EventPrepState; data: ReportPreviewData }) {
+  return (
+    <section className="report-card report-page-break">
+      <h2>Verification Queue</h2>
+      <PrintableTable headers={["Task", "Area", "Verification", "Verifiers", "Last Remark"]} rows={data.tasks.filter((task) => ["Needs Verification", "Partially Verified", "Rejected / Needs Correction", "Verified Completed"].includes(data.latest.get(task.id)?.verificationStatus || "")).map((task) => {
+        const update = data.latest.get(task.id);
+        return [taskDetails(state, task).taskDetails, areaName(state, task.areaId), update?.verificationStatus || "Not Submitted", task.assignedVerifierIds.map((idValue) => state.profiles.find((profile) => profile.id === idValue)?.fullName || idValue).join(", ") || "-", update?.correctionComment || update?.remarks || "-"];
+      })} />
+    </section>
+  );
+}
+
+function AttentionReportPreview({ state, data }: { state: EventPrepState; data: ReportPreviewData }) {
+  return (
+    <section className="report-card report-page-break">
+      <h2>Issue / Attention Details</h2>
+      <PrintableTable headers={["Task / Item", "Area", "Reason", "Due Date", "Status"]} rows={data.riskTasks.map((task) => {
+        const update = data.latest.get(task.id);
+        return [taskDetails(state, task).taskDetails, areaName(state, task.areaId), update?.correctionComment || update?.remarks || task.delayReason || "Overdue or issue found", task.dueDate || "-", update?.verificationStatus || update?.status || "Pending"];
+      })} />
+    </section>
+  );
+}
+
+function ReportSummaryNotes({ data }: { data: ReportPreviewData }) {
+  const weakestArea = data.areaRows.slice().sort((a, b) => a.progress - b.progress)[0];
+  return (
+    <section className="report-card">
+      <h2>Summary Notes</h2>
+      <p className="report-body-text">
+        Overall IT preparation is currently {data.metrics.overallVerifiedPercent}% verified complete across the selected scope.
+        {weakestArea ? ` ${weakestArea.area} requires attention at ${weakestArea.progress}% verified completion.` : ""}
+        {data.issueTasks.length ? ` ${data.issueTasks.length} issue task(s) are currently marked for follow-up.` : " No issue-found tasks are visible in the selected filters."}
+      </p>
+    </section>
+  );
+}
+
+function DonutChart({ rows }: { rows: Array<{ label: string; value: number; color: string }> }) {
+  const total = rows.reduce((sum, row) => sum + row.value, 0);
+  let offset = 25;
+  const segments = rows.map((row) => {
+    const dash = total ? (row.value / total) * 100 : 0;
+    const segment = <circle key={row.label} cx="60" cy="60" r="42" fill="none" stroke={row.color} strokeWidth="16" strokeDasharray={`${dash} ${100 - dash}`} strokeDashoffset={offset} pathLength="100" />;
+    offset -= dash;
+    return segment;
+  });
+  return (
+    <div className="report-donut-wrap">
+      <svg viewBox="0 0 120 120" className="report-donut" role="img" aria-label="Status distribution donut chart">
+        <circle cx="60" cy="60" r="42" fill="none" stroke="#F3E7C3" strokeWidth="16" />
+        {segments}
+        <text x="60" y="57" textAnchor="middle" className="report-donut-number">{total}</text>
+        <text x="60" y="73" textAnchor="middle" className="report-donut-label">tasks</text>
+      </svg>
+      <div className="report-chart-legend">
+        {rows.map((row) => <span key={row.label}><i style={{ background: row.color }} />{row.label}: {row.value}</span>)}
+      </div>
+    </div>
+  );
+}
+
+function BarList({ rows }: { rows: Array<{ label: string; value: number; helper?: string }> }) {
+  if (!rows.length) return <p className="text-sm text-[var(--color-text-muted)]">No chart data available.</p>;
+  return (
+    <div className="report-bar-list">
+      {rows.map((row) => (
+        <div key={row.label}>
+          <div className="flex items-center justify-between gap-3">
+            <p>{row.label}</p>
+            <strong>{row.value}%</strong>
+          </div>
+          <div className="report-bar-track"><span style={{ width: `${row.value}%` }} /></div>
+          {row.helper ? <small>{row.helper}</small> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LineTrendChart({ rows }: { rows: Array<{ label: string; submitted: number; attention: number }> }) {
+  if (!rows.length) return <p className="text-sm text-[var(--color-text-muted)]">No daily report trend data available.</p>;
+  const maxValue = Math.max(1, ...rows.map((row) => Math.max(row.submitted, row.attention)));
+  const pointsFor = (key: "submitted" | "attention") => rows.map((row, index) => {
+    const x = rows.length === 1 ? 50 : (index / (rows.length - 1)) * 100;
+    const y = 88 - (row[key] / maxValue) * 70;
+    return `${x},${y}`;
+  }).join(" ");
+  return (
+    <div className="report-line-chart">
+      <svg viewBox="0 0 100 100" role="img" aria-label="Daily report submission trend">
+        <line x1="0" y1="88" x2="100" y2="88" />
+        <line x1="0" y1="18" x2="0" y2="88" />
+        <polyline points={pointsFor("attention")} className="attention-line" />
+        <polyline points={pointsFor("submitted")} className="submitted-line" />
+        {rows.map((row, index) => {
+          const x = rows.length === 1 ? 50 : (index / (rows.length - 1)) * 100;
+          const y = 88 - (row.submitted / maxValue) * 70;
+          return <circle key={row.label} cx={x} cy={y} r="2.2" />;
+        })}
+      </svg>
+      <div className="report-chart-legend">
+        <span><i style={{ background: "#0B4F3A" }} />Submitted</span>
+        <span><i style={{ background: "#7A1F2B" }} />Missing / partial / late</span>
+      </div>
+      <div className="report-trend-labels">
+        <span>{rows[0]?.label}</span>
+        <span>{rows[rows.length - 1]?.label}</span>
+      </div>
+    </div>
+  );
+}
+
+function AttentionList({ rows }: { rows: Array<{ label: string; count: number }> }) {
+  return (
+    <div className="report-attention-list">
+      {rows.map((row) => <div key={row.label}><span>{row.label}</span><strong>{row.count}</strong></div>)}
+    </div>
+  );
+}
+
+function PrintableTable({ headers, rows }: { headers: string[]; rows: Array<Array<ReactNode>> }) {
+  return (
+    <div className="print-table-wrap">
+      <table className="print-table">
+        <thead><tr>{headers.map((header) => <th key={header}>{header}</th>)}</tr></thead>
+        <tbody>{rows.length ? rows.map((row, index) => <tr key={index}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>) : <tr><td colSpan={headers.length}>No data available for the selected filters.</td></tr>}</tbody>
+      </table>
+    </div>
+  );
+}
+
+function MiniReportFact({ label, value }: { label: string; value: string }) {
+  return <div className="mini-report-fact"><p>{label}</p><strong>{value}</strong></div>;
+}
+
+function buildReportPreviewData(state: EventPrepState, filters: {
+  allowedAreaIds: string[];
+  zoneTypeId: string;
+  areaId: string;
+  workstream: string;
+  status: string;
+  priority: string;
+  verificationStatus: string;
+  requestStatus: string;
+  dueFrom: string;
+  dueTo: string;
+  reportDate: string;
+}) {
+  const latest = latestUpdateMap(state.taskUpdates);
+  const areas = state.areas.filter((area) =>
+    filters.allowedAreaIds.includes(area.id) &&
+    (filters.zoneTypeId === "All" || area.zoneTypeId === filters.zoneTypeId) &&
+    (filters.areaId === "All" || area.id === filters.areaId)
+  );
+  const areaIds = areas.map((area) => area.id);
+  const tasks = state.liveTasks.filter((task) => {
+    const details = taskDetails(state, task);
+    const update = latest.get(task.id);
+    return (
+      areaIds.includes(task.areaId) &&
+      task.active &&
+      !task.notApplicable &&
+      (filters.workstream === "All" || (details.workstream || "General") === filters.workstream) &&
+      (filters.priority === "All" || task.priority === filters.priority) &&
+      (filters.status === "All" || (update?.status || "Pending") === filters.status) &&
+      (filters.verificationStatus === "All" || (update?.verificationStatus || "Not Submitted") === filters.verificationStatus) &&
+      (!filters.dueFrom || task.dueDate >= filters.dueFrom) &&
+      (!filters.dueTo || task.dueDate <= filters.dueTo)
+    );
+  });
+  const taskIds = new Set(tasks.map((task) => task.id));
+  const reportDate = filters.reportDate || todayIso();
+  const dailyReports = state.dailyReports.filter((report) => areaIds.includes(report.areaId) && (!reportDate || report.reportDate === reportDate));
+  const reportIds = new Set(dailyReports.map((report) => report.id));
+  const updates = state.taskUpdates.filter((update) => taskIds.has(update.liveTaskId) && (!reportIds.size || reportIds.has(update.dailyReportId)));
+  const requests = state.requests.filter((request) => areaIds.includes(request.areaId) && (filters.requestStatus === "All" || request.status === filters.requestStatus));
+  const verifiedTasks = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed");
+  const inProgressTasks = tasks.filter((task) => latest.get(task.id)?.status === "In Progress");
+  const pendingTasks = tasks.filter((task) => !latest.get(task.id) || latest.get(task.id)?.status === "Pending");
+  const issueTasks = tasks.filter((task) => latest.get(task.id)?.status === "Issue Found");
+  const needsVerificationTasks = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Needs Verification");
+  const rejectedTasks = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Rejected / Needs Correction");
+  const overdueTasks = tasks.filter((task) => task.dueDate < todayIso() && latest.get(task.id)?.verificationStatus !== "Verified Completed");
+  const riskTasks = uniqueBy([...issueTasks, ...rejectedTasks, ...overdueTasks], (task) => task.id);
+  const pendingRequests = requests.filter((request) => ["Under Review", "Sent for Verification", "Need More Info"].includes(request.status));
+  const submittedReports = dailyReports.filter((report) => ["Submitted", "Late Submitted", "Closed"].includes(report.status)).length;
+  const missingReports = Math.max(0, areas.filter((area) => area.active).length - dailyReports.filter((report) => ["Submitted", "Late Submitted", "Closed", "Draft Saved", "Partially Updated"].includes(report.status)).length);
+  const partialReports = dailyReports.filter((report) => ["Draft Saved", "Partially Updated"].includes(report.status)).length;
+  const metrics: DashboardMetrics = {
+    overallVerifiedPercent: percent(verifiedTasks.length, tasks.length),
+    totalLiveTasks: tasks.length,
+    verifiedTasks: verifiedTasks.length,
+    submittedReports,
+    missingOrPartialReports: missingReports + partialReports,
+    needsVerification: needsVerificationTasks.length,
+    issueFound: issueTasks.length,
+    pendingRequests: pendingRequests.length,
+    daysToEvent: Math.max(0, Math.ceil((new Date(`${state.settings.eventStartDate}T00:00:00`).getTime() - Date.now()) / 86400000))
+  };
+  const areaRows = areas.map((area) => {
+    const areaTasks = tasks.filter((task) => task.areaId === area.id);
+    const verified = areaTasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
+    const inProgress = areaTasks.filter((task) => latest.get(task.id)?.status === "In Progress").length;
+    const issues = areaTasks.filter((task) => latest.get(task.id)?.status === "Issue Found").length;
+    return {
+      area: area.name,
+      zone: zoneName(state, area.zoneTypeId),
+      total: areaTasks.length,
+      verified,
+      inProgress,
+      pending: areaTasks.filter((task) => !latest.get(task.id) || latest.get(task.id)?.status === "Pending").length,
+      issues,
+      progress: percent(verified, areaTasks.length)
+    };
+  }).filter((row) => row.total || filters.areaId !== "All");
+  const workstreamRows = unique(tasks.map((task) => taskDetails(state, task).workstream || "General")).map((workstream) => {
+    const workstreamTasks = tasks.filter((task) => (taskDetails(state, task).workstream || "General") === workstream);
+    const verified = workstreamTasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
+    return { workstream, total: workstreamTasks.length, verified, progress: percent(verified, workstreamTasks.length) };
+  });
+  const statusRows = [
+    { label: "Pending", value: pendingTasks.length, color: "#F3E7C3" },
+    { label: "In Progress", value: inProgressTasks.length, color: "#2E7D5B" },
+    { label: "Issue Found", value: issueTasks.length, color: "#7A1F2B" },
+    { label: "Needs Verification", value: needsVerificationTasks.length, color: "#C9A227" },
+    { label: "Verified Completed", value: verifiedTasks.length, color: "#0B4F3A" },
+    { label: "Needs Correction", value: rejectedTasks.length, color: "#9F3642" }
+  ].filter((row) => row.value > 0);
+  const attentionRows = [
+    { label: "Missing Daily Reports", count: missingReports },
+    { label: "Partially Updated Reports", count: partialReports },
+    { label: "Late Submitted Reports", count: dailyReports.filter((report) => report.status === "Late Submitted").length },
+    { label: "Issue Found Tasks", count: issueTasks.length },
+    { label: "Overdue Tasks", count: overdueTasks.length },
+    { label: "Pending Verification", count: needsVerificationTasks.length },
+    { label: "Rejected / Needs Correction", count: rejectedTasks.length },
+    { label: "Pending Requests", count: pendingRequests.length }
+  ];
+  const dailyReportTrendRows = unique(dailyReports.map((report) => report.reportDate)).sort().slice(-10).map((date) => {
+    const reportsForDate = dailyReports.filter((report) => report.reportDate === date);
+    return {
+      label: date.slice(5),
+      submitted: reportsForDate.filter((report) => ["Submitted", "Closed"].includes(report.status)).length,
+      attention: reportsForDate.filter((report) => ["Draft Saved", "Partially Updated", "Late Submitted", "Escalated", "Not Started"].includes(report.status)).length
+    };
+  });
+  const filterLabel = [
+    filters.zoneTypeId === "All" ? "All Zone Types" : zoneName(state, filters.zoneTypeId),
+    filters.areaId === "All" ? "All Areas" : areaName(state, filters.areaId),
+    filters.workstream === "All" ? "All Workstreams" : filters.workstream,
+    `Report date ${reportDate}`
+  ].join(" / ");
+  return {
+    areas,
+    tasks,
+    requests,
+    dailyReports,
+    updates,
+    latest,
+    metrics,
+    areaRows,
+    workstreamRows,
+    statusRows,
+    attentionRows,
+    dailyReportTrendRows,
+    verifiedTasks,
+    inProgressTasks,
+    pendingTasks,
+    issueTasks,
+    overdueTasks,
+    riskTasks,
+    pendingRequests,
+    filterLabel
+  };
+}
+
+function taskProgressPercent(task: LiveTask, update?: TaskUpdate) {
+  if (update?.verificationStatus === "Verified Completed") return 100;
+  if (task.taskType === "Quantity-Based Task" && task.requiredQuantity) return Math.min(100, Math.round(((update?.completedQuantity || 0) / task.requiredQuantity) * 100));
+  if (update?.status === "Completed") return 75;
+  if (update?.status === "In Progress") return 45;
+  if (update?.status === "Issue Found") return 25;
+  return 0;
+}
+
+function prepDayForDate(preparationStartDate: string, date: string) {
+  const diff = Math.floor((new Date(`${date}T00:00:00`).getTime() - new Date(`${preparationStartDate}T00:00:00`).getTime()) / 86400000) + 1;
+  return Math.min(20, Math.max(1, diff || 1));
+}
+
+function uniqueBy<T>(items: T[], getKey: (item: T) => string) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = getKey(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function FoundationTab({
