@@ -403,7 +403,7 @@ export default function EventPrepDashboard() {
 
         <section className={`min-w-0 flex-1 transition-[margin] duration-300 ${sidebarCollapsed ? "lg:ml-20" : "lg:ml-80"}`}>
           <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-[rgba(250,247,239,0.96)] px-4 py-4 backdrop-blur">
-            <div className="mx-auto flex max-w-[96rem] flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex items-center gap-3">
                 <button className="icon-btn" onClick={toggleMenu} aria-label={sidebarCollapsed ? "Expand navigation" : "Open or collapse navigation"} title="Menu">
                   <Menu size={18} />
@@ -425,7 +425,7 @@ export default function EventPrepDashboard() {
             </div>
           </header>
 
-          <div className="animate-fade-in mx-auto max-w-[96rem] p-4 lg:p-6">
+          <div className="animate-fade-in w-full p-3 sm:p-4 lg:p-5 2xl:p-6">
             <NotificationCenter state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} />
             {activeTab === "Dashboard" ? <DashboardTab state={state} currentProfile={currentProfile} chartSettings={dashboardCharts} /> : null}
             {activeTab === "Daily Reports" ? <DailyReportsTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}

@@ -1009,6 +1009,7 @@ table {
 
   .task-filter-bar {
     display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
     gap: 0.75rem;
     border-radius: 0.5rem;
     border: 1px solid var(--color-border);
@@ -1068,8 +1069,8 @@ table {
   .task-summary-head,
   .task-summary-row {
     display: grid;
-    grid-template-columns: minmax(18rem, 1fr) minmax(8rem, auto) minmax(7rem, auto) minmax(7rem, auto) minmax(8rem, 0.6fr) minmax(4rem, auto);
-    gap: 0.75rem;
+    grid-template-columns: minmax(15rem, 2fr) minmax(5.5rem, 0.48fr) minmax(5.25rem, 0.42fr) minmax(5.5rem, 0.42fr) minmax(8rem, 0.72fr) minmax(3.25rem, 0.28fr);
+    gap: 0;
     align-items: center;
   }
 
@@ -1100,7 +1101,7 @@ table {
   .task-summary-head > span,
   .task-summary-row > span {
     min-height: 100%;
-    padding: 1rem;
+    padding: clamp(0.62rem, 0.75vw, 1rem);
   }
 
   .task-summary-head > span + span,
@@ -1153,17 +1154,20 @@ table {
     color: var(--color-primary);
     font-size: 0.78rem;
     font-weight: 900;
+    min-width: 0;
   }
 
   .task-summary-edit {
-    justify-self: end;
+    align-self: center;
+    justify-self: center;
+    min-height: 2rem !important;
     border-radius: 999px;
     border: 1px solid var(--color-border);
     background: var(--color-accent-light);
     color: var(--color-primary);
     font-size: 0.75rem;
     font-weight: 900;
-    padding: 0.42rem 0.7rem;
+    padding: 0.42rem 0.7rem !important;
   }
 
   .task-drawer-overlay {
@@ -1935,8 +1939,14 @@ table {
     }
 
     .task-filter-bar {
-      grid-template-columns: minmax(16rem, 1fr) repeat(4, minmax(9rem, 0.6fr));
+      grid-template-columns: minmax(14rem, 1.4fr) repeat(4, minmax(8.5rem, 0.8fr));
       align-items: end;
+    }
+  }
+
+  @media (min-width: 1440px) {
+    .task-filter-bar {
+      grid-template-columns: minmax(18rem, 1.6fr) repeat(4, minmax(10rem, 0.8fr));
     }
   }
 
@@ -1946,9 +1956,14 @@ table {
     }
   }
 
-  @media (max-width: 1199px) {
+  @media (max-width: 1350px) {
     .task-summary-head {
       display: none;
+    }
+
+    .task-summary-list {
+      gap: 0.75rem;
+      padding: 0 0.75rem 0.9rem;
     }
 
     .task-summary-row {
@@ -1981,6 +1996,9 @@ table {
     .task-summary-edit {
       justify-self: start;
     }
+  }
+
+  @media (max-width: 1199px) {
 
     .task-workstream-header {
       align-items: flex-start;
