@@ -1,6 +1,6 @@
 "use client";
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type RealtimeChannel, type SupabaseClient } from "@supabase/supabase-js";
 import { createSeedState } from "@/lib/eventPrepSeed";
 import type {
   Area,
@@ -133,7 +133,16 @@ export async function saveEventPrepState(state: EventPrepState, profile?: Profil
   const db = eventPrepSupabase();
   if (!db) return;
   if (!profile) return;
-  await saveToSupabase(db, state, profile);
+  const { data } = await db.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error("Supabase session is missing. Sign out and sign in again.");
+  const response = await fetch("/api/event-prep/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ state })
+  });
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(String(json.error || "Supabase sync failed."));
 }
 
 export async function uploadTaskEvidence(file: File, liveTaskId: string) {
@@ -143,6 +152,45 @@ export async function uploadTaskEvidence(file: File, liveTaskId: string) {
   const { error } = await db.storage.from("task-evidence").upload(storagePath, file, { upsert: false });
   if (error) throw error;
   return { storagePath };
+}
+
+export function subscribeToEventPrepChanges(onChange: () => void) {
+  const db = eventPrepSupabase();
+  if (!db) return () => undefined;
+  let timer: number | null = null;
+  const schedule = () => {
+    if (timer) window.clearTimeout(timer);
+    timer = window.setTimeout(onChange, 500);
+  };
+  const channel = db.channel("ashara-event-prep-sync") as RealtimeChannel;
+  [
+    "event_settings",
+    "profiles",
+    "zone_types",
+    "areas",
+    "area_access",
+    "task_templates",
+    "live_tasks",
+    "daily_reports",
+    "task_updates",
+    "task_files",
+    "verification_logs",
+    "requests",
+    "request_reviews",
+    "reminders",
+    "in_app_notifications",
+    "activity_logs",
+    "report_exports",
+    "global_options",
+    "form_fields"
+  ].forEach((table) => {
+    channel.on("postgres_changes", { event: "*", schema: "public", table }, schedule);
+  });
+  channel.subscribe();
+  return () => {
+    if (timer) window.clearTimeout(timer);
+    db.removeChannel(channel);
+  };
 }
 
 async function loadFromSupabase(db: SupabaseClient): Promise<EventPrepState> {

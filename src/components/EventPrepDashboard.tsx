@@ -71,6 +71,7 @@ import {
   saveEventPrepState,
   signInWithPassword,
   signOutEventPrep,
+  subscribeToEventPrepChanges,
   uploadTaskEvidence
 } from "@/lib/eventPrepStore";
 
@@ -127,6 +128,7 @@ export default function EventPrepDashboard() {
   const [sessionUserId, setSessionUserId] = useState("");
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const saveTimerRef = useRef<number | null>(null);
+  const skipNextSaveRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -173,20 +175,37 @@ export default function EventPrepDashboard() {
   useEffect(() => {
     if (!state) return;
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    if (skipNextSaveRef.current) {
+      skipNextSaveRef.current = false;
+      return;
+    }
     saveTimerRef.current = window.setTimeout(() => {
       const activeProfile = getCurrentProfile(state, currentProfileId, sessionEmail, sessionUserId);
       if (isEventPrepSupabaseConfigured() && !activeProfile) return;
       saveEventPrepState(state, activeProfile)
         .then(() => setSyncStatus(isEventPrepSupabaseConfigured() ? "Saved to Supabase" : "Saved locally"))
         .catch((error) => {
-          console.warn("Supabase save failed; local copy was kept.", error);
-          setSyncStatus("Saved locally");
+          console.warn("Supabase sync failed.", error);
+          setSyncStatus(readError(error, "Supabase sync failed"));
         });
     }, 450);
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     };
   }, [currentProfileId, sessionEmail, sessionUserId, state]);
+
+  useEffect(() => {
+    if (!isEventPrepSupabaseConfigured() || !authChecked || !sessionEmail) return;
+    return subscribeToEventPrepChanges(() => {
+      loadEventPrepState()
+        .then((loaded) => {
+          skipNextSaveRef.current = true;
+          setState(loaded);
+          setSyncStatus("Synced from Supabase");
+        })
+        .catch((error) => setSyncStatus(readError(error, "Realtime sync failed")));
+    });
+  }, [authChecked, sessionEmail]);
 
   const handlePasswordLogin = async () => {
     try {
