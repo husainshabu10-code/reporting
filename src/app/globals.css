@@ -2033,7 +2033,7 @@ table {
     background: rgba(122, 31, 43, 0.06);
   }
 
-  @media (min-width: 1280px) {
+  @media (min-width: 1024px) {
     .reports-workspace {
       grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr);
       align-items: start;
@@ -2042,8 +2042,14 @@ table {
     .reports-control-panel {
       position: sticky;
       top: 1rem;
+      max-height: calc(100dvh - 2rem);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      z-index: 20;
     }
+  }
 
+  @media (min-width: 1280px) {
     .report-chart-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
