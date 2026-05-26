@@ -1023,7 +1023,7 @@ table {
   }
 
   .task-group-card {
-    overflow: hidden;
+    overflow: visible;
     border-radius: 0.5rem;
     border: 1px solid var(--color-border);
     background: var(--color-card);
@@ -1036,11 +1036,19 @@ table {
     justify-content: space-between;
     gap: 1rem;
     border-bottom: 1px solid rgba(232, 221, 197, 0.72);
-    padding: 1rem;
+    border-radius: 0.5rem 0.5rem 0 0;
+    background: var(--color-card);
+    padding: 1.05rem 1rem;
+    box-shadow: 0 8px 22px rgba(11, 79, 58, 0.05);
   }
 
   .task-workstream-block {
-    border-top: 1px solid rgba(232, 221, 197, 0.42);
+    margin: 0.85rem 0.85rem 0;
+    overflow: hidden;
+    border: 1px solid rgba(232, 221, 197, 0.86);
+    border-radius: 0.55rem;
+    background: var(--color-card);
+    box-shadow: 0 8px 18px rgba(11, 79, 58, 0.035);
   }
 
   .task-workstream-header {
@@ -1050,20 +1058,40 @@ table {
     justify-content: space-between;
     gap: 1rem;
     background: white;
-    padding: 0.9rem 1rem;
+    padding: 0.95rem 1rem;
     text-align: left;
-    transition: background-color 180ms ease, box-shadow 180ms ease;
+    box-shadow: 0 1px 0 rgba(232, 221, 197, 0.84), 0 8px 18px rgba(11, 79, 58, 0.035);
+    transition: background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
   }
 
   .task-workstream-header:hover {
     background: rgba(243, 231, 195, 0.26);
-    box-shadow: inset 0 1px 0 rgba(201, 162, 39, 0.18), inset 0 -1px 0 rgba(201, 162, 39, 0.18);
+    box-shadow: 0 1px 0 rgba(232, 221, 197, 0.84), 0 10px 24px rgba(11, 79, 58, 0.055);
+    transform: translateY(-1px);
+  }
+
+  .task-collapse-icon {
+    display: inline-flex;
+    min-height: 2rem;
+    width: 2rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-card);
+    color: var(--color-primary);
+    box-shadow: 0 4px 12px rgba(11, 79, 58, 0.06);
+    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease;
+  }
+
+  .task-collapse-icon.is-collapsed {
+    transform: rotate(-90deg);
   }
 
   .task-summary-list {
     display: grid;
     gap: 0;
-    padding: 0 1rem 1rem;
+    padding: 0.9rem;
   }
 
   .task-summary-head,
@@ -1963,7 +1991,7 @@ table {
 
     .task-summary-list {
       gap: 0.75rem;
-      padding: 0 0.75rem 0.9rem;
+      padding: 0.75rem;
     }
 
     .task-summary-row {

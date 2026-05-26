@@ -8,6 +8,7 @@ import {
   Bell,
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
   ClipboardCheck,
   Download,
   Eye,
@@ -1196,7 +1197,9 @@ function LiveTasksConfigTable({
                       </div>
                     </div>
                     <Badge>{progress}%</Badge>
-                    <span className="text-xs font-black text-[var(--color-primary)]">{collapsed ? "Show" : "Hide"}</span>
+                    <span className={`task-collapse-icon ${collapsed ? "is-collapsed" : ""}`} aria-hidden="true">
+                      <ChevronDown size={17} />
+                    </span>
                   </div>
                 </button>
                 <div className={collapsed ? "hidden" : "task-summary-list"}>
