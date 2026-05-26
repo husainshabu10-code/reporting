@@ -380,9 +380,9 @@ export default function EventPrepDashboard() {
                 {activeTab === "Dashboard" ? <button className="top-action-btn" onClick={() => showToast("Dashboard settings", "Dashboard cards are using verified-completion data only.", "info")}><Settings2 size={16} /> Chart Settings</button> : null}
                 {activeTab === "Dashboard" ? <button className="top-action-btn" onClick={() => setPresentationMode(true)}><Presentation size={16} /> Presentation</button> : null}
                 {isAdmin ? <button className="top-action-btn" onClick={() => openWorkspace("Zones / Areas", "Area setup opened", "Create or update event areas from this tab.")}><Plus size={16} /> Add Area</button> : null}
-                {isAdmin ? <button className="top-action-btn top-action-primary" onClick={() => openWorkspace("Master Tasks", "Task setup opened", "Add a custom live task or apply reference templates.")}><Plus size={16} /> Add Task</button> : null}
+                {isAdmin ? <button className="top-action-btn top-action-primary" onClick={() => openWorkspace("Master Tasks", "Task setup opened", "Add a custom live task or use a reference suggestion.")}><Plus size={16} /> Add Task</button> : null}
                 {isAdmin ? <button className="top-action-btn" onClick={exportCsv}><Download size={16} /> Export CSV</button> : null}
-                {isAdmin ? <button className="top-action-btn" onClick={() => openWorkspace("Master Tasks", "Import panel opened", "Use the upload control to import Excel or CSV task templates.")}><Upload size={16} /> Import CSV</button> : null}
+                {isAdmin ? <button className="top-action-btn" onClick={() => openWorkspace("Master Tasks", "Import panel opened", "Use the upload control to import Excel or CSV reference suggestions.")}><Upload size={16} /> Import CSV</button> : null}
                 <Badge>{unreadNotificationsFor(state, currentProfile).length + buildUserAlerts(state, currentProfile).length} alert(s)</Badge>
               </div>
             </div>
@@ -758,14 +758,9 @@ function RemindersConfig({ state, currentProfile, updateState, showToast }: { st
 
 function MasterTasksTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const [importMessage, setImportMessage] = useState("");
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [dayFilter, setDayFilter] = useState("All");
-  const [workstreamFilter, setWorkstreamFilter] = useState("All");
   const [applyAreaId, setApplyAreaId] = useState(state.areas[0]?.id || "");
-  const [taskType, setTaskType] = useState<(typeof TASK_TYPES)[number]>("Simple Task");
-  const [requiredQuantity, setRequiredQuantity] = useState("1");
-  const [unit, setUnit] = useState("Item");
   const [selectedTaskId, setSelectedTaskId] = useState("");
+  const [selectedSuggestionId, setSelectedSuggestionId] = useState("");
   const [customTitle, setCustomTitle] = useState("");
   const [customWorkstream, setCustomWorkstream] = useState("General");
   const [customResponsibleTeam, setCustomResponsibleTeam] = useState("");
@@ -782,12 +777,7 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
   const priorityOptions = activeOptions(state, "Priority options", PRIORITY_OPTIONS);
   const referenceTemplates = state.taskTemplates.filter((template) => template.source !== "custom");
   const selectedTask = state.liveTasks.find((task) => task.id === selectedTaskId);
-
-  const filteredTemplates = referenceTemplates.filter((template) => {
-    const matchesDay = dayFilter === "All" || String(template.day) === dayFilter;
-    const matchesWorkstream = workstreamFilter === "All" || template.workstream === workstreamFilter;
-    return matchesDay && matchesWorkstream;
-  });
+  const selectedSuggestion = referenceTemplates.find((template) => template.id === selectedSuggestionId);
 
   const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -798,8 +788,8 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
         ...current,
         taskTemplates: mergeTemplates(current.taskTemplates, templates)
       }));
-      setImportMessage(`${templates.length} task templates imported into the reusable master template list.`);
-      showToast("Import completed", `${templates.length} template(s) added to Master Tasks.`);
+      setImportMessage(`${templates.length} reference suggestion(s) imported. Use them from the custom task form.`);
+      showToast("Import completed", `${templates.length} reference suggestion(s) added to Master Tasks.`);
     } catch (error) {
       setImportMessage(readError(error, "Import failed."));
       showToast("Import failed", readError(error, "Please check the file and try again."), "error");
@@ -808,27 +798,20 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
     }
   };
 
-  const applyTemplates = () => {
-    if (!applyAreaId || !selectedIds.length) {
-      showToast("Nothing selected", "Choose at least one template and an area first.", "warning");
-      return;
-    }
-    const templatesToApply = selectedIds.filter((templateId) => !state.liveTasks.some((task) => task.templateId === templateId && task.areaId === applyAreaId));
-    updateState((current) => {
-      const newTasks = templatesToApply
-        .filter((templateId) => !current.liveTasks.some((task) => task.templateId === templateId && task.areaId === applyAreaId))
-        .map((templateId) => {
-          const template = current.taskTemplates.find((item) => item.id === templateId);
-          return createLiveTask(template, applyAreaId, taskType, Number(requiredQuantity || 0), unit, current, current.settings.preparationStartDate);
-        })
-        .filter(Boolean) as LiveTask[];
-      return withActivity({ ...current, liveTasks: [...newTasks, ...current.liveTasks] }, currentProfile, "Template changes", `Applied ${newTasks.length} template(s) to ${areaName(current, applyAreaId)}`, "live_task", applyAreaId, { count: newTasks.length });
-    });
-    showToast(
-      templatesToApply.length ? "Templates applied" : "No new live tasks",
-      templatesToApply.length ? `${templatesToApply.length} live task(s) created for ${areaName(state, applyAreaId)}.` : "Those templates were already applied to this area.",
-      templatesToApply.length ? "success" : "info"
-    );
+  const applySuggestion = (templateId: string) => {
+    setSelectedSuggestionId(templateId);
+    const suggestion = referenceTemplates.find((template) => template.id === templateId);
+    if (!suggestion) return;
+    setCustomTitle(suggestion.taskDetails);
+    setCustomWorkstream(suggestion.workstream || "General");
+    setCustomResponsibleTeam(suggestion.responsibleTeam || "");
+    setCustomExpectedOutput(suggestion.expectedOutput || "");
+    setCustomRequiredEquipment(suggestion.requiredEquipment || "");
+    setCustomPrepDay(String(suggestion.day || 1));
+    setCustomStartDate(addDays(state.settings.preparationStartDate, (suggestion.day || 1) - 1));
+    setCustomDueDate(addDays(state.settings.preparationStartDate, (suggestion.day || 1) - 1));
+    setCustomPriority(suggestion.priorityLevel);
+    showToast("Suggestion applied", "The reference suggestion filled the custom task fields. You can edit anything before adding it.", "info");
   };
 
   const addCustomTask = () => {
@@ -844,7 +827,8 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
       expectedOutput: customExpectedOutput,
       requiredEquipment: customRequiredEquipment,
       prepDay,
-      priority: customPriority
+      priority: customPriority,
+      reference: selectedSuggestion
     });
     updateState((current) => {
       const liveTask = createLiveTask(template, applyAreaId, customTaskType, Number(customQuantity || 0), customUnit, current, current.settings.preparationStartDate);
@@ -859,6 +843,7 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
     setCustomTitle("");
     setCustomExpectedOutput("");
     setCustomRequiredEquipment("");
+    setSelectedSuggestionId("");
     showToast("Custom task added", `${template.taskDetails} was added to ${areaName(state, applyAreaId)}.`);
   };
 
@@ -871,19 +856,13 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
 
   return (
     <div className="space-y-4">
-      <Panel title="Excel Import Into Task Templates" action={<Badge>Day Plan sheet preferred</Badge>}>
-        <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+      <Panel title="Excel Import Into Reference Suggestions" action={<Badge>Day Plan sheet preferred</Badge>}>
+        <div className="grid gap-3">
           <div>
             <label className="field-label">Upload preparation plan</label>
             <input className="field mt-2" type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} />
-            <p className="mt-2 text-xs text-[var(--color-text-muted)]">Imports useful Day Plan columns into reusable templates. Dependencies and risk are kept only as hidden reference.</p>
+            <p className="mt-2 text-xs text-[var(--color-text-muted)]">Imported Day Plan rows are kept as optional suggestions while creating custom live tasks. They do not become live tasks by themselves.</p>
           </div>
-          <button className="btn-secondary" onClick={() => {
-            setSelectedIds(filteredTemplates.map((template) => template.id));
-            showToast("Templates selected", `${filteredTemplates.length} filtered template(s) selected.`, "info");
-          }}>
-            Select Filtered
-          </button>
         </div>
         {importMessage ? <p className="mt-3 rounded-lg bg-[var(--color-accent-light)] p-3 text-sm font-bold text-[var(--color-primary)]">{importMessage}</p> : null}
       </Panel>
@@ -891,6 +870,18 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
       <Panel title="Add Custom Live Task" action={<Badge>No template required</Badge>}>
         <div className="grid gap-3 lg:grid-cols-4">
           <Select label="Area" value={applyAreaId} onChange={setApplyAreaId} options={state.areas.map((area) => ({ label: area.name, value: area.id }))} />
+          <Select
+            label="Use reference suggestion"
+            value={selectedSuggestionId}
+            onChange={applySuggestion}
+            options={[
+              { label: "Start blank custom task", value: "" },
+              ...referenceTemplates.map((template) => ({
+                label: `Day ${template.day} - ${template.taskDetails.length > 70 ? `${template.taskDetails.slice(0, 70)}...` : template.taskDetails}`,
+                value: template.id
+              }))
+            ]}
+          />
           <Input label="Task title" value={customTitle} onChange={setCustomTitle} placeholder="Install backup router" />
           <Input label="Workstream" value={customWorkstream} onChange={setCustomWorkstream} placeholder="Network" />
           <Select label="Task Type" value={customTaskType} onChange={(value) => setCustomTaskType(value as typeof customTaskType)} options={[...TASK_TYPES]} />
@@ -906,45 +897,16 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
           <Input label="Expected output" value={customExpectedOutput} onChange={setCustomExpectedOutput} placeholder="Task completion criteria" />
           <Input label="Required equipment" value={customRequiredEquipment} onChange={setCustomRequiredEquipment} placeholder="Routers, cables, tools" />
         </div>
+        {selectedSuggestion ? (
+          <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-accent-light)]/60 p-3 text-sm">
+            <p className="font-black text-[var(--color-primary)]">Reference suggestion preview</p>
+            <p className="mt-1 text-[var(--color-text)]">{selectedSuggestion.taskDetails}</p>
+            <p className="mt-1 text-xs font-bold text-[var(--color-text-muted)]">{selectedSuggestion.workstream || "General"} | {selectedSuggestion.responsibleTeam || "No team specified"} | Day {selectedSuggestion.day}</p>
+          </div>
+        ) : null}
         <button className="btn-primary mt-3" onClick={addCustomTask}>
           <Plus size={17} /> Add Custom Task
         </button>
-      </Panel>
-
-      <Panel title="Apply Reference Templates To Area" action={<Badge>{selectedIds.length} selected</Badge>}>
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-          <Select label="Day" value={dayFilter} onChange={setDayFilter} options={["All", ...unique(referenceTemplates.map((template) => String(template.day)))]} />
-          <Select label="Workstream" value={workstreamFilter} onChange={setWorkstreamFilter} options={["All", ...unique(referenceTemplates.map((template) => template.workstream))]} />
-          <Select label="Area" value={applyAreaId} onChange={setApplyAreaId} options={state.areas.map((area) => ({ label: area.name, value: area.id }))} />
-          <Select label="Task Type" value={taskType} onChange={(value) => setTaskType(value as typeof taskType)} options={[...TASK_TYPES]} />
-          <Input label="Required Qty" value={requiredQuantity} onChange={setRequiredQuantity} type="number" />
-          <Select label="Unit" value={unit} onChange={setUnit} options={unitOptions} />
-        </div>
-        <button className="btn-primary mt-3" onClick={applyTemplates}>
-          <Plus size={17} /> Apply Selected Reference Templates
-        </button>
-      </Panel>
-
-      <Panel title="Reference Task Templates" action={<Badge>Optional reference only</Badge>}>
-        <div className="grid gap-3">
-          {filteredTemplates.map((template) => (
-            <label key={template.id} className="flex gap-3 rounded-lg border border-[var(--color-border)] bg-white p-3">
-              <input
-                type="checkbox"
-                checked={selectedIds.includes(template.id)}
-                onChange={(event) => setSelectedIds((current) => (event.target.checked ? [...current, template.id] : current.filter((id) => id !== template.id)))}
-              />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge>Day {template.day}</Badge>
-                  <StatusBadge value={template.priorityLevel} />
-                  <p className="font-black text-[var(--color-primary)]">{template.taskDetails}</p>
-                </div>
-                <p className="mt-1 text-sm text-[var(--color-text-muted)]">{template.workstream} | {template.responsibleTeam}</p>
-              </div>
-            </label>
-          ))}
-        </div>
       </Panel>
 
       <Panel title="Live Tasks Area Configuration" action={<Badge>{state.liveTasks.length} live tasks</Badge>}>
@@ -1465,7 +1427,7 @@ function TaskCardList({
   missingIds: string[];
   showToast: ShowToast;
 }) {
-  if (!tasks.length) return <EmptyState title="No tasks in this view" body="Change the task view filter or ask admin to apply task templates to this area." />;
+  if (!tasks.length) return <EmptyState title="No tasks in this view" body="Change the task view filter or ask admin to add live tasks to this area." />;
   const area = state.areas.find((item) => item.id === report.areaId);
   const groupedTasks = tasks.reduce<Array<{ workstream: string; tasks: LiveTask[] }>>((groups, task) => {
     const details = taskDetails(state, task);
@@ -3421,7 +3383,8 @@ function createCustomTaskTemplate({
   expectedOutput,
   requiredEquipment,
   prepDay,
-  priority
+  priority,
+  reference
 }: {
   title: string;
   workstream: string;
@@ -3430,21 +3393,22 @@ function createCustomTaskTemplate({
   requiredEquipment: string;
   prepDay: number;
   priority: TaskTemplate["priorityLevel"];
+  reference?: TaskTemplate;
 }): TaskTemplate {
   return {
     id: `template-custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     source: "custom",
     day: prepDay,
     priorityLevel: priority,
-    mainObjective: "",
+    mainObjective: reference?.mainObjective || "",
     workstream: workstream.trim() || "General",
     taskDetails: title.trim(),
     responsibleTeam: responsibleTeam.trim(),
-    followUpQuestions: "",
+    followUpQuestions: reference?.followUpQuestions || "",
     requiredEquipment: requiredEquipment.trim(),
     expectedOutput: expectedOutput.trim(),
-    testingRequired: "",
-    hiddenReference: {},
+    testingRequired: reference?.testingRequired || "",
+    hiddenReference: reference?.hiddenReference || {},
     importedAt: new Date().toISOString()
   };
 }
