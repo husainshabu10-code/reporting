@@ -772,7 +772,6 @@ function LoginScreen({
               <button className="btn-secondary mt-3 w-full justify-center" type="button" onClick={submitAccessRequest}>Submit Access Request</button>
             </div>
           ) : null}
-          <p className="login-trust">Secure - Reliable - Trusted</p>
         </section>
       </div>
     </main>

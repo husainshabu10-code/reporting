@@ -284,8 +284,8 @@ table {
   .login-page {
     min-height: 100dvh;
     background-image:
-      linear-gradient(120deg, rgba(11, 79, 58, 0.20), rgba(250, 247, 239, 0.22)),
-      url("/ashara-login-bg.svg");
+      linear-gradient(120deg, rgba(250, 247, 239, 0.34), rgba(255, 255, 255, 0.16)),
+      url("/fatemi-login-bg.jpg");
     background-position: center;
     background-size: cover;
     padding: 1rem;
@@ -423,14 +423,6 @@ table {
     color: var(--color-text-muted);
     font-size: 0.68rem;
     font-weight: 800;
-  }
-
-  .login-trust {
-    margin-top: 0.8rem;
-    color: rgba(31, 41, 51, 0.62);
-    font-size: 0.72rem;
-    font-weight: 800;
-    text-align: center;
   }
 
   .app-sidebar {
