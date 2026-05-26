@@ -209,6 +209,22 @@ table {
   }
 }
 
+@keyframes skeleton-pulse {
+  0% {
+    background-position: 180% 0;
+  }
+
+  100% {
+    background-position: -180% 0;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media print {
   body {
     background: white;
@@ -265,6 +281,10 @@ table {
     color: var(--color-text);
     outline: none;
     transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease, transform 180ms ease, color 180ms ease;
+  }
+
+  .field:disabled {
+    background: rgba(243, 231, 195, 0.22);
   }
 
   .field:hover:not(:disabled) {
@@ -349,6 +369,27 @@ table {
     background: var(--color-secondary);
     box-shadow: 0 8px 18px rgba(11, 79, 58, 0.16);
     transform: translateY(-1px);
+  }
+
+  .spinner {
+    display: inline-block;
+    height: 1rem;
+    width: 1rem;
+    flex: none;
+    border-radius: 999px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    animation: spin 680ms linear infinite;
+  }
+
+  .skeleton-line {
+    position: relative;
+    display: block;
+    overflow: hidden;
+    border-radius: 999px;
+    background: linear-gradient(90deg, rgba(232, 221, 197, 0.42), rgba(243, 231, 195, 0.88), rgba(232, 221, 197, 0.42));
+    background-size: 260% 100%;
+    animation: skeleton-pulse 1.35s ease-in-out infinite;
   }
 
   .top-action-btn {
@@ -748,6 +789,15 @@ table {
   .task-table th,
   .task-table td {
     vertical-align: middle;
+  }
+
+  .table-row-motion {
+    animation: fade-in 220ms ease both;
+    transition: background-color 160ms ease, transform 160ms ease;
+  }
+
+  .table-row-motion:hover {
+    background: rgba(243, 231, 195, 0.18);
   }
 
   .task-table th + th,

@@ -248,11 +248,7 @@ export default function EventPrepDashboard() {
   if (!state) {
     return (
       <main className="min-h-screen bg-[var(--color-bg)] p-4 text-[var(--color-text)]">
-        <div className="mx-auto flex min-h-[70vh] max-w-xl items-center justify-center">
-          <div className="rounded-lg border border-[var(--color-border)] bg-white p-6 shadow-soft">
-            <p className="text-sm font-bold text-[var(--color-primary)]">Loading ASHARA MUBARAKAH IT Event Preparation Dashboard...</p>
-          </div>
-        </div>
+        <DashboardSkeleton />
       </main>
     );
   }
@@ -1915,6 +1911,7 @@ function UsersAccessTab({ state, currentProfile, updateState, showToast }: { sta
   const [temporaryPassword, setTemporaryPassword] = useState("");
   const [customPassword, setCustomPassword] = useState("");
   const [accessMessage, setAccessMessage] = useState("");
+  const [savingAccessId, setSavingAccessId] = useState("");
   const shownProfiles = isAdmin
     ? state.profiles
     : state.profiles.filter((profile) => {
@@ -2007,6 +2004,7 @@ function UsersAccessTab({ state, currentProfile, updateState, showToast }: { sta
       return;
     }
     try {
+      setSavingAccessId(profile.id);
       setAccessMessage("Saving access...");
       const uniqueAreaIds = Array.from(new Set(nextAreaIds));
       const result = isEventPrepSupabaseConfigured()
@@ -2027,6 +2025,8 @@ function UsersAccessTab({ state, currentProfile, updateState, showToast }: { sta
     } catch (error) {
       setAccessMessage(readError(error, "Unable to save access."));
       showToast("Access update failed", readError(error, "Please try again."), "error");
+    } finally {
+      setSavingAccessId("");
     }
   };
 
@@ -2056,6 +2056,7 @@ function UsersAccessTab({ state, currentProfile, updateState, showToast }: { sta
                 zoneTypes={state.zoneTypes}
                 currentAreaIds={state.areaAccess.filter((access) => access.profileId === profile.id).map((access) => access.areaId)}
                 onSave={saveUserAccess}
+                saving={savingAccessId === profile.id}
               />
             ))}
             {!state.profiles.some((profile) => profile.status === "active" && profile.id !== currentProfile.id) ? <EmptyState title="No active users to edit" body="Create or approve users first, then their access controls will appear here." /> : null}
@@ -2088,13 +2089,15 @@ function AccessEditor({
   areas,
   zoneTypes,
   currentAreaIds,
-  onSave
+  onSave,
+  saving = false
 }: {
   profile: Profile;
   areas: EventPrepState["areas"];
   zoneTypes: EventPrepState["zoneTypes"];
   currentAreaIds: string[];
   onSave: (profile: Profile, nextRole: UserRole, nextStatus: Profile["status"], nextAreaIds: string[], viewerAccess?: Profile["viewerAccess"]) => void | Promise<void>;
+  saving?: boolean;
 }) {
   const [role, setRole] = useState<UserRole>(profile.role);
   const [status, setStatus] = useState<Profile["status"]>(profile.status);
@@ -2135,7 +2138,10 @@ function AccessEditor({
         <div className="grid gap-3 md:grid-cols-[12rem_12rem_auto] md:items-end">
           <Select label="Role" value={role} onChange={(value) => setRole(value as UserRole)} options={["super_admin", "admin", "area_admin", "verifier", "report_user", "viewer"].map((value) => ({ label: roleLabel(value as UserRole), value }))} />
           <Select label="Status" value={status} onChange={(value) => setStatus(value as Profile["status"])} options={[{ label: "Active", value: "active" }, { label: "Pending Approval", value: "pending_approval" }, { label: "Disabled", value: "disabled" }]} />
-          <button className="btn-primary" onClick={() => onSave(profile, role, status, areaIds, role === "viewer" ? nextViewerAccess : undefined)}>Save Access</button>
+          <button className="btn-primary" disabled={saving} onClick={() => onSave(profile, role, status, areaIds, role === "viewer" ? nextViewerAccess : undefined)}>
+            {saving ? <Spinner /> : null}
+            {saving ? "Saving..." : "Save Access"}
+          </button>
         </div>
       </div>
       <div className="mt-3">
@@ -2575,6 +2581,53 @@ function Panel({ title, action, children }: { title: string; action?: ReactNode;
   );
 }
 
+function Spinner() {
+  return <span className="spinner" aria-hidden="true" />;
+}
+
+function SkeletonLine({ className = "" }: { className?: string }) {
+  return <span className={`skeleton-line ${className}`} aria-hidden="true" />;
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="mx-auto grid min-h-[82vh] max-w-[96rem] gap-4 lg:grid-cols-[18rem_1fr]">
+      <aside className="hidden rounded-lg bg-[var(--color-primary)] p-5 shadow-soft lg:block">
+        <SkeletonLine className="h-3 w-32 bg-white/20" />
+        <SkeletonLine className="mt-4 h-7 w-52 bg-white/25" />
+        <div className="mt-10 grid gap-3">
+          {Array.from({ length: 8 }).map((_, index) => <SkeletonLine key={index} className="h-11 bg-white/15" />)}
+        </div>
+      </aside>
+      <section className="space-y-4">
+        <div className="rounded-lg border border-[var(--color-border)] bg-white p-5 shadow-soft">
+          <SkeletonLine className="h-3 w-24" />
+          <SkeletonLine className="mt-3 h-8 w-80 max-w-full" />
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="rounded-lg border border-[var(--color-border)] p-4">
+                <SkeletonLine className="h-3 w-24" />
+                <SkeletonLine className="mt-3 h-8 w-20" />
+                <SkeletonLine className="mt-3 h-3 w-32" />
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="rounded-lg border border-[var(--color-border)] bg-white p-5 shadow-sm">
+              <SkeletonLine className="h-5 w-48" />
+              <SkeletonLine className="mt-5 h-3 w-full" />
+              <SkeletonLine className="mt-3 h-3 w-11/12" />
+              <SkeletonLine className="mt-3 h-3 w-4/5" />
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function ToastStack({ toasts, dismissToast }: { toasts: ToastMessage[]; dismissToast: (toastId: string) => void }) {
   if (!toasts.length) return null;
   const toneClass: Record<ToastTone, string> = {
@@ -2675,7 +2728,7 @@ function ResponsiveTable({ headers, rows }: { headers: string[]; rows: ReactNode
         </thead>
         <tbody>
           {rows.map((row, rowIndex) => (
-            <tr key={rowIndex}>
+            <tr key={rowIndex} className="table-row-motion">
               {row.map((cell, cellIndex) => (
                 <td key={cellIndex} className="border-b border-[var(--color-border)] px-3 py-3 align-top">{cell}</td>
               ))}
