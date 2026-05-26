@@ -1089,6 +1089,14 @@ table {
     transform: translateY(-1px);
   }
 
+  .task-workstream-header:active .task-collapse-icon {
+    transform: scale(0.9);
+  }
+
+  .task-workstream-header:active .task-collapse-icon.is-collapsed {
+    transform: rotate(-90deg) scale(0.9);
+  }
+
   .task-collapse-icon {
     display: inline-flex;
     min-height: 2rem;
@@ -1100,11 +1108,37 @@ table {
     background: var(--color-card);
     color: var(--color-primary);
     box-shadow: 0 4px 12px rgba(11, 79, 58, 0.06);
-    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease;
+    transition: transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1), background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
   }
 
   .task-collapse-icon.is-collapsed {
     transform: rotate(-90deg);
+  }
+
+  .task-collapse-panel {
+    display: grid;
+    grid-template-rows: 1fr;
+    opacity: 1;
+    overflow: hidden;
+    transition:
+      grid-template-rows 260ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 180ms ease;
+  }
+
+  .task-collapse-panel.is-collapsed {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+
+  .task-collapse-inner {
+    min-height: 0;
+    overflow: hidden;
+    transform: translateY(0);
+    transition: transform 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .task-collapse-panel.is-collapsed .task-collapse-inner {
+    transform: translateY(-0.45rem);
   }
 
   .task-summary-list {

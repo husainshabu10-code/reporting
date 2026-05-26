@@ -1202,17 +1202,21 @@ function LiveTasksConfigTable({
                     </span>
                   </div>
                 </button>
-                <div className={collapsed ? "hidden" : "task-summary-list"}>
-                  <div className="task-summary-head">
-                    <span>Task</span>
-                    <span>Status</span>
-                    <span>Priority</span>
-                    <span>Due</span>
-                    <span>Progress</span>
+                <div className={`task-collapse-panel ${collapsed ? "is-collapsed" : ""}`}>
+                  <div className="task-collapse-inner">
+                    <div className="task-summary-list">
+                      <div className="task-summary-head">
+                        <span>Task</span>
+                        <span>Status</span>
+                        <span>Priority</span>
+                        <span>Due</span>
+                        <span>Progress</span>
+                      </div>
+                      {tasks.map((task) => (
+                        <TaskSummaryRow key={task.id} state={state} task={task} update={latestUpdates.get(task.id)} openTask={openTask} />
+                      ))}
+                    </div>
                   </div>
-                  {tasks.map((task) => (
-                    <TaskSummaryRow key={task.id} state={state} task={task} update={latestUpdates.get(task.id)} openTask={openTask} />
-                  ))}
                 </div>
               </div>
             );
