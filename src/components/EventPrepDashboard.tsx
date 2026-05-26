@@ -2640,12 +2640,6 @@ function ReportsTab({ state, currentProfile, updateState, showToast }: { state: 
           <button className="btn-secondary" disabled={!canExcel} onClick={exportExcel}><FileSpreadsheet size={16} /> Export Data CSV / Excel</button>
           <button className="btn-secondary" disabled={!canExcel} onClick={() => exportLiveTasksCsv({ ...state, liveTasks: previewData.tasks })}><Download size={16} /> Export Task CSV</button>
         </div>
-        <div className="hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-accent-light)]/60 p-3 text-xs font-bold text-[var(--color-primary)]">
-          Browser print is the PDF engine. Choose “Save as PDF” from the print dialog.
-        </div>
-        <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-accent-light)]/60 p-3 text-xs font-bold text-[var(--color-primary)]">
-          Browser print is the PDF engine. Choose "Save as PDF" from the print dialog.
-        </div>
       </aside>
 
       <section className="reports-preview-column">
