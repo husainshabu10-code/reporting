@@ -1209,7 +1209,6 @@ function LiveTasksConfigTable({
                     <span>Priority</span>
                     <span>Due</span>
                     <span>Progress</span>
-                    <span aria-label="Edit task" />
                   </div>
                   {tasks.map((task) => (
                     <TaskSummaryRow key={task.id} state={state} task={task} update={latestUpdates.get(task.id)} openTask={openTask} />
@@ -1252,7 +1251,6 @@ function TaskSummaryRow({ state, task, update, openTask }: { state: EventPrepSta
         </span>
         <strong>{progress}%</strong>
       </span>
-      <span className="task-summary-edit" aria-hidden="true">Open</span>
     </button>
   );
 }

@@ -1119,7 +1119,7 @@ table {
   .task-summary-head,
   .task-summary-row {
     display: grid;
-    grid-template-columns: minmax(15rem, 2fr) minmax(5.5rem, 0.48fr) minmax(5.25rem, 0.42fr) minmax(5.5rem, 0.42fr) minmax(8rem, 0.72fr) minmax(3.25rem, 0.28fr);
+    grid-template-columns: minmax(15rem, 2fr) minmax(5.5rem, 0.48fr) minmax(5.25rem, 0.42fr) minmax(5.5rem, 0.42fr) minmax(8rem, 0.72fr);
     gap: 0;
     align-items: center;
   }
@@ -1217,25 +1217,6 @@ table {
     font-size: 0.78rem;
     font-weight: 900;
     min-width: 0;
-  }
-
-  .task-summary-edit {
-    align-self: center;
-    justify-self: center;
-    min-height: auto !important;
-    border: 0;
-    background: transparent;
-    color: var(--color-primary);
-    font-size: 0.72rem;
-    font-weight: 900;
-    opacity: 0.7;
-    padding: 0 !important;
-    text-decoration: underline;
-    text-underline-offset: 0.18rem;
-  }
-
-  .task-summary-row:hover .task-summary-edit {
-    opacity: 1;
   }
 
   .task-drawer-overlay {
@@ -2061,9 +2042,6 @@ table {
       width: 100%;
     }
 
-    .task-summary-edit {
-      justify-self: start;
-    }
   }
 
   @media (max-width: 1199px) {
