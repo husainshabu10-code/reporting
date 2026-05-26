@@ -284,7 +284,9 @@ table {
   .login-page {
     min-height: 100dvh;
     background-image:
-      linear-gradient(120deg, rgba(250, 247, 239, 0.34), rgba(255, 255, 255, 0.16)),
+      radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.82), rgba(250, 247, 239, 0.66) 34%, rgba(243, 231, 195, 0.54) 72%),
+      linear-gradient(135deg, rgba(11, 79, 58, 0.18), rgba(46, 125, 91, 0.12) 42%, rgba(250, 247, 239, 0.76)),
+      linear-gradient(0deg, rgba(250, 247, 239, 0.62), rgba(250, 247, 239, 0.62)),
       url("/fatemi-login-bg.jpg");
     background-position: center;
     background-size: cover;
