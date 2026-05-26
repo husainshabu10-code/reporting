@@ -114,6 +114,23 @@ const DEFAULT_DASHBOARD_CHARTS: DashboardChartSettings = {
   workstream: "Progress bars",
   attention: "Score cards"
 };
+const USER_ROLE_STANDING_OPTIONS = [
+  "Local IT SPOC",
+  "Local IT Team Member",
+  "Area Coordinator",
+  "Vendor SPOC",
+  "Vendor Engineer / Technician",
+  "Central IT Team",
+  "NOC Team",
+  "SOC Team",
+  "Relay Team",
+  "Power / Electrical Team",
+  "Cabling Team",
+  "Network Engineer",
+  "ISP Provider / ISP Engineer",
+  "Volunteer",
+  "Other"
+] as const;
 
 const ADMIN_TABS: AdminTab[] = [
   "Dashboard",
@@ -1865,7 +1882,7 @@ function TaskCard({
 
         <div className="mt-4 grid gap-3 lg:grid-cols-3">
           {showStatus ? <Select label="Status" value={draft.status} onChange={(value) => setDraft({ ...draft, status: value as TaskUpdate["status"] })} options={[...USER_TASK_STATUSES]} /> : null}
-          {showRole ? <Input label="User role / standing" value={draft.userRoleStanding} onChange={(value) => setDraft({ ...draft, userRoleStanding: value })} placeholder="Local IT SPOC" /> : null}
+          {showRole ? <RoleStandingMultiSelect value={draft.userRoleStanding} onChange={(value) => setDraft({ ...draft, userRoleStanding: value })} /> : null}
           {showQuantity ? <Input label={`Completed / installed quantity (${task.unit || "unit"})`} value={String(draft.completedQuantity || "")} onChange={(value) => setDraft({ ...draft, completedQuantity: Number(value || 0) })} type="number" /> : null}
         </div>
 
@@ -3550,6 +3567,43 @@ function Select({
   );
 }
 
+function RoleStandingMultiSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const parsed = parseRoleStanding(value);
+  const selected = new Set(parsed.selected);
+  const toggle = (option: string, checked: boolean) => {
+    const next = checked ? [...parsed.selected, option] : parsed.selected.filter((item) => item !== option);
+    onChange(formatRoleStanding(next, parsed.other));
+  };
+  const updateOther = (other: string) => {
+    const next = selected.has("Other") ? parsed.selected : [...parsed.selected, "Other"];
+    onChange(formatRoleStanding(next, other));
+  };
+  const summary = value.trim() || "Select one or more roles";
+
+  return (
+    <div className="block">
+      <span className="field-label">User role / standing</span>
+      <details className="multi-choice-field mt-2">
+        <summary className="field multi-choice-summary">
+          <span>{summary}</span>
+          <ChevronDown size={16} />
+        </summary>
+        <div className="multi-choice-menu">
+          {USER_ROLE_STANDING_OPTIONS.map((option) => (
+            <label key={option} className="multi-choice-option">
+              <input type="checkbox" checked={selected.has(option)} onChange={(event) => toggle(option, event.target.checked)} />
+              <span>{option === "Other" ? "Other (with a text input if selected)" : option}</span>
+            </label>
+          ))}
+          {selected.has("Other") ? (
+            <input className="field mt-2" value={parsed.other} onChange={(event) => updateOther(event.target.value)} placeholder="Enter other role / standing" />
+          ) : null}
+        </div>
+      </details>
+    </div>
+  );
+}
+
 function Input({ label, value, onChange, type = "text", placeholder, disabled }: { label: string; value: string; onChange: (value: string) => void; type?: string; placeholder?: string; disabled?: boolean }) {
   return (
     <label className="block">
@@ -3718,6 +3772,31 @@ function peopleSummary(row: EscalationPoint | SupportingPerson) {
     "reason" in row ? row.reason : row.responsibility
   ].filter(Boolean);
   return parts.join(" / ") || "Saved contact details";
+}
+
+function parseRoleStanding(value: string) {
+  const selected: string[] = [];
+  let other = "";
+  value.split(",").map((item) => item.trim()).filter(Boolean).forEach((item) => {
+    if (item.toLowerCase().startsWith("other:")) {
+      if (!selected.includes("Other")) selected.push("Other");
+      other = item.slice(item.indexOf(":") + 1).trim();
+    } else if (USER_ROLE_STANDING_OPTIONS.includes(item as (typeof USER_ROLE_STANDING_OPTIONS)[number])) {
+      if (!selected.includes(item)) selected.push(item);
+    } else if (item) {
+      if (!selected.includes("Other")) selected.push("Other");
+      other = other || item;
+    }
+  });
+  return { selected, other };
+}
+
+function formatRoleStanding(selected: string[], other: string) {
+  const uniqueSelected = Array.from(new Set(selected.filter(Boolean)));
+  return uniqueSelected
+    .filter((item) => item !== "Other")
+    .concat(uniqueSelected.includes("Other") ? [other.trim() ? `Other: ${other.trim()}` : "Other"] : [])
+    .join(", ");
 }
 
 function exportLiveTasksCsv(state: EventPrepState) {
