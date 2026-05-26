@@ -3248,7 +3248,7 @@ function taskDetails(state: EventPrepState, task: LiveTask) {
   };
 }
 
-function getAllowedAreas(state: EventPrepState, profile: Profile) {
+function getAllowedAreas(state: EventPrepState, profile: Profile): EventPrepState["areas"] {
   if (["super_admin", "admin"].includes(profile.role)) return state.areas;
   if (profile.role === "viewer") return dashboardAllowedAreas(state, profile);
   const accessAreaIds = state.areaAccess.filter((access) => access.profileId === profile.id).map((access) => access.areaId);
@@ -3279,14 +3279,14 @@ function viewerAccessFor(profile: Profile, state: Pick<EventPrepState, "areas" |
   };
 }
 
-function dashboardAllowedAreas(state: EventPrepState, profile: Profile) {
+function dashboardAllowedAreas(state: EventPrepState, profile: Profile): EventPrepState["areas"] {
   if (["super_admin", "admin"].includes(profile.role)) return state.areas;
   if (profile.role !== "viewer") return getAllowedAreas(state, profile);
   const access = viewerAccessFor(profile, state);
   return state.areas.filter((area) => access.areaIds.includes(area.id) && access.zoneTypeIds.includes(area.zoneTypeId));
 }
 
-function dashboardAllowedAreaIds(state: EventPrepState, profile: Profile) {
+function dashboardAllowedAreaIds(state: EventPrepState, profile: Profile): string[] {
   return dashboardAllowedAreas(state, profile).map((area) => area.id);
 }
 
