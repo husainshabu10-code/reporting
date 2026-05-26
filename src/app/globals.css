@@ -247,8 +247,9 @@ table {
 
   @media (min-width: 1024px) {
     .app-sidebar {
-      position: sticky;
+      position: fixed;
       top: 0;
+      left: 0;
       align-self: flex-start;
       height: 100vh;
     }
