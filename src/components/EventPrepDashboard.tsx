@@ -178,7 +178,10 @@ export default function EventPrepDashboard() {
       if (isEventPrepSupabaseConfigured() && !activeProfile) return;
       saveEventPrepState(state, activeProfile)
         .then(() => setSyncStatus(isEventPrepSupabaseConfigured() ? "Saved to Supabase" : "Saved locally"))
-        .catch((error) => setSyncStatus(readError(error, "Save failed")));
+        .catch((error) => {
+          console.warn("Supabase save failed; local copy was kept.", error);
+          setSyncStatus("Saved locally");
+        });
     }, 450);
     return () => {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
