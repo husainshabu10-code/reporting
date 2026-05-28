@@ -27,7 +27,6 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Trash2,
-  Upload,
   Users,
   X
 } from "lucide-react";
@@ -371,10 +370,6 @@ export default function EventPrepDashboard() {
     setMobileActionsOpen(false);
     setNotificationsOpen(true);
   };
-  const openImportCsv = () => {
-    setMobileActionsOpen(false);
-    openWorkspace("Master Tasks", "Import CSV opened", "Use the import panel to add reference suggestions from CSV or Excel.");
-  };
   const isDailyReportsTab = activeTab === "Daily Reports";
   const usesChartControls = activeTab === "Dashboard" || isDailyReportsTab;
   const headerSubtitle = isDailyReportsTab
@@ -499,17 +494,9 @@ export default function EventPrepDashboard() {
               </div>
               <div className="top-action-cluster">
                 <div className="top-actions-desktop">
-                  {usesChartControls ? <button className="top-action-btn" onClick={openChartSettings} title="Chart Settings" aria-label="Chart Settings"><SlidersHorizontal size={18} /> <span className="hidden 2xl:inline">Chart Settings</span></button> : null}
-                  {usesChartControls ? <button className="top-action-btn presentation-action" onClick={openPresentation} title="Presentation Mode" aria-label="Presentation Mode"><MonitorPlay size={18} /> <span className="hidden 2xl:inline">Presentation</span></button> : null}
-                  {isDailyReportsTab && isAdmin ? (
-                    <>
-                      <button className="top-action-btn" onClick={openAddArea}><MapPinPlus size={18} /> <span className="hidden 2xl:inline">Add Area</span></button>
-                      <button className="top-action-btn top-action-primary" onClick={openAddTask}><Plus size={18} /> <span>Add Task</span></button>
-                      <button className="top-action-btn" onClick={runExportCsv}><FileDown size={18} /> <span className="hidden 2xl:inline">Export CSV</span></button>
-                      <button className="top-action-btn" onClick={openImportCsv}><Upload size={18} /> <span className="hidden 2xl:inline">Import CSV</span></button>
-                    </>
-                  ) : null}
-                  {!isDailyReportsTab && isAdmin ? (
+                  {usesChartControls ? <button className="top-action-btn top-action-icon" onClick={openChartSettings} title="Chart Settings" aria-label="Chart Settings"><SlidersHorizontal size={18} /></button> : null}
+                  {usesChartControls ? <button className="top-action-btn top-action-icon presentation-action" onClick={openPresentation} title="Presentation Mode" aria-label="Presentation Mode"><MonitorPlay size={18} /></button> : null}
+                  {isAdmin ? (
                     <div className="create-action-wrap">
                       <button className="top-action-btn top-action-primary create-action-btn" onClick={() => setCreateMenuOpen((open) => !open)} aria-expanded={createMenuOpen} aria-haspopup="menu">
                         <Plus size={18} />
@@ -524,7 +511,7 @@ export default function EventPrepDashboard() {
                       ) : null}
                     </div>
                   ) : null}
-                  {!isDailyReportsTab && isAdmin ? <button className="top-action-btn top-action-icon" onClick={runExportCsv} title="Export CSV" aria-label="Export CSV"><FileDown size={18} /></button> : null}
+                  {isAdmin ? <button className="top-action-btn top-action-icon" onClick={runExportCsv} title="Export CSV" aria-label="Export CSV"><FileDown size={18} /></button> : null}
                 </div>
                 {usesChartControls || isAdmin ? (
                   <div className="top-actions-mobile">
@@ -540,7 +527,6 @@ export default function EventPrepDashboard() {
                           {isAdmin ? <button onClick={openAddArea} role="menuitem"><MapPinPlus size={17} /> Add Area</button> : null}
                           {isAdmin ? <button onClick={openAddTask} role="menuitem"><ClipboardPlus size={17} /> Add Task</button> : null}
                           {isAdmin ? <button onClick={runExportCsv} role="menuitem"><FileDown size={17} /> Export CSV</button> : null}
-                          {isAdmin ? <button onClick={openImportCsv} role="menuitem"><Upload size={17} /> Import CSV</button> : null}
                         </div>
                       ) : null}
                     </div>
@@ -647,10 +633,6 @@ function DashboardTab({ state, currentProfile, presentationMode = false, chartSe
     return { label: workstream, value: percent(verified, tasks.length), helper: `${tasks.length} live tasks` };
   });
   const pendingRequestsCount = metrics.pendingRequests;
-  const generatedAlerts: Array<Pick<InAppNotification, "id" | "type" | "title" | "message">> = buildUserAlerts(state, currentProfile).slice(0, 2);
-  const alertCards = generatedAlerts.length
-    ? generatedAlerts
-    : [{ id: "clear", type: "All clear", title: "No urgent alerts", message: "Nothing needs immediate attention." }];
   const quickStatusRows = [
     { label: "Total Tasks", value: String(scopedTasks.length), helper: "Filtered scope", tone: "good" as const },
     { label: "Verified Tasks", value: String(scopedVerified), helper: "Counts as complete", tone: "good" as const },
@@ -692,31 +674,6 @@ function DashboardTab({ state, currentProfile, presentationMode = false, chartSe
         <MetricCard title="Countdown to Event" value={`${metrics.daysToEvent}d`} helper={state.settings.eventStartDate} />
         <MetricCard title="Pending Requests" value={String(pendingRequestsCount)} helper="Requests needing review" tone="warning" />
       </div>
-
-      {!presentationMode ? (
-        <section className="dashboard-alerts-card">
-          <div className="dashboard-card-heading">
-            <div className="flex items-center gap-2">
-              <Bell size={18} className="text-[var(--color-accent)]" />
-              <h3>Alerts & Notifications</h3>
-            </div>
-            <button className="dashboard-link-button" type="button" onClick={() => document.querySelector<HTMLButtonElement>(".notification-bell")?.click()}>View all alerts ({generatedAlerts.length})</button>
-          </div>
-          <div className="dashboard-alert-grid">
-            {alertCards.map((alert) => (
-              <div key={alert.id} className="dashboard-alert-item">
-                <span className="dashboard-alert-icon"><Bell size={18} /></span>
-                <div>
-                  <p className="dashboard-alert-type">{alert.type}</p>
-                  <h4>{alert.title}</h4>
-                  <p>{alert.message}</p>
-                </div>
-                <ChevronDown size={16} className="-rotate-90 text-[var(--color-primary)]" />
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
 
       <div className="dashboard-main-grid">
         <Panel title="Zone Type Progress" action={<Badge>Verified completed only</Badge>}>
@@ -1056,7 +1013,6 @@ function DailyReportsTab({
   const lateReports = todayReports.filter((report) => report.status === "Late Submitted").length;
   const pendingRequests = scopedState.requests.filter((request) => ["Under Review", "Sent for Verification", "Need More Info"].includes(request.status)).length;
   const attentionRows = buildAttention(scopedState);
-  const alertCards = buildUserAlerts(scopedState, currentProfile).filter((alert) => ["Missing report", "Daily report reminder", "Request status changed"].includes(alert.type)).slice(0, 2);
   const recentReminderActivity = state.activityLogs
     .filter((log) => `${log.category} ${log.action}`.toLowerCase().includes("reminder") || `${log.category} ${log.action}`.toLowerCase().includes("escalation"))
     .slice(0, 5);
@@ -1075,32 +1031,6 @@ function DailyReportsTab({
 
       <div className="daily-reports-layout">
         <div className="daily-reports-main">
-          <section className="daily-card motion-card">
-            <div className="daily-card-header">
-              <div className="daily-title-row">
-                <Bell size={18} className="text-[var(--color-accent)]" />
-                <h2>Alerts & Notifications</h2>
-              </div>
-              <button className="daily-link-button" type="button" onClick={openNotifications}>
-                View all alerts
-                <ChevronDown size={15} className="-rotate-90" />
-              </button>
-            </div>
-            <div className="daily-alert-grid">
-              {alertCards.length ? alertCards.map((alert) => (
-                <button key={alert.id} className={`daily-alert-card ${alert.type.toLowerCase().includes("request") ? "is-info" : "is-warning"}`} type="button" onClick={openNotifications}>
-                  <span className="daily-alert-icon"><Bell size={20} /></span>
-                  <span className="min-w-0 text-left">
-                    <span className="daily-alert-type">{alert.type}</span>
-                    <strong>{alert.title}</strong>
-                    <small>{alert.message}</small>
-                  </span>
-                  <ChevronDown size={16} className="-rotate-90 text-[var(--color-primary)]" />
-                </button>
-              )) : <EmptyState title="No alerts at the moment" body="Nothing requires attention for Daily Reports right now." />}
-            </div>
-          </section>
-
           <section className="daily-card motion-card">
             <div className="daily-card-header">
               <div className="daily-title-row">
