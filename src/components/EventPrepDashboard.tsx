@@ -10,7 +10,7 @@ import {
   CheckCircle2,
   ChevronDown,
   ClipboardCheck,
-  Download,
+  ClipboardPlus,
   Eye,
   FileDown,
   FileSpreadsheet,
@@ -18,13 +18,14 @@ import {
   Filter,
   KeyRound,
   LogOut,
+  MapPinPlus,
   Menu,
+  MonitorPlay,
+  MoreVertical,
   Plus,
-  Presentation,
-  Settings2,
   ShieldCheck,
+  SlidersHorizontal,
   Trash2,
-  Upload,
   Users,
   X
 } from "lucide-react";
@@ -163,6 +164,8 @@ export default function EventPrepDashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [presentationMode, setPresentationMode] = useState(false);
   const [chartSettingsOpen, setChartSettingsOpen] = useState(false);
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
+  const [mobileActionsOpen, setMobileActionsOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [dashboardCharts, setDashboardCharts] = useState<DashboardChartSettings>(DEFAULT_DASHBOARD_CHARTS);
   const [syncStatus, setSyncStatus] = useState("Loading");
@@ -338,6 +341,28 @@ export default function EventPrepDashboard() {
     exportLiveTasksCsv(state);
     showToast("CSV exported", "Live task summary downloaded from the dashboard.", "success");
   };
+  const openAddArea = () => {
+    setCreateMenuOpen(false);
+    setMobileActionsOpen(false);
+    openWorkspace("Zones / Areas", "Area setup opened", "Create or update event areas from this tab.");
+  };
+  const openAddTask = () => {
+    setCreateMenuOpen(false);
+    setMobileActionsOpen(false);
+    openWorkspace("Master Tasks", "Task setup opened", "Add a custom live task or use a reference suggestion.");
+  };
+  const openChartSettings = () => {
+    setMobileActionsOpen(false);
+    setChartSettingsOpen(true);
+  };
+  const openPresentation = () => {
+    setMobileActionsOpen(false);
+    setPresentationMode(true);
+  };
+  const runExportCsv = () => {
+    setMobileActionsOpen(false);
+    exportCsv();
+  };
 
   if (presentationMode && activeTab === "Dashboard") {
     return (
@@ -454,13 +479,46 @@ export default function EventPrepDashboard() {
                   <p className="mt-1 text-sm font-bold text-[var(--color-text-muted)]">Real-time overview of IT readiness, reporting, and outstanding actions.</p>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {activeTab === "Dashboard" ? <button className="top-action-btn" onClick={() => setChartSettingsOpen(true)}><Settings2 size={16} /> Chart Settings</button> : null}
-                {activeTab === "Dashboard" ? <button className="top-action-btn" onClick={() => setPresentationMode(true)}><Presentation size={16} /> Presentation</button> : null}
-                {isAdmin ? <button className="top-action-btn" onClick={() => openWorkspace("Zones / Areas", "Area setup opened", "Create or update event areas from this tab.")}><Plus size={16} /> Add Area</button> : null}
-                {isAdmin ? <button className="top-action-btn top-action-primary" onClick={() => openWorkspace("Master Tasks", "Task setup opened", "Add a custom live task or use a reference suggestion.")}><Plus size={16} /> Add Task</button> : null}
-                {isAdmin ? <button className="top-action-btn" onClick={exportCsv}><Download size={16} /> Export CSV</button> : null}
-                {isAdmin ? <button className="top-action-btn" onClick={() => openWorkspace("Master Tasks", "Import panel opened", "Use the upload control to import Excel or CSV reference suggestions.")}><Upload size={16} /> Import CSV</button> : null}
+              <div className="top-action-cluster">
+                <div className="top-actions-desktop">
+                  {activeTab === "Dashboard" ? <button className="top-action-btn top-action-icon" onClick={openChartSettings} title="Chart Settings" aria-label="Chart Settings"><SlidersHorizontal size={18} /></button> : null}
+                  {activeTab === "Dashboard" ? <button className="top-action-btn top-action-icon presentation-action" onClick={openPresentation} title="Presentation Mode" aria-label="Presentation Mode"><MonitorPlay size={18} /></button> : null}
+                  {isAdmin ? (
+                    <div className="create-action-wrap">
+                      <button className="top-action-btn top-action-primary create-action-btn" onClick={() => setCreateMenuOpen((open) => !open)} aria-expanded={createMenuOpen} aria-haspopup="menu">
+                        <Plus size={18} />
+                        <span>Create</span>
+                        <ChevronDown size={16} className={createMenuOpen ? "rotate-180 transition-transform" : "transition-transform"} />
+                      </button>
+                      {createMenuOpen ? (
+                        <div className="create-action-menu" role="menu">
+                          <button onClick={openAddArea} role="menuitem"><MapPinPlus size={18} /> Add Area</button>
+                          <button onClick={openAddTask} role="menuitem"><ClipboardPlus size={18} /> Add Task</button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {isAdmin ? <button className="top-action-btn top-action-icon" onClick={runExportCsv} title="Export CSV" aria-label="Export CSV"><FileDown size={18} /></button> : null}
+                </div>
+                {activeTab === "Dashboard" || isAdmin ? (
+                  <div className="top-actions-mobile">
+                    {activeTab === "Dashboard" ? <button className="top-action-btn top-action-icon presentation-action" onClick={openPresentation} title="Presentation Mode" aria-label="Presentation Mode"><MonitorPlay size={18} /></button> : null}
+                    <div className="mobile-action-wrap">
+                      <button className="top-action-btn top-action-icon" onClick={() => setMobileActionsOpen((open) => !open)} aria-expanded={mobileActionsOpen} aria-label="Open action menu">
+                        <MoreVertical size={18} />
+                      </button>
+                      {mobileActionsOpen ? (
+                        <div className="mobile-action-menu" role="menu">
+                          {activeTab === "Dashboard" ? <button onClick={openChartSettings} role="menuitem"><SlidersHorizontal size={17} /> Chart Settings</button> : null}
+                          {activeTab === "Dashboard" ? <button onClick={openPresentation} role="menuitem"><MonitorPlay size={17} /> Presentation Mode</button> : null}
+                          {isAdmin ? <button onClick={openAddArea} role="menuitem"><MapPinPlus size={17} /> Add Area</button> : null}
+                          {isAdmin ? <button onClick={openAddTask} role="menuitem"><ClipboardPlus size={17} /> Add Task</button> : null}
+                          {isAdmin ? <button onClick={runExportCsv} role="menuitem"><FileDown size={17} /> Export CSV</button> : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
                 <div className="notification-bell-wrap">
                   <button className={`top-action-btn notification-bell ${notificationCount ? "has-unread" : ""}`} onClick={() => setNotificationsOpen((open) => !open)} aria-expanded={notificationsOpen} aria-label="Open notifications">
                     <Bell size={16} />
