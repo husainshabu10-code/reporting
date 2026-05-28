@@ -1201,7 +1201,7 @@ function LiveTasksConfigTable({
             const progress = tasks.length ? Math.round((completedCount / tasks.length) * 100) : 0;
             const collapsed = collapsedGroups.includes(groupKey);
             return (
-              <div key={groupKey} className="task-workstream-block">
+              <div key={groupKey} className={`task-workstream-block ${collapsed ? "is-collapsed" : "is-open"}`}>
                 <button className="task-workstream-header" onClick={() => toggleGroup(groupKey)} aria-expanded={!collapsed}>
                   <div className="min-w-0">
                     <p className="font-black text-[var(--color-primary)]">Workstream: {workstream}</p>
