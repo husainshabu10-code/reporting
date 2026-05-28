@@ -24,6 +24,7 @@ import {
   Settings2,
   ShieldCheck,
   Trash2,
+  Upload,
   Users,
   X
 } from "lucide-react";
@@ -148,6 +149,11 @@ const USER_TABS: UserTab[] = ["Daily Report", "My Area", "Requests", "Profile / 
 const AREA_ADMIN_TABS: AnyTab[] = ["My Area", "Users & Access", "Requests", "Profile / Access"];
 const VERIFIER_TABS: AnyTab[] = ["Verification", "Requests", "Users & Access", "Profile / Access"];
 const VIEWER_TABS: AnyTab[] = ["Dashboard", "Profile / Access"];
+const SIDEBAR_SECTIONS: Array<{ title: string; tabs: AnyTab[] }> = [
+  { title: "Operations", tabs: ["Dashboard", "Daily Reports", "Daily Report", "My Area", "Master Tasks", "Zones / Areas", "Verification", "Requests"] },
+  { title: "Administration", tabs: ["Users & Access", "Forms", "Global Fields", "Profile / Access"] },
+  { title: "Insights", tabs: ["Reports", "Activity Log"] }
+];
 
 export default function EventPrepDashboard() {
   const [state, setState] = useState<EventPrepState | null>(null);
@@ -386,28 +392,39 @@ export default function EventPrepDashboard() {
                 <div className="min-w-0">
                   <p className="truncate text-base font-black text-white">{currentProfile.fullName}</p>
                   <p className="mt-0.5 text-sm font-black text-[var(--color-accent-light)]">{roleLabel(currentProfile.role)}</p>
-                  <p className="mt-1 truncate text-xs font-bold text-white/68">{currentProfile.email}</p>
+                  <p className="mt-1 truncate text-xs font-bold text-white/70">{currentProfile.email}</p>
                 </div>
               </div>
             )}
             <p className="mt-2 text-xs text-white/70">{syncStatus}</p>
           </div>
 
-          <nav className="mt-5 flex-1 space-y-2 px-4">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                className={`sidebar-nav-item group flex min-h-12 w-full items-center gap-3 rounded-lg px-4 text-left text-sm font-black ${activeTab === tab ? "is-active bg-[var(--color-accent)] text-[var(--color-primary)] shadow-lg shadow-black/10" : "text-white/90 hover:bg-white/10 hover:text-white"} ${sidebarCollapsed ? "lg:justify-center lg:px-2" : ""}`}
-                onClick={() => {
-                  setActiveTab(tab);
-                  setSidebarOpen(false);
-                }}
-                title={tab}
-              >
-                <span className="flex-none">{tabIcon(tab)}</span>
-                <span className={sidebarCollapsed ? "lg:hidden" : ""}>{tab}</span>
-              </button>
-            ))}
+          <nav className="mt-5 flex-1 space-y-5 px-4">
+            {SIDEBAR_SECTIONS.map((section) => {
+              const sectionTabs = section.tabs.filter((tab) => tabs.includes(tab));
+              if (!sectionTabs.length) return null;
+              return (
+                <div key={section.title} className="sidebar-section">
+                  <p className={`sidebar-section-label ${sidebarCollapsed ? "lg:hidden" : ""}`}>{section.title}</p>
+                  <div className="mt-2 space-y-2">
+                    {sectionTabs.map((tab) => (
+                      <button
+                        key={tab}
+                        className={`sidebar-nav-item group flex min-h-12 w-full items-center gap-3 rounded-lg px-4 text-left text-sm font-black ${activeTab === tab ? "is-active bg-[var(--color-accent)] text-[var(--color-primary)] shadow-lg shadow-black/10" : "text-white/90 hover:bg-white/10 hover:text-white"} ${sidebarCollapsed ? "lg:justify-center lg:px-2" : ""}`}
+                        onClick={() => {
+                          setActiveTab(tab);
+                          setSidebarOpen(false);
+                        }}
+                        title={tab}
+                      >
+                        <span className="flex-none">{tabIcon(tab)}</span>
+                        <span className={sidebarCollapsed ? "lg:hidden" : ""}>{tab}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </nav>
 
           {!isEventPrepSupabaseConfigured() ? null : <div className={`m-5 rounded-lg border border-white/10 bg-white/10 p-3 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
@@ -434,6 +451,7 @@ export default function EventPrepDashboard() {
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.08em] text-[var(--color-accent)]">{activeTab}</p>
                   <h2 className="text-2xl font-black leading-tight text-[var(--color-primary)]">IT / Event Preparation Dashboard</h2>
+                  <p className="mt-1 text-sm font-bold text-[var(--color-text-muted)]">Real-time overview of IT readiness, reporting, and outstanding actions.</p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -442,6 +460,7 @@ export default function EventPrepDashboard() {
                 {isAdmin ? <button className="top-action-btn" onClick={() => openWorkspace("Zones / Areas", "Area setup opened", "Create or update event areas from this tab.")}><Plus size={16} /> Add Area</button> : null}
                 {isAdmin ? <button className="top-action-btn top-action-primary" onClick={() => openWorkspace("Master Tasks", "Task setup opened", "Add a custom live task or use a reference suggestion.")}><Plus size={16} /> Add Task</button> : null}
                 {isAdmin ? <button className="top-action-btn" onClick={exportCsv}><Download size={16} /> Export CSV</button> : null}
+                {isAdmin ? <button className="top-action-btn" onClick={() => openWorkspace("Master Tasks", "Import panel opened", "Use the upload control to import Excel or CSV reference suggestions.")}><Upload size={16} /> Import CSV</button> : null}
                 <div className="notification-bell-wrap">
                   <button className={`top-action-btn notification-bell ${notificationCount ? "has-unread" : ""}`} onClick={() => setNotificationsOpen((open) => !open)} aria-expanded={notificationsOpen} aria-label="Open notifications">
                     <Bell size={16} />
@@ -542,12 +561,22 @@ function DashboardTab({ state, currentProfile, presentationMode = false, chartSe
     const verified = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed").length;
     return { label: workstream, value: percent(verified, tasks.length), helper: `${tasks.length} live tasks` };
   });
+  const pendingRequestsCount = metrics.pendingRequests;
+  const generatedAlerts: Array<Pick<InAppNotification, "id" | "type" | "title" | "message">> = buildUserAlerts(state, currentProfile).slice(0, 2);
+  const alertCards = generatedAlerts.length
+    ? generatedAlerts
+    : [{ id: "clear", type: "All clear", title: "No urgent alerts", message: "Nothing needs immediate attention." }];
+  const quickStatusRows = [
+    { label: "Total Tasks", value: String(scopedTasks.length), helper: "Filtered scope", tone: "good" as const },
+    { label: "Verified Tasks", value: String(scopedVerified), helper: "Counts as complete", tone: "good" as const },
+    { label: "In Progress", value: String(scopedTasks.filter((task) => latest.get(task.id)?.status === "In Progress").length), helper: "Currently active", tone: "warning" as const }
+  ];
 
   return (
-    <div className="space-y-5">
-      {!presentationMode ? <section className="rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm">
+    <div className="premium-dashboard space-y-5">
+      {!presentationMode ? <section className="dashboard-filter-card">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <button className="btn-primary w-full sm:w-auto" onClick={() => setFiltersOpen((current) => !current)}>
+          <button className="btn-secondary w-full sm:w-auto" onClick={() => setFiltersOpen((current) => !current)}>
             <Filter size={17} /> Filter
           </button>
           <p className="text-sm text-[var(--color-text-muted)]">
@@ -570,15 +599,41 @@ function DashboardTab({ state, currentProfile, presentationMode = false, chartSe
         ) : null}
       </section> : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="dashboard-kpi-grid">
         <MetricCard title="Overall Verified Completion" value={`${percent(scopedVerified, scopedTasks.length)}%`} helper={`${scopedVerified}/${scopedTasks.length} verified in scope`} tone="good" />
         <MetricCard title="Daily Reports Submitted" value={String(metrics.submittedReports)} helper={presentationMode ? "Submitted reports" : `${metrics.missingOrPartialReports} missing or partial`} />
         <MetricCard title="Needs Verification" value={String(metrics.needsVerification)} helper={presentationMode ? "Awaiting review" : "Completed by users, awaiting review"} tone="warning" />
         <MetricCard title="Issue Found Tasks" value={String(metrics.issueFound)} helper={presentationMode ? "Attention count" : "User flagged task issues"} tone="critical" />
         <MetricCard title="Countdown to Event" value={`${metrics.daysToEvent}d`} helper={state.settings.eventStartDate} />
+        <MetricCard title="Pending Requests" value={String(pendingRequestsCount)} helper="Requests needing review" tone="warning" />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+      {!presentationMode ? (
+        <section className="dashboard-alerts-card">
+          <div className="dashboard-card-heading">
+            <div className="flex items-center gap-2">
+              <Bell size={18} className="text-[var(--color-accent)]" />
+              <h3>Alerts & Notifications</h3>
+            </div>
+            <button className="dashboard-link-button" type="button" onClick={() => document.querySelector<HTMLButtonElement>(".notification-bell")?.click()}>View all alerts ({generatedAlerts.length})</button>
+          </div>
+          <div className="dashboard-alert-grid">
+            {alertCards.map((alert) => (
+              <div key={alert.id} className="dashboard-alert-item">
+                <span className="dashboard-alert-icon"><Bell size={18} /></span>
+                <div>
+                  <p className="dashboard-alert-type">{alert.type}</p>
+                  <h4>{alert.title}</h4>
+                  <p>{alert.message}</p>
+                </div>
+                <ChevronDown size={16} className="-rotate-90 text-[var(--color-primary)]" />
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <div className="dashboard-main-grid">
         <Panel title="Zone Type Progress" action={<Badge>Verified completed only</Badge>}>
           <DashboardChartVisual rows={zoneRows.map((row) => ({ label: row.label, value: row.percent, helper: `${row.verified}/${row.total} tasks` }))} type={chartSettings.zoneType} />
         </Panel>
@@ -587,7 +642,7 @@ function DashboardTab({ state, currentProfile, presentationMode = false, chartSe
         </Panel>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="dashboard-lower-grid">
         <Panel title="Area-Wise Progress">
           <DashboardChartVisual rows={areaProgressRows} type={chartSettings.area} />
         </Panel>
@@ -596,6 +651,24 @@ function DashboardTab({ state, currentProfile, presentationMode = false, chartSe
         </Panel>
         <Panel title="Workstream Progress">
           <DashboardChartVisual rows={workstreamRows} type={chartSettings.workstream} />
+        </Panel>
+        <Panel title="Quick Status">
+          <div className="quick-status-grid">
+            {quickStatusRows.map((item) => (
+              <div key={item.label} className={`quick-status-item tone-${item.tone}`}>
+                <span className="quick-status-icon"><CheckCircle2 size={18} /></span>
+                <div>
+                  <p>{item.label}</p>
+                  <strong>{item.value}</strong>
+                  <small>{item.helper}</small>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex items-center justify-between border-t border-[var(--color-border)] pt-3 text-xs font-bold text-[var(--color-text-muted)]">
+            <span>Last updated: {new Date().toLocaleDateString()}</span>
+            <span className="text-[var(--color-secondary)]">Auto refresh: On</span>
+          </div>
         </Panel>
       </div>
     </div>
@@ -636,11 +709,14 @@ function DashboardAttentionVisual({ rows, type }: { rows: ReturnType<typeof buil
     );
   }
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
+    <div className="attention-card-grid">
       {rows.map((item) => (
-        <div key={item.label} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-          <p className="text-xl font-black text-[var(--color-primary)]">{item.count}</p>
-          <p className="text-xs font-bold text-[var(--color-text-muted)]">{item.label}</p>
+        <div key={item.label} className={`attention-mini-card ${attentionToneClass(item.label)}`}>
+          <span className="attention-mini-icon"><Bell size={16} /></span>
+          <div>
+            <p>{item.count}</p>
+            <span>{item.label}</span>
+          </div>
         </div>
       ))}
     </div>
@@ -3545,14 +3621,36 @@ function ToastStack({ toasts, dismissToast }: { toasts: ToastMessage[]; dismissT
 }
 
 function MetricCard({ title, value, helper, tone }: { title: string; value: string; helper: string; tone?: "good" | "warning" | "critical" }) {
-  const color = tone === "critical" ? "text-[var(--color-important)]" : tone === "warning" ? "text-[var(--color-accent)]" : "text-[var(--color-primary)]";
+  const normalizedTone = tone || "good";
+  const icon = metricIconFor(title);
   return (
-    <div className="motion-card animate-fade-in rounded-lg border border-[var(--color-border)] bg-white p-4 shadow-sm">
-      <p className="text-xs font-bold uppercase text-[var(--color-text-muted)]">{title}</p>
-      <p className={`mt-2 text-3xl font-black ${color}`}>{value}</p>
-      <p className="mt-1 text-xs text-[var(--color-text-muted)]">{helper}</p>
+    <div className={`metric-card metric-${normalizedTone} motion-card animate-fade-in`}>
+      <span className="metric-icon">{icon}</span>
+      <div className="min-w-0">
+        <p className="metric-label">{title}</p>
+        <p className="metric-value">{value}</p>
+        <p className="metric-helper">{helper}</p>
+      </div>
+      <span className="metric-line" aria-hidden="true" />
     </div>
   );
+}
+
+function metricIconFor(title: string) {
+  if (title.includes("Verified")) return <ShieldCheck size={22} />;
+  if (title.includes("Daily")) return <FileText size={22} />;
+  if (title.includes("Verification")) return <Users size={22} />;
+  if (title.includes("Issue")) return <ClipboardCheck size={22} />;
+  if (title.includes("Countdown")) return <CalendarClock size={22} />;
+  if (title.includes("Requests")) return <FileSpreadsheet size={22} />;
+  return <CheckCircle2 size={22} />;
+}
+
+function attentionToneClass(label: string) {
+  const lower = label.toLowerCase();
+  if (lower.includes("issue") || lower.includes("rejected") || lower.includes("overdue") || lower.includes("late")) return "is-critical";
+  if (lower.includes("pending") || lower.includes("verification") || lower.includes("partial") || lower.includes("missing")) return "is-warning";
+  return "is-neutral";
 }
 
 function ProgressRow({ label, value, helper }: { label: string; value: number; helper: string }) {
