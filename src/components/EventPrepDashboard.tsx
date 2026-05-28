@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ClipboardCheck,
   ClipboardPlus,
+  Download,
   Eye,
   FileDown,
   FileSpreadsheet,
@@ -26,6 +27,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Trash2,
+  Upload,
   Users,
   X
 } from "lucide-react";
@@ -365,8 +367,21 @@ export default function EventPrepDashboard() {
     setMobileActionsOpen(false);
     exportCsv();
   };
+  const openNotificationsPanel = () => {
+    setMobileActionsOpen(false);
+    setNotificationsOpen(true);
+  };
+  const openImportCsv = () => {
+    setMobileActionsOpen(false);
+    openWorkspace("Master Tasks", "Import CSV opened", "Use the import panel to add reference suggestions from CSV or Excel.");
+  };
+  const isDailyReportsTab = activeTab === "Daily Reports";
+  const usesChartControls = activeTab === "Dashboard" || isDailyReportsTab;
+  const headerSubtitle = isDailyReportsTab
+    ? "Track area-wise daily submissions, missing reports, and in-app reminder rules."
+    : "Real-time overview of IT readiness, reporting, and outstanding actions.";
 
-  if (presentationMode && activeTab === "Dashboard") {
+  if (presentationMode && (activeTab === "Dashboard" || isDailyReportsTab)) {
     return (
       <main className="min-h-screen bg-[var(--color-bg)] p-4 text-[var(--color-text)]">
         <div className="mx-auto max-w-[96rem]">
@@ -377,7 +392,8 @@ export default function EventPrepDashboard() {
             </div>
             <button className="btn-primary" onClick={() => setPresentationMode(false)}>Exit Presentation</button>
           </div>
-          <DashboardTab state={state} currentProfile={currentProfile} presentationMode />
+          {activeTab === "Dashboard" ? <DashboardTab state={state} currentProfile={currentProfile} presentationMode /> : null}
+          {isDailyReportsTab ? <DailyReportsTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} openWorkspace={openWorkspace} openNotifications={() => showToast("Notifications", "Exit presentation mode to review and mark notifications.", "info")} /> : null}
         </div>
         <ToastStack toasts={toasts} dismissToast={dismissToast} />
       </main>
@@ -478,14 +494,22 @@ export default function EventPrepDashboard() {
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.08em] text-[var(--color-accent)]">{activeTab}</p>
                   <h2 className="text-2xl font-black leading-tight text-[var(--color-primary)]">IT / Event Preparation Dashboard</h2>
-                  <p className="mt-1 text-sm font-bold text-[var(--color-text-muted)]">Real-time overview of IT readiness, reporting, and outstanding actions.</p>
+                  <p className="mt-1 text-sm font-bold text-[var(--color-text-muted)]">{headerSubtitle}</p>
                 </div>
               </div>
               <div className="top-action-cluster">
                 <div className="top-actions-desktop">
-                  {activeTab === "Dashboard" ? <button className="top-action-btn top-action-icon" onClick={openChartSettings} title="Chart Settings" aria-label="Chart Settings"><SlidersHorizontal size={18} /></button> : null}
-                  {activeTab === "Dashboard" ? <button className="top-action-btn top-action-icon presentation-action" onClick={openPresentation} title="Presentation Mode" aria-label="Presentation Mode"><MonitorPlay size={18} /></button> : null}
-                  {isAdmin ? (
+                  {usesChartControls ? <button className="top-action-btn" onClick={openChartSettings} title="Chart Settings" aria-label="Chart Settings"><SlidersHorizontal size={18} /> <span className="hidden 2xl:inline">Chart Settings</span></button> : null}
+                  {usesChartControls ? <button className="top-action-btn presentation-action" onClick={openPresentation} title="Presentation Mode" aria-label="Presentation Mode"><MonitorPlay size={18} /> <span className="hidden 2xl:inline">Presentation</span></button> : null}
+                  {isDailyReportsTab && isAdmin ? (
+                    <>
+                      <button className="top-action-btn" onClick={openAddArea}><MapPinPlus size={18} /> <span className="hidden 2xl:inline">Add Area</span></button>
+                      <button className="top-action-btn top-action-primary" onClick={openAddTask}><Plus size={18} /> <span>Add Task</span></button>
+                      <button className="top-action-btn" onClick={runExportCsv}><FileDown size={18} /> <span className="hidden 2xl:inline">Export CSV</span></button>
+                      <button className="top-action-btn" onClick={openImportCsv}><Upload size={18} /> <span className="hidden 2xl:inline">Import CSV</span></button>
+                    </>
+                  ) : null}
+                  {!isDailyReportsTab && isAdmin ? (
                     <div className="create-action-wrap">
                       <button className="top-action-btn top-action-primary create-action-btn" onClick={() => setCreateMenuOpen((open) => !open)} aria-expanded={createMenuOpen} aria-haspopup="menu">
                         <Plus size={18} />
@@ -500,22 +524,23 @@ export default function EventPrepDashboard() {
                       ) : null}
                     </div>
                   ) : null}
-                  {isAdmin ? <button className="top-action-btn top-action-icon" onClick={runExportCsv} title="Export CSV" aria-label="Export CSV"><FileDown size={18} /></button> : null}
+                  {!isDailyReportsTab && isAdmin ? <button className="top-action-btn top-action-icon" onClick={runExportCsv} title="Export CSV" aria-label="Export CSV"><FileDown size={18} /></button> : null}
                 </div>
-                {activeTab === "Dashboard" || isAdmin ? (
+                {usesChartControls || isAdmin ? (
                   <div className="top-actions-mobile">
-                    {activeTab === "Dashboard" ? <button className="top-action-btn top-action-icon presentation-action" onClick={openPresentation} title="Presentation Mode" aria-label="Presentation Mode"><MonitorPlay size={18} /></button> : null}
+                    {usesChartControls ? <button className="top-action-btn top-action-icon presentation-action" onClick={openPresentation} title="Presentation Mode" aria-label="Presentation Mode"><MonitorPlay size={18} /></button> : null}
                     <div className="mobile-action-wrap">
                       <button className="top-action-btn top-action-icon" onClick={() => setMobileActionsOpen((open) => !open)} aria-expanded={mobileActionsOpen} aria-label="Open action menu">
                         <MoreVertical size={18} />
                       </button>
                       {mobileActionsOpen ? (
                         <div className="mobile-action-menu" role="menu">
-                          {activeTab === "Dashboard" ? <button onClick={openChartSettings} role="menuitem"><SlidersHorizontal size={17} /> Chart Settings</button> : null}
-                          {activeTab === "Dashboard" ? <button onClick={openPresentation} role="menuitem"><MonitorPlay size={17} /> Presentation Mode</button> : null}
+                          {usesChartControls ? <button onClick={openChartSettings} role="menuitem"><SlidersHorizontal size={17} /> Chart Settings</button> : null}
+                          {usesChartControls ? <button onClick={openPresentation} role="menuitem"><MonitorPlay size={17} /> Presentation Mode</button> : null}
                           {isAdmin ? <button onClick={openAddArea} role="menuitem"><MapPinPlus size={17} /> Add Area</button> : null}
                           {isAdmin ? <button onClick={openAddTask} role="menuitem"><ClipboardPlus size={17} /> Add Task</button> : null}
                           {isAdmin ? <button onClick={runExportCsv} role="menuitem"><FileDown size={17} /> Export CSV</button> : null}
+                          {isAdmin ? <button onClick={openImportCsv} role="menuitem"><Upload size={17} /> Import CSV</button> : null}
                         </div>
                       ) : null}
                     </div>
@@ -538,7 +563,7 @@ export default function EventPrepDashboard() {
 
           <div className="animate-fade-in w-full p-3 sm:p-4 lg:p-5 2xl:p-6">
             {activeTab === "Dashboard" ? <DashboardTab state={state} currentProfile={currentProfile} chartSettings={dashboardCharts} /> : null}
-            {activeTab === "Daily Reports" ? <DailyReportsTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
+            {activeTab === "Daily Reports" ? <DailyReportsTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} openWorkspace={openWorkspace} openNotifications={openNotificationsPanel} /> : null}
             {activeTab === "Master Tasks" ? <MasterTasksTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
             {activeTab === "Zones / Areas" ? <ZonesAreasTab state={state} updateState={updateState} showToast={showToast} /> : null}
             {activeTab === "Verification" ? <VerificationTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
@@ -996,27 +1021,189 @@ function PasswordChangeScreen({ profile, onChanged, signOut }: { profile: Profil
   );
 }
 
-function DailyReportsTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
+function DailyReportsTab({
+  state,
+  currentProfile,
+  updateState,
+  showToast,
+  openWorkspace,
+  openNotifications
+}: {
+  state: EventPrepState;
+  currentProfile: Profile;
+  updateState: (updater: (current: EventPrepState) => EventPrepState) => void;
+  showToast: ShowToast;
+  openWorkspace?: (tab: AnyTab, title: string, message: string) => void;
+  openNotifications: () => void;
+}) {
   const today = todayIso();
-  const rows = state.areas.map((area) => {
+  const allowedAreas = dashboardAllowedAreas(state, currentProfile).filter((area) => area.active);
+  const allowedAreaIds = allowedAreas.map((area) => area.id);
+  const scopedState: EventPrepState = {
+    ...state,
+    areas: state.areas.filter((area) => allowedAreaIds.includes(area.id)),
+    liveTasks: state.liveTasks.filter((task) => allowedAreaIds.includes(task.areaId)),
+    dailyReports: state.dailyReports.filter((report) => allowedAreaIds.includes(report.areaId)),
+    requests: state.requests.filter((request) => allowedAreaIds.includes(request.areaId))
+  };
+  const metrics = buildMetricsForAreas(state, allowedAreaIds);
+  const todayReports = scopedState.dailyReports.filter((report) => report.reportDate === today);
+  const rows = allowedAreas.map((area) => {
     const report = state.dailyReports.find((item) => item.areaId === area.id && item.reportDate === today);
     return { area, report };
   });
+  const partialReports = todayReports.filter((report) => ["Draft Saved", "Partially Updated"].includes(report.status)).length;
+  const lateReports = todayReports.filter((report) => report.status === "Late Submitted").length;
+  const pendingRequests = scopedState.requests.filter((request) => ["Under Review", "Sent for Verification", "Need More Info"].includes(request.status)).length;
+  const attentionRows = buildAttention(scopedState);
+  const alertCards = buildUserAlerts(scopedState, currentProfile).filter((alert) => ["Missing report", "Daily report reminder", "Request status changed"].includes(alert.type)).slice(0, 2);
+  const recentReminderActivity = state.activityLogs
+    .filter((log) => `${log.category} ${log.action}`.toLowerCase().includes("reminder") || `${log.category} ${log.action}`.toLowerCase().includes("escalation"))
+    .slice(0, 5);
+  const submittedPercent = percent(metrics.submittedReports, Math.max(allowedAreas.length, 1));
+
   return (
-    <div className="space-y-4">
-      <Panel title="Daily Reports" action={<Badge>{today}</Badge>}>
-        <ResponsiveTable
-          headers={["Area", "Zone Type", "Status", "Remark", "Submitted"]}
-          rows={rows.map(({ area, report }) => [
-            area.name,
-            zoneName(state, area.zoneTypeId),
-            <StatusBadge key="status" value={report?.status || "Not Started"} />,
-            report?.generalRemark || "No report yet",
-            report?.submittedAt ? new Date(report.submittedAt).toLocaleString() : "-"
-          ])}
-        />
-      </Panel>
-      {["super_admin", "admin"].includes(currentProfile.role) ? <RemindersConfig state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
+    <div className="daily-reports-page space-y-5">
+      <div className="daily-report-kpis">
+        <MetricCard title="Total Areas" value={String(allowedAreas.length)} helper="Active areas" tone="good" />
+        <MetricCard title="Reports Submitted Today" value={String(metrics.submittedReports)} helper={`${submittedPercent}% of areas`} tone="good" />
+        <MetricCard title="Missing Reports" value={String(Math.max(0, metrics.missingOrPartialReports - partialReports))} helper={`${metrics.missingOrPartialReports} missing or partial`} tone="critical" />
+        <MetricCard title="Partially Updated" value={String(partialReports)} helper="Draft saved or partial" tone="warning" />
+        <MetricCard title="Late Submitted" value={String(lateReports)} helper="Submitted after deadline" tone="good" />
+        <MetricCard title="Pending Requests" value={String(pendingRequests)} helper={pendingRequests ? "Needs attention" : "No pending requests"} tone="warning" />
+      </div>
+
+      <div className="daily-reports-layout">
+        <div className="daily-reports-main">
+          <section className="daily-card motion-card">
+            <div className="daily-card-header">
+              <div className="daily-title-row">
+                <Bell size={18} className="text-[var(--color-accent)]" />
+                <h2>Alerts & Notifications</h2>
+              </div>
+              <button className="daily-link-button" type="button" onClick={openNotifications}>
+                View all alerts
+                <ChevronDown size={15} className="-rotate-90" />
+              </button>
+            </div>
+            <div className="daily-alert-grid">
+              {alertCards.length ? alertCards.map((alert) => (
+                <button key={alert.id} className={`daily-alert-card ${alert.type.toLowerCase().includes("request") ? "is-info" : "is-warning"}`} type="button" onClick={openNotifications}>
+                  <span className="daily-alert-icon"><Bell size={20} /></span>
+                  <span className="min-w-0 text-left">
+                    <span className="daily-alert-type">{alert.type}</span>
+                    <strong>{alert.title}</strong>
+                    <small>{alert.message}</small>
+                  </span>
+                  <ChevronDown size={16} className="-rotate-90 text-[var(--color-primary)]" />
+                </button>
+              )) : <EmptyState title="No alerts at the moment" body="Nothing requires attention for Daily Reports right now." />}
+            </div>
+          </section>
+
+          <section className="daily-card motion-card">
+            <div className="daily-card-header">
+              <div className="daily-title-row">
+                <FileText size={18} className="text-[var(--color-accent)]" />
+                <h2>Daily Reports Overview</h2>
+              </div>
+              <Badge>{today}</Badge>
+            </div>
+            <div className="daily-report-table-wrap">
+              <table className="daily-report-table">
+                <thead>
+                  <tr>
+                    <th>Area</th>
+                    <th>Zone Type</th>
+                    <th>Status</th>
+                    <th>Remark</th>
+                    <th>Submitted</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(({ area, report }) => (
+                    <tr key={area.id}>
+                      <td>
+                        <div className="daily-area-cell">
+                          <span className="daily-area-icon"><FileSpreadsheet size={15} /></span>
+                          <span>{area.name}</span>
+                        </div>
+                      </td>
+                      <td><span className="daily-soft-badge">{zoneName(state, area.zoneTypeId)}</span></td>
+                      <td><StatusBadge value={report?.status || "Not Started"} /></td>
+                      <td>{report?.generalRemark || "No report yet"}</td>
+                      <td>{report?.submittedAt ? new Date(report.submittedAt).toLocaleString() : "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!rows.length ? <EmptyState title="No daily report areas" body="No authorized active areas are available for this view." /> : null}
+            </div>
+            <div className="daily-report-mobile-list">
+              {rows.map(({ area, report }) => (
+                <article key={area.id} className="daily-report-mobile-card">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="daily-area-cell">
+                      <span className="daily-area-icon"><FileSpreadsheet size={15} /></span>
+                      <span>{area.name}</span>
+                    </div>
+                    <StatusBadge value={report?.status || "Not Started"} />
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="daily-soft-badge">{zoneName(state, area.zoneTypeId)}</span>
+                    <span className="daily-soft-badge">{report?.submittedAt ? new Date(report.submittedAt).toLocaleString() : "Not submitted"}</span>
+                  </div>
+                  <p className="mt-3 text-sm font-bold text-[var(--color-text-muted)]">{report?.generalRemark || "No report yet"}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          {["super_admin", "admin"].includes(currentProfile.role) ? <RemindersConfig state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
+        </div>
+
+        <aside className="daily-reports-side">
+          <section className="daily-card motion-card">
+            <div className="daily-card-header">
+              <div className="daily-title-row">
+                <Bell size={18} className="text-[var(--color-accent)]" />
+                <h2>Attention Required</h2>
+              </div>
+              <button className="daily-link-button" type="button" onClick={openNotifications}>
+                View all
+                <ChevronDown size={15} className="-rotate-90" />
+              </button>
+            </div>
+            <DashboardAttentionVisual rows={attentionRows} type="Score cards" />
+          </section>
+
+          <section className="daily-card motion-card">
+            <div className="daily-card-header">
+              <div className="daily-title-row">
+                <SlidersHorizontal size={18} className="text-[var(--color-secondary)]" />
+                <h2>Recent Reminder Activity</h2>
+              </div>
+              <button className="daily-link-button" type="button" onClick={() => openWorkspace ? openWorkspace("Activity Log", "Activity Log opened", "Showing reminder-related activity with the full audit trail.") : showToast("Recent reminder activity", "Showing reminder-related activity from the Activity Log.", "info")}>
+                View all
+                <ChevronDown size={15} className="-rotate-90" />
+              </button>
+            </div>
+            {recentReminderActivity.length ? (
+              <div className="daily-activity-list">
+                {recentReminderActivity.map((log) => (
+                  <div key={log.id} className="daily-activity-row">
+                    <span className="daily-activity-dot" />
+                    <span className="min-w-0">
+                      <strong>{log.action}</strong>
+                      <small>{new Date(log.createdAt).toLocaleString()}</small>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : <EmptyState title="No reminder activity yet" body="Reminder updates will appear here after real activity is recorded." />}
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }
@@ -1103,32 +1290,68 @@ function RemindersConfig({ state, currentProfile, updateState, showToast }: { st
     }, currentProfile, "Reminder activity", "Updated reminder rule", "reminder", reminderId, { changed: true }));
   };
   return (
-    <Panel title="Configurable In-App Reminders" action={<Badge>No email delivery</Badge>}>
-      <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+    <section className="daily-card motion-card">
+      <div className="daily-card-header">
+        <div className="daily-title-row">
+          <Bell size={18} className="text-[var(--color-accent)]" />
+          <span>
+            <h2>Configurable In-App Reminders</h2>
+            <p>Create in-app reminder rules for daily reports, verifications, and escalations.</p>
+          </span>
+        </div>
+        <Badge>No email delivery</Badge>
+      </div>
+      <div className="daily-reminder-form">
         <Select label="Reminder type" value={reminderType} onChange={setReminderType} options={reminderTypes} />
         <Select label="Area / Zone" value={areaId} onChange={setAreaId} options={[{ label: "All areas", value: "" }, ...state.areas.map((area) => ({ label: area.name, value: area.id }))]} />
-        <button className="btn-primary" onClick={addReminder}>Add Reminder</button>
+        <button className="btn-primary" onClick={addReminder}><Plus size={16} /> Add Reminder</button>
       </div>
-      <div className="mt-4">
-        <ResponsiveTable
-          headers={["Type", "Area", "Deadline", "Reminder", "Escalation", "Recipients", "Active"]}
-          rows={state.reminders.map((reminder) => [
-            <select key="type" className="field" value={reminder.reminderType} onChange={(event) => updateReminder(reminder.id, { reminderType: event.target.value })}>
-              {reminderTypes.map((type) => <option key={type}>{type}</option>)}
-            </select>,
-            <select key="area" className="field" value={reminder.areaId || ""} onChange={(event) => updateReminder(reminder.id, { areaId: event.target.value || undefined })}>
-              <option value="">All areas</option>
-              {state.areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}
-            </select>,
-            <input key="deadline" className="field" type="time" value={reminder.deadlineTime} onChange={(event) => updateReminder(reminder.id, { deadlineTime: event.target.value })} />,
-            <input key="reminder" className="field" type="time" value={reminder.reminderTime} onChange={(event) => updateReminder(reminder.id, { reminderTime: event.target.value })} />,
-            <input key="escalation" className="field" type="time" value={reminder.escalationTime} onChange={(event) => updateReminder(reminder.id, { escalationTime: event.target.value })} />,
-            <input key="recipients" className="field min-w-48" value={reminder.recipients.join(", ")} onChange={(event) => updateReminder(reminder.id, { recipients: event.target.value.split(",").map((value) => value.trim()).filter(Boolean) })} />,
-            <input key="active" type="checkbox" checked={reminder.active} onChange={(event) => updateReminder(reminder.id, { active: event.target.checked })} />
-          ])}
-        />
+      <div className="daily-reminder-grid">
+        {state.reminders.map((reminder) => (
+          <article key={reminder.id} className="daily-reminder-card">
+            <div className="daily-reminder-head">
+              <div className="min-w-0">
+                <select className="daily-reminder-title-control" value={reminder.reminderType} onChange={(event) => updateReminder(reminder.id, { reminderType: event.target.value })}>
+                  {reminderTypes.map((type) => <option key={type}>{type}</option>)}
+                </select>
+                <select className="daily-reminder-area-control" value={reminder.areaId || ""} onChange={(event) => updateReminder(reminder.id, { areaId: event.target.value || undefined })}>
+                  <option value="">All areas</option>
+                  {state.areas.map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}
+                </select>
+              </div>
+              <label className="daily-toggle" title={reminder.active ? "Reminder active" : "Reminder inactive"}>
+                <input type="checkbox" checked={reminder.active} onChange={(event) => updateReminder(reminder.id, { active: event.target.checked })} />
+                <span />
+              </label>
+            </div>
+            <div className="daily-reminder-times">
+              <label>
+                <span>Deadline</span>
+                <input className="field" type="time" value={reminder.deadlineTime} onChange={(event) => updateReminder(reminder.id, { deadlineTime: event.target.value })} />
+              </label>
+              <label>
+                <span>Reminder</span>
+                <input className="field" type="time" value={reminder.reminderTime} onChange={(event) => updateReminder(reminder.id, { reminderTime: event.target.value })} />
+              </label>
+              <label>
+                <span>Escalation</span>
+                <input className="field" type="time" value={reminder.escalationTime} onChange={(event) => updateReminder(reminder.id, { escalationTime: event.target.value })} />
+              </label>
+            </div>
+            <label className="daily-recipient-editor">
+              <span>Recipients</span>
+              <input className="field" value={reminder.recipients.join(", ")} onChange={(event) => updateReminder(reminder.id, { recipients: event.target.value.split(",").map((value) => value.trim()).filter(Boolean) })} />
+            </label>
+            <div className="daily-recipient-chips">
+              {reminder.recipients.map((recipient) => <span key={recipient}>{recipient}</span>)}
+              {!reminder.recipients.length ? <span>No recipients</span> : null}
+            </div>
+          </article>
+        ))}
       </div>
-    </Panel>
+      {!state.reminders.length ? <EmptyState title="No reminder rules yet" body="Create an in-app reminder rule above." /> : null}
+      <p className="daily-reminder-foot">Showing all reminder rules. All times are shown in your local timezone.</p>
+    </section>
   );
 }
 
@@ -3952,11 +4175,13 @@ function StatusBadge({ value }: { value: string }) {
   const lower = value.toLowerCase();
   const cls = lower.includes("needs correction")
     ? "bg-[rgba(122,31,43,0.10)] text-[var(--color-important)]"
-    : lower.includes("verified completed") || lower === "completed" || lower.includes("approved")
+    : lower.includes("verified completed") || lower === "completed" || lower === "submitted" || lower.includes("approved")
     ? "bg-[var(--color-primary)] text-white"
-    : lower.includes("issue") || lower.includes("rejected") || lower.includes("late") || lower.includes("overdue") || lower === "critical"
+    : lower.includes("late")
+      ? "bg-[rgba(122,31,43,0.10)] text-[var(--color-important)]"
+    : lower.includes("issue") || lower.includes("rejected") || lower.includes("overdue") || lower.includes("escalated") || lower === "critical"
       ? "bg-[var(--color-important)] text-white"
-      : lower.includes("needs verification") || lower.includes("partially verified")
+      : lower.includes("needs verification") || lower.includes("partially verified") || lower.includes("partially updated") || lower.includes("draft saved")
         ? "bg-[var(--color-accent)] text-[var(--color-primary)]"
         : lower.includes("progress")
           ? "bg-[rgba(46,125,91,0.12)] text-[var(--color-secondary)]"

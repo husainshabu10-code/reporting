@@ -1008,14 +1008,8 @@ table {
   }
 
   .metric-card::after {
-    content: "";
-    position: absolute;
-    right: -2.6rem;
-    top: -2.8rem;
-    height: 7rem;
-    width: 7rem;
-    border-radius: 999px;
-    background: rgba(243, 231, 195, 0.36);
+    display: none;
+    content: none;
   }
 
   .metric-icon {
@@ -1305,6 +1299,468 @@ table {
     color: var(--color-text-muted);
     font-size: 0.72rem;
     font-weight: 700;
+  }
+
+  .daily-reports-page {
+    --daily-shadow: 0 18px 44px rgba(11, 79, 58, 0.065);
+  }
+
+  .daily-report-kpis {
+    display: grid;
+    gap: 0.85rem;
+    grid-template-columns: repeat(auto-fit, minmax(12.5rem, 1fr));
+  }
+
+  .daily-reports-page .metric-card {
+    min-height: 8.9rem;
+    border-radius: 0.62rem;
+    padding: 1rem;
+    box-shadow: var(--daily-shadow);
+  }
+
+  .daily-reports-page .metric-icon {
+    height: 3.25rem;
+    width: 3.25rem;
+  }
+
+  .daily-reports-page .metric-label {
+    font-size: 0.68rem;
+  }
+
+  .daily-reports-page .metric-value {
+    font-size: 2rem;
+  }
+
+  .daily-reports-page .metric-line {
+    bottom: 0.9rem;
+    left: 1rem;
+    right: 1rem;
+    height: 0.35rem;
+  }
+
+  .daily-reports-layout {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .daily-reports-main,
+  .daily-reports-side {
+    display: grid;
+    gap: 1rem;
+    align-content: start;
+    min-width: 0;
+  }
+
+  .daily-card {
+    border-radius: 0.72rem;
+    border: 1px solid var(--color-border);
+    background: rgba(255, 255, 255, 0.94);
+    padding: 1rem;
+    box-shadow: var(--daily-shadow);
+  }
+
+  .daily-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .daily-title-row {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    gap: 0.62rem;
+    color: var(--color-primary);
+  }
+
+  .daily-title-row h2 {
+    color: var(--color-primary);
+    font-size: 1rem;
+    font-weight: 1000;
+    line-height: 1.2;
+  }
+
+  .daily-title-row p {
+    margin-top: 0.2rem;
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+
+  .daily-link-button {
+    display: inline-flex;
+    min-height: 2rem;
+    flex: none;
+    align-items: center;
+    gap: 0.35rem;
+    border: 0;
+    background: transparent;
+    color: var(--color-primary);
+    font-size: 0.78rem;
+    font-weight: 1000;
+    transition: color 160ms ease, transform 160ms ease;
+  }
+
+  .daily-link-button:hover {
+    color: var(--color-accent);
+    transform: translateX(2px);
+  }
+
+  .daily-alert-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  }
+
+  .daily-alert-card {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.9rem;
+    min-height: 5.2rem;
+    border-radius: 0.62rem;
+    border: 1px solid rgba(232, 221, 197, 0.92);
+    background: linear-gradient(135deg, rgba(243, 231, 195, 0.35), rgba(255, 255, 255, 0.94));
+    padding: 0.85rem 1rem;
+    color: var(--color-text);
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  .daily-alert-card.is-info {
+    background: linear-gradient(135deg, rgba(46, 125, 91, 0.08), rgba(255, 255, 255, 0.94));
+  }
+
+  .daily-alert-card:hover {
+    border-color: rgba(201, 162, 39, 0.58);
+    box-shadow: 0 16px 34px rgba(11, 79, 58, 0.08);
+    transform: translateY(-1px);
+  }
+
+  .daily-alert-icon {
+    display: inline-flex;
+    height: 2.8rem;
+    width: 2.8rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(201, 162, 39, 0.15);
+    color: var(--color-accent);
+  }
+
+  .daily-alert-card.is-info .daily-alert-icon {
+    background: rgba(46, 125, 91, 0.12);
+    color: var(--color-secondary);
+  }
+
+  .daily-alert-type {
+    display: block;
+    color: var(--color-accent);
+    font-size: 0.66rem;
+    font-weight: 1000;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .daily-alert-card strong {
+    display: block;
+    margin-top: 0.15rem;
+    color: var(--color-primary);
+    font-size: 0.92rem;
+    font-weight: 1000;
+  }
+
+  .daily-alert-card small {
+    display: block;
+    margin-top: 0.16rem;
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    font-weight: 750;
+  }
+
+  .daily-report-table-wrap {
+    overflow-x: auto;
+  }
+
+  .daily-report-table {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: separate;
+    border-spacing: 0;
+    overflow: hidden;
+    border-radius: 0.58rem;
+    border: 1px solid var(--color-border);
+    font-size: 0.86rem;
+  }
+
+  .daily-report-table th {
+    background: rgba(243, 231, 195, 0.42);
+    color: var(--color-primary);
+    padding: 0.82rem 0.9rem;
+    text-align: left;
+    font-size: 0.72rem;
+    font-weight: 1000;
+    text-transform: uppercase;
+  }
+
+  .daily-report-table td {
+    border-top: 1px solid rgba(232, 221, 197, 0.86);
+    background: rgba(255, 255, 255, 0.88);
+    padding: 0.9rem;
+    color: var(--color-text);
+    font-weight: 750;
+    vertical-align: middle;
+  }
+
+  .daily-report-table tr:hover td {
+    background: rgba(243, 231, 195, 0.2);
+  }
+
+  .daily-area-cell {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.6rem;
+    color: var(--color-primary);
+    font-weight: 1000;
+  }
+
+  .daily-area-icon {
+    display: inline-flex;
+    height: 2rem;
+    width: 2rem;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: rgba(11, 79, 58, 0.08);
+    color: var(--color-primary);
+  }
+
+  .daily-soft-badge {
+    display: inline-flex;
+    max-width: 100%;
+    align-items: center;
+    border-radius: 999px;
+    background: rgba(46, 125, 91, 0.1);
+    color: var(--color-primary);
+    font-size: 0.76rem;
+    font-weight: 1000;
+    line-height: 1.2;
+    padding: 0.35rem 0.65rem;
+  }
+
+  .daily-report-mobile-list {
+    display: none;
+  }
+
+  .daily-report-mobile-card {
+    border-radius: 0.62rem;
+    border: 1px solid var(--color-border);
+    background: rgba(250, 247, 239, 0.56);
+    padding: 0.9rem;
+  }
+
+  .daily-reminder-form {
+    display: grid;
+    gap: 0.75rem;
+    align-items: end;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .daily-reminder-grid {
+    display: grid;
+    gap: 0.85rem;
+    margin-top: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  }
+
+  .daily-reminder-card {
+    border-radius: 0.72rem;
+    border: 1px solid var(--color-border);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 247, 239, 0.44));
+    padding: 0.95rem;
+    box-shadow: 0 12px 28px rgba(11, 79, 58, 0.055);
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+  }
+
+  .daily-reminder-card:hover {
+    border-color: rgba(201, 162, 39, 0.54);
+    box-shadow: 0 16px 34px rgba(11, 79, 58, 0.08);
+    transform: translateY(-1px);
+  }
+
+  .daily-reminder-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .daily-reminder-title-control,
+  .daily-reminder-area-control {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: var(--color-primary);
+    outline: none;
+  }
+
+  .daily-reminder-title-control {
+    min-height: 1.8rem;
+    font-size: 0.95rem;
+    font-weight: 1000;
+  }
+
+  .daily-reminder-area-control {
+    margin-top: 0.15rem;
+    min-height: 1.65rem;
+    border-radius: 999px;
+    background: rgba(46, 125, 91, 0.1);
+    padding-inline: 0.45rem;
+    font-size: 0.73rem;
+    font-weight: 1000;
+  }
+
+  .daily-toggle {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+  }
+
+  .daily-toggle input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .daily-toggle span {
+    position: relative;
+    display: inline-block;
+    height: 1.35rem;
+    width: 2.45rem;
+    border-radius: 999px;
+    background: rgba(107, 114, 128, 0.28);
+    box-shadow: inset 0 0 0 1px rgba(107, 114, 128, 0.18);
+    transition: background-color 180ms ease, box-shadow 180ms ease;
+  }
+
+  .daily-toggle span::after {
+    content: "";
+    position: absolute;
+    left: 0.18rem;
+    top: 0.18rem;
+    height: 0.99rem;
+    width: 0.99rem;
+    border-radius: 999px;
+    background: white;
+    box-shadow: 0 2px 6px rgba(11, 79, 58, 0.18);
+    transition: transform 180ms ease;
+  }
+
+  .daily-toggle input:checked + span {
+    background: var(--color-primary);
+    box-shadow: inset 0 0 0 1px rgba(11, 79, 58, 0.16);
+  }
+
+  .daily-toggle input:checked + span::after {
+    transform: translateX(1.1rem);
+  }
+
+  .daily-reminder-times {
+    display: grid;
+    gap: 0.55rem;
+    margin-top: 0.85rem;
+  }
+
+  .daily-reminder-times label,
+  .daily-recipient-editor {
+    display: grid;
+    gap: 0.3rem;
+  }
+
+  .daily-reminder-times span,
+  .daily-recipient-editor span {
+    color: var(--color-text-muted);
+    font-size: 0.7rem;
+    font-weight: 1000;
+    text-transform: uppercase;
+  }
+
+  .daily-recipient-editor {
+    margin-top: 0.75rem;
+  }
+
+  .daily-recipient-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-top: 0.65rem;
+  }
+
+  .daily-recipient-chips span {
+    border-radius: 999px;
+    background: rgba(46, 125, 91, 0.12);
+    color: var(--color-primary);
+    font-size: 0.72rem;
+    font-weight: 1000;
+    padding: 0.34rem 0.58rem;
+  }
+
+  .daily-reminder-foot {
+    margin-top: 1rem;
+    border-top: 1px solid rgba(232, 221, 197, 0.82);
+    padding-top: 0.75rem;
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+
+  .daily-activity-list {
+    display: grid;
+    gap: 0;
+  }
+
+  .daily-activity-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.65rem;
+    align-items: center;
+    border-top: 1px solid rgba(232, 221, 197, 0.82);
+    padding: 0.85rem 0;
+  }
+
+  .daily-activity-row:first-child {
+    border-top: 0;
+    padding-top: 0;
+  }
+
+  .daily-activity-dot {
+    height: 0.48rem;
+    width: 0.48rem;
+    border-radius: 999px;
+    background: var(--color-secondary);
+  }
+
+  .daily-activity-row strong {
+    display: block;
+    overflow: hidden;
+    color: var(--color-primary);
+    font-size: 0.82rem;
+    font-weight: 900;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .daily-activity-row small {
+    display: block;
+    margin-top: 0.12rem;
+    color: var(--color-text-muted);
+    font-size: 0.74rem;
+    font-weight: 750;
   }
 
   .panel-grip {
@@ -2916,6 +3372,11 @@ table {
       align-items: stretch;
     }
 
+    .daily-reports-layout {
+      grid-template-columns: minmax(0, 1fr) minmax(21rem, 0.45fr);
+      align-items: start;
+    }
+
     .dashboard-lower-grid {
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
@@ -2933,6 +3394,10 @@ table {
   @media (min-width: 1440px) {
     .task-filter-bar {
       grid-template-columns: minmax(18rem, 1.6fr) repeat(4, minmax(10rem, 0.8fr));
+    }
+
+    .daily-reminder-form {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
     }
   }
 
@@ -3009,6 +3474,46 @@ table {
 
     .report-countdown {
       width: 100%;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .daily-card {
+      padding: 0.85rem;
+    }
+
+    .daily-card-header {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .daily-report-table-wrap {
+      display: none;
+    }
+
+    .daily-report-mobile-list {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .daily-reports-page .metric-card {
+      min-height: 8.25rem;
+      padding: 0.9rem;
+    }
+
+    .daily-reports-page .metric-icon {
+      height: 2.8rem;
+      width: 2.8rem;
+    }
+
+    .daily-reminder-times {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .daily-reminder-times {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
 
