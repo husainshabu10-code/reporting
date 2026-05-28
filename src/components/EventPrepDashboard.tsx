@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import {
   BarChart3,
   Bell,
+  Building2,
   CalendarClock,
   CheckCircle2,
   ChevronDown,
@@ -18,12 +19,14 @@ import {
   FileText,
   Filter,
   KeyRound,
+  Landmark,
   LogOut,
   MapPinPlus,
   Menu,
   MonitorPlay,
   MoreVertical,
   Plus,
+  RadioTower,
   ShieldCheck,
   SlidersHorizontal,
   Trash2,
@@ -104,6 +107,7 @@ type DashboardChartSettings = {
   workstream: DashboardChartKind;
   attention: AttentionChartKind;
 };
+type ChartRow = { label: string; value: number; helper: string; iconKey?: string };
 type PublicAreaOption = { id: string; name: string; zoneName: string };
 type ToastTone = "success" | "info" | "warning" | "error";
 type ToastMessage = { id: string; title: string; message?: string; tone: ToastTone };
@@ -694,7 +698,7 @@ function DashboardTab({ state, currentProfile, presentationMode = false, chartSe
 
       <div className="dashboard-main-grid">
         <Panel title="Zone Type Progress" action={<Badge>Verified completed only</Badge>}>
-          <DashboardChartVisual rows={zoneRows.map((row) => ({ label: row.label, value: row.percent, helper: `${row.verified}/${row.total} tasks` }))} type={chartSettings.zoneType} />
+          <DashboardChartVisual rows={zoneRows.map((row) => ({ label: row.label, value: row.percent, helper: `${row.verified}/${row.total} tasks`, iconKey: zoneProgressIconKey(row.label) }))} type={chartSettings.zoneType} />
         </Panel>
         <Panel title="Attention Required">
           <DashboardAttentionVisual rows={attention} type={chartSettings.attention} />
@@ -734,7 +738,7 @@ function DashboardTab({ state, currentProfile, presentationMode = false, chartSe
   );
 }
 
-function DashboardChartVisual({ rows, type }: { rows: Array<{ label: string; value: number; helper: string }>; type: DashboardChartKind }) {
+function DashboardChartVisual({ rows, type }: { rows: ChartRow[]; type: DashboardChartKind }) {
   const visibleRows = rows.filter((row) => row.label);
   if (!visibleRows.length) return <EmptyState title="No chart data" body="Adjust filters or add live tasks to populate this chart." />;
   if (type === "Donut chart") {
@@ -755,7 +759,7 @@ function DashboardChartVisual({ rows, type }: { rows: Array<{ label: string; val
     );
   }
   if (type === "Compact bars") return <DashboardBarChart rows={visibleRows} compact />;
-  return <div className="space-y-3">{visibleRows.map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} helper={row.helper} />)}</div>;
+  return <div className="chart-progress-list">{visibleRows.map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} helper={row.helper} iconKey={row.iconKey} />)}</div>;
 }
 
 function DashboardAttentionVisual({ rows, type }: { rows: ReturnType<typeof buildAttention>; type: AttentionChartKind }) {
@@ -3958,28 +3962,34 @@ function attentionToneClass(label: string) {
   return "is-neutral";
 }
 
-function ProgressRow({ label, value, helper }: { label: string; value: number; helper: string }) {
+function ProgressRow({ label, value, helper, iconKey }: ChartRow) {
   return (
-    <div>
-      <div className="flex items-center justify-between gap-3 text-sm">
-        <p className="font-bold text-[var(--color-primary)]">{label}</p>
-        <p className="text-[var(--color-text-muted)]">{value}%</p>
+    <div className={iconKey ? "chart-progress-row has-icon" : "chart-progress-row"}>
+      <div className="chart-progress-row-head">
+        <div className="chart-progress-label-wrap">
+          {iconKey ? <span className={`zone-progress-icon zone-${iconKey}`}>{zoneProgressIcon(iconKey)}</span> : null}
+          <p className="chart-progress-label">{label}</p>
+        </div>
+        <p className="chart-progress-value">{value}%</p>
       </div>
-      <div className="mt-2 h-2 rounded-full bg-[var(--color-accent-light)]">
+      <div className="chart-progress-track">
         <div className="progress-fill h-2 rounded-full bg-[var(--color-secondary)]" style={{ width: `${value}%` }} />
       </div>
-      <p className="mt-1 text-xs text-[var(--color-text-muted)]">{helper}</p>
+      <p className="chart-progress-helper">{helper}</p>
     </div>
   );
 }
 
-function DashboardBarChart({ rows, compact = false }: { rows: Array<{ label: string; value: number; helper: string }>; compact?: boolean }) {
+function DashboardBarChart({ rows, compact = false }: { rows: ChartRow[]; compact?: boolean }) {
   if (!rows.length) return <EmptyState title="No chart data" body="Adjust filters or add live tasks to populate this chart." />;
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
       {rows.map((row) => (
         <div key={row.label} className="grid gap-2 sm:grid-cols-[11rem_1fr_5rem] sm:items-center">
-          <p className="truncate text-sm font-bold text-[var(--color-text-muted)]">{row.label}</p>
+          <div className="chart-progress-label-wrap">
+            {row.iconKey ? <span className={`zone-progress-icon zone-${row.iconKey}`}>{zoneProgressIcon(row.iconKey)}</span> : null}
+            <p className="truncate text-sm font-bold text-[var(--color-text-muted)]">{row.label}</p>
+          </div>
           <div className="h-3 overflow-hidden rounded-full bg-[var(--color-accent-light)]">
             <div className="progress-fill h-full rounded-full bg-[var(--color-accent)]" style={{ width: `${row.value}%` }} />
           </div>
@@ -3989,6 +3999,21 @@ function DashboardBarChart({ rows, compact = false }: { rows: Array<{ label: str
       ))}
     </div>
   );
+}
+
+function zoneProgressIconKey(label: string) {
+  const normalized = label.toLowerCase();
+  if (normalized.includes("cmz")) return "cmz";
+  if (normalized.includes("central")) return "central-office";
+  if (normalized.includes("relay")) return "relay-zone";
+  return "zone";
+}
+
+function zoneProgressIcon(iconKey: string) {
+  if (iconKey === "cmz") return <Landmark size={16} />;
+  if (iconKey === "central-office") return <Building2 size={16} />;
+  if (iconKey === "relay-zone") return <RadioTower size={16} />;
+  return <MapPinPlus size={16} />;
 }
 
 function MiniStat({ label, value }: { label: string; value: string }) {
