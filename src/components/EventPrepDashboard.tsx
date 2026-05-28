@@ -3275,21 +3275,28 @@ function FormBuilderTab({ state, currentProfile, updateState, showToast }: { sta
 }
 
 function GlobalFieldsTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
-  const groups = unique(state.globalOptions.map((option) => option.group));
-  const [group, setGroup] = useState(groups[0] || "Workstreams");
+  const groups = unique(state.globalOptions.filter((option) => option.active).map((option) => option.group));
+  const [groupMode, setGroupMode] = useState(groups[0] || "Workstreams");
+  const [newGroup, setNewGroup] = useState("");
   const [value, setValue] = useState("");
+  const selectedGroup = groupMode === "__new__" ? newGroup.trim() : groupMode;
   const addOption = () => {
-    if (!group.trim() || !value.trim()) {
+    if (!selectedGroup.trim() || !value.trim()) {
       showToast("Option details required", "Add both the group and value before saving.", "warning");
       return;
     }
     const optionValue = value.trim();
+    const optionGroup = selectedGroup.trim();
     updateState((current) => {
-      const option: GlobalOption = { id: id("option"), group: group.trim(), value: optionValue, active: true };
+      const option: GlobalOption = { id: id("option"), group: optionGroup, value: optionValue, active: true };
       return withActivity({ ...current, globalOptions: [...current.globalOptions, option] }, currentProfile, "Form/global field changes", `Added global option ${option.value}`, "global_option", option.id, { active: true });
     });
     setValue("");
-    showToast("Global option added", `${optionValue} is now available in ${group.trim()}.`);
+    if (groupMode === "__new__") {
+      setGroupMode(optionGroup);
+      setNewGroup("");
+    }
+    showToast("Global option added", `${optionValue} is now available in ${optionGroup}.`);
   };
   const updateOption = (optionId: string, patch: Partial<GlobalOption>) => {
     updateState((current) => withActivity({
@@ -3301,7 +3308,8 @@ function GlobalFieldsTab({ state, currentProfile, updateState, showToast }: { st
     <div className="space-y-4">
       <Panel title="Add Global Option">
         <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
-          <Input label="Group" value={group} onChange={setGroup} placeholder="Team Types" />
+          <Select label="Group" value={groupMode} onChange={setGroupMode} options={[...groups, { label: "+ Add new global field group", value: "__new__" }]} />
+          {groupMode === "__new__" ? <Input label="New group name" value={newGroup} onChange={setNewGroup} placeholder="Team Types" /> : null}
           <Input label="Value" value={value} onChange={setValue} placeholder="Fiber Team" />
           <button className="btn-primary" onClick={addOption}>Add Option</button>
         </div>
