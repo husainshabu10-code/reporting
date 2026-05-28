@@ -116,6 +116,23 @@ const DEFAULT_DASHBOARD_CHARTS: DashboardChartSettings = {
   workstream: "Progress bars",
   attention: "Score cards"
 };
+const RESPONSIBLE_TEAM_OPTIONS = [
+  "Central IT Team",
+  "Local IT Team",
+  "Central IT + Local IT Team",
+  "NOC Team",
+  "SOC Team",
+  "Relay Team",
+  "ISP Provider",
+  "Network Vendor",
+  "Cabling Vendor",
+  "Power / Electrical Team",
+  "Scanning Team",
+  "Printer / Scanner Support",
+  "Area Coordinator",
+  "Vendor",
+  "Joint Team"
+];
 const USER_ROLE_STANDING_OPTIONS = [
   "Local IT SPOC",
   "Local IT Team Member",
@@ -1416,7 +1433,7 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
           {customTaskType === "Quantity-Based Task" ? <Select label="Unit" value={customUnit} onChange={setCustomUnit} options={unitOptions} /> : null}
         </div>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
-          <Input label="Responsible team" value={customResponsibleTeam} onChange={setCustomResponsibleTeam} placeholder="Local IT Team" />
+          <ResponsibleTeamSelect value={customResponsibleTeam} onChange={setCustomResponsibleTeam} />
           <Input label="Expected output" value={customExpectedOutput} onChange={setCustomExpectedOutput} placeholder="Task completion criteria" />
           <Input label="Required equipment" value={customRequiredEquipment} onChange={setCustomRequiredEquipment} placeholder="Routers, cables, tools" />
         </div>
@@ -1689,7 +1706,7 @@ function LiveTaskEditorModal({
               <Input label="Main objective" value={details.mainObjective} onChange={(value) => updateDraft({ mainObjective: value })} />
                 <div className="grid gap-3 md:grid-cols-2">
                 <WorkstreamSelect label="Workstream" value={details.workstream} onChange={(value) => updateDraft({ workstream: value })} options={workstreamOptions} />
-                <Input label="Responsible team" value={details.responsibleTeam} onChange={(value) => updateDraft({ responsibleTeam: value })} />
+                <ResponsibleTeamSelect value={details.responsibleTeam} onChange={(value) => updateDraft({ responsibleTeam: value })} />
                 <Input label="Required equipment" value={details.requiredEquipment} onChange={(value) => updateDraft({ requiredEquipment: value })} />
                 <Input label="Testing required" value={details.testingRequired} onChange={(value) => updateDraft({ testingRequired: value })} />
                 </div>
@@ -4084,6 +4101,40 @@ function WorkstreamSelect({ label, value, onChange, options }: { label: string; 
         options={[...cleanedOptions, { label: "Other / Custom workstream", value: "__other__" }]}
       />
       {selected === "__other__" ? <Input label="Custom workstream" value={value} onChange={onChange} placeholder="Enter custom workstream" /> : null}
+    </div>
+  );
+}
+
+function ResponsibleTeamSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [otherSelected, setOtherSelected] = useState(false);
+  const normalizedValue = value.trim();
+  const isKnownValue = RESPONSIBLE_TEAM_OPTIONS.includes(normalizedValue);
+  const selected = normalizedValue
+    ? isKnownValue ? normalizedValue : "Other"
+    : otherSelected ? "Other" : "";
+  return (
+    <div className="grid gap-2">
+      <Select
+        label="Responsible Team"
+        value={selected}
+        onChange={(next) => {
+          setOtherSelected(next === "Other");
+          onChange(next === "Other" ? (selected === "Other" ? normalizedValue : "") : next);
+        }}
+        options={[
+          { label: "Select responsible team", value: "" },
+          ...RESPONSIBLE_TEAM_OPTIONS,
+          "Other"
+        ]}
+      />
+      {selected === "Other" ? (
+        <Input
+          label="Specify Responsible Team"
+          value={normalizedValue}
+          onChange={onChange}
+          placeholder="Enter responsible team"
+        />
+      ) : null}
     </div>
   );
 }
