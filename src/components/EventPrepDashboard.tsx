@@ -24,7 +24,6 @@ import {
   Settings2,
   ShieldCheck,
   Trash2,
-  Upload,
   Users,
   X
 } from "lucide-react";
@@ -158,6 +157,7 @@ export default function EventPrepDashboard() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [presentationMode, setPresentationMode] = useState(false);
   const [chartSettingsOpen, setChartSettingsOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [dashboardCharts, setDashboardCharts] = useState<DashboardChartSettings>(DEFAULT_DASHBOARD_CHARTS);
   const [syncStatus, setSyncStatus] = useState("Loading");
   const [loginId, setLoginId] = useState("");
@@ -275,6 +275,7 @@ export default function EventPrepDashboard() {
   const isVerifier = currentProfile?.role === "verifier";
   const isViewer = currentProfile?.role === "viewer";
   const tabs: AnyTab[] = isAdmin ? ADMIN_TABS : isAreaAdmin ? AREA_ADMIN_TABS : isVerifier ? VERIFIER_TABS : isViewer ? viewerTabsFor(state || undefined, currentProfile) : USER_TABS;
+  const notificationCount = state && currentProfile ? unreadNotificationsFor(state, currentProfile).length + buildUserAlerts(state, currentProfile).length : 0;
 
   useEffect(() => {
     if (!tabs.includes(activeTab)) setActiveTab(tabs[0] || (isVerifier ? "Verification" : isAreaAdmin ? "My Area" : "Daily Report"));
@@ -367,7 +368,7 @@ export default function EventPrepDashboard() {
             </button>
           </div>
 
-          <div className={`mx-5 rounded-lg border border-white/10 bg-white/10 p-3 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
+          <div className={`sidebar-profile-card mx-5 rounded-lg border border-white/10 bg-white/10 p-3 ${sidebarCollapsed ? "lg:hidden" : ""}`}>
             {!isEventPrepSupabaseConfigured() ? (
               <>
                 <label className="text-xs font-black uppercase text-white/70">Demo profile</label>
@@ -380,10 +381,14 @@ export default function EventPrepDashboard() {
                 </select>
               </>
             ) : (
-              <>
-                <p className="text-xs font-black uppercase text-white/70">Signed in as</p>
-                <p className="mt-2 text-sm font-bold text-white">{currentProfile.email}</p>
-              </>
+              <div className="flex items-center gap-3">
+                <div className="sidebar-avatar" aria-hidden="true">{profileInitials(currentProfile)}</div>
+                <div className="min-w-0">
+                  <p className="truncate text-base font-black text-white">{currentProfile.fullName}</p>
+                  <p className="mt-0.5 text-sm font-black text-[var(--color-accent-light)]">{roleLabel(currentProfile.role)}</p>
+                  <p className="mt-1 truncate text-xs font-bold text-white/68">{currentProfile.email}</p>
+                </div>
+              </div>
             )}
             <p className="mt-2 text-xs text-white/70">{syncStatus}</p>
           </div>
@@ -437,14 +442,22 @@ export default function EventPrepDashboard() {
                 {isAdmin ? <button className="top-action-btn" onClick={() => openWorkspace("Zones / Areas", "Area setup opened", "Create or update event areas from this tab.")}><Plus size={16} /> Add Area</button> : null}
                 {isAdmin ? <button className="top-action-btn top-action-primary" onClick={() => openWorkspace("Master Tasks", "Task setup opened", "Add a custom live task or use a reference suggestion.")}><Plus size={16} /> Add Task</button> : null}
                 {isAdmin ? <button className="top-action-btn" onClick={exportCsv}><Download size={16} /> Export CSV</button> : null}
-                {isAdmin ? <button className="top-action-btn" onClick={() => openWorkspace("Master Tasks", "Import panel opened", "Use the upload control to import Excel or CSV reference suggestions.")}><Upload size={16} /> Import CSV</button> : null}
-                <Badge>{unreadNotificationsFor(state, currentProfile).length + buildUserAlerts(state, currentProfile).length} alert(s)</Badge>
+                <div className="notification-bell-wrap">
+                  <button className={`top-action-btn notification-bell ${notificationCount ? "has-unread" : ""}`} onClick={() => setNotificationsOpen((open) => !open)} aria-expanded={notificationsOpen} aria-label="Open notifications">
+                    <Bell size={16} />
+                    {notificationCount ? <span className="notification-count">{notificationCount}</span> : null}
+                  </button>
+                  {notificationsOpen ? (
+                    <div className="notification-popover">
+                      <NotificationCenter state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} />
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
           </header>
 
           <div className="animate-fade-in w-full p-3 sm:p-4 lg:p-5 2xl:p-6">
-            <NotificationCenter state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} />
             {activeTab === "Dashboard" ? <DashboardTab state={state} currentProfile={currentProfile} chartSettings={dashboardCharts} /> : null}
             {activeTab === "Daily Reports" ? <DailyReportsTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
             {activeTab === "Master Tasks" ? <MasterTasksTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
@@ -876,7 +889,6 @@ function NotificationCenter({ state, currentProfile, updateState, showToast }: {
   const stored = unreadNotificationsFor(state, currentProfile);
   const generated = buildUserAlerts(state, currentProfile);
   const count = stored.length + generated.length;
-  if (!count) return null;
   const markRead = (notificationId: string) => {
     updateState((current) => ({
       ...current,
@@ -885,8 +897,16 @@ function NotificationCenter({ state, currentProfile, updateState, showToast }: {
     showToast("Notification marked read", "This alert is now cleared from your unread list.");
   };
   return (
-    <Panel title="Alerts & Notifications" action={<Badge>{count} item(s)</Badge>}>
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+    <div className="notification-panel">
+      <div className="flex items-start justify-between gap-3 border-b border-[var(--color-border)] p-4">
+        <div>
+          <p className="text-xs font-black uppercase text-[var(--color-accent)]">Alerts & Notifications</p>
+          <h3 className="mt-1 text-lg font-black text-[var(--color-primary)]">Notifications</h3>
+        </div>
+        <Badge>{count} item(s)</Badge>
+      </div>
+      <div className="grid max-h-[28rem] gap-2 overflow-y-auto p-3">
+        {!count ? <EmptyState title="No unread notifications" body="You are clear for now." /> : null}
         {generated.map((notification) => (
           <div key={notification.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
             <div className="flex items-center gap-2">
@@ -909,7 +929,7 @@ function NotificationCenter({ state, currentProfile, updateState, showToast }: {
           </div>
         ))}
       </div>
-    </Panel>
+    </div>
   );
 }
 
@@ -1146,6 +1166,7 @@ function LiveTasksConfigTable({
   const [workstreamFilter, setWorkstreamFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
+  const [collapsedAreas, setCollapsedAreas] = useState<string[]>([]);
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
   const workstreamOptions = unique(state.liveTasks.map((task) => taskDetails(state, task).workstream || "General"));
   const visibleTasks = state.liveTasks.filter((task) => {
@@ -1170,6 +1191,7 @@ function LiveTasksConfigTable({
     })
     .filter((group) => group.tasks.length);
 
+  const toggleArea = (areaId: string) => setCollapsedAreas((current) => (current.includes(areaId) ? current.filter((item) => item !== areaId) : [...current, areaId]));
   const toggleGroup = (groupKey: string) => setCollapsedGroups((current) => (current.includes(groupKey) ? current.filter((item) => item !== groupKey) : [...current, groupKey]));
 
   return (
@@ -1185,15 +1207,25 @@ function LiveTasksConfigTable({
         <Select label="Priority" value={priorityFilter} onChange={setPriorityFilter} options={["All", ...activeOptions(state, "Priority options", PRIORITY_OPTIONS)]} />
       </div>
       {!grouped.length ? <EmptyState title="No live tasks found" body="Adjust filters or add a custom live task to an area." /> : null}
-      {grouped.map(({ area, workstreams }) => (
-        <section key={area.id} className="task-group-card motion-card animate-fade-in">
-          <div className="task-group-main-header">
+      {grouped.map(({ area, workstreams }) => {
+        const areaTasks = visibleTasks.filter((task) => task.areaId === area.id);
+        const areaCollapsed = collapsedAreas.includes(area.id);
+        return (
+        <section key={area.id} className={`task-group-card motion-card animate-fade-in ${areaCollapsed ? "is-collapsed" : "is-open"}`}>
+          <button className="task-group-main-header" onClick={() => toggleArea(area.id)} aria-expanded={!areaCollapsed}>
             <div>
               <p className="text-xs font-black uppercase text-[var(--color-accent)]">Area</p>
               <h3 className="text-lg font-black text-[var(--color-primary)]">{area.name}</h3>
             </div>
-            <Badge>{visibleTasks.filter((task) => task.areaId === area.id).length} task(s)</Badge>
-          </div>
+            <div className="flex items-center gap-3">
+              <Badge>{areaTasks.length} task(s)</Badge>
+              <span className={`task-collapse-icon ${areaCollapsed ? "is-collapsed" : ""}`} aria-hidden="true">
+                <ChevronDown size={17} />
+              </span>
+            </div>
+          </button>
+          <div className={`task-area-collapse-panel ${areaCollapsed ? "is-collapsed" : ""}`}>
+            <div className="task-area-collapse-inner">
           {workstreams.map((workstream) => {
             const groupKey = `${area.id}-${workstream}`;
             const tasks = visibleTasks.filter((task) => task.areaId === area.id && (taskDetails(state, task).workstream || "General") === workstream);
@@ -1238,8 +1270,11 @@ function LiveTasksConfigTable({
               </div>
             );
           })}
+            </div>
+          </div>
         </section>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -3218,6 +3253,11 @@ function FoundationTab({
 function FormBuilderTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const [taskType, setTaskType] = useState<TaskTypeName>("Simple Task");
   const [label, setLabel] = useState("");
+  const [questionType, setQuestionType] = useState("Short answer");
+  const visibleFields = state.formFields
+    .filter((field) => field.taskType === taskType)
+    .slice()
+    .sort((a, b) => a.displayOrder - b.displayOrder);
   const addField = () => {
     if (!label.trim()) {
       showToast("Field label required", "Add a label before creating the form field.", "warning");
@@ -3229,7 +3269,7 @@ function FormBuilderTab({ state, currentProfile, updateState, showToast }: { sta
       const field: FormField = {
         id: id("field"),
         taskType,
-        fieldKey: slug(fieldLabel),
+        fieldKey: questionType === "File upload" ? "file_upload" : questionType === "Date" ? "date" : questionType === "Time" ? "time" : slug(fieldLabel),
         label: fieldLabel,
         required: false,
         visible: true,
@@ -3246,30 +3286,64 @@ function FormBuilderTab({ state, currentProfile, updateState, showToast }: { sta
       formFields: current.formFields.map((field) => (field.id === fieldId ? { ...field, ...patch } : field))
     }, currentProfile, "Form/global field changes", "Updated form field", "form_field", fieldId, { changed: true }));
   };
+  const duplicateField = (field: FormField) => {
+    updateState((current) => {
+      const fieldsForType = current.formFields.filter((item) => item.taskType === field.taskType);
+      const copy: FormField = { ...field, id: id("field"), fieldKey: slug(`${field.label} copy`), label: `${field.label} copy`, displayOrder: fieldsForType.length + 1 };
+      return withActivity({ ...current, formFields: [...current.formFields, copy] }, currentProfile, "Form/global field changes", `Duplicated form field ${field.label}`, "form_field", copy.id, { duplicatedFrom: field.id });
+    });
+    showToast("Question duplicated", `${field.label} was copied.`);
+  };
+  const hideField = (field: FormField) => {
+    updateField(field.id, { visible: false });
+    showToast("Question hidden", `${field.label} is hidden from ${taskType}.`, "info");
+  };
+  const saveForm = () => showToast("Form saved", `${taskType} form changes are queued for Supabase sync.`, "success");
   return (
-    <div className="space-y-4">
-      <Panel title="Add Form Field">
-        <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
-          <Select label="Task Type" value={taskType} onChange={(value) => setTaskType(value as TaskTypeName)} options={[...TASK_TYPES]} />
-          <Input label="Field label" value={label} onChange={setLabel} placeholder="Testing result" />
-          <button className="btn-primary" onClick={addField}>Add Field</button>
+    <div className="form-builder-shell">
+      <div className="form-builder-toolbar dashboard-panel">
+        <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+          <Select label="Task type form" value={taskType} onChange={(value) => setTaskType(value as TaskTypeName)} options={[...TASK_TYPES]} />
+          <button className="btn-primary" onClick={saveForm}><CheckCircle2 size={16} /> Save Form</button>
         </div>
-      </Panel>
-      <Panel title="Task Type Form Builder">
-        <ResponsiveTable
-          headers={["Task Type", "Field", "Order", "Visible", "Required"]}
-          rows={state.formFields
-            .slice()
-            .sort((a, b) => a.taskType.localeCompare(b.taskType) || a.displayOrder - b.displayOrder)
-            .map((field) => [
-              field.taskType,
-              <input key="label" className="field" value={field.label} onChange={(event) => updateField(field.id, { label: event.target.value })} />,
-              <input key="order" className="field w-20" type="number" value={field.displayOrder} onChange={(event) => updateField(field.id, { displayOrder: Number(event.target.value || 0) })} />,
-              <input key="visible" type="checkbox" checked={field.visible} onChange={(event) => updateField(field.id, { visible: event.target.checked })} />,
-              <input key="required" type="checkbox" checked={field.required} onChange={(event) => updateField(field.id, { required: event.target.checked })} />
-            ])}
-        />
-      </Panel>
+        <p className="text-sm font-bold text-[var(--color-text-muted)]">Choose a task type, edit its questions, then use the save controls. Changes sync through Supabase for everyone.</p>
+      </div>
+
+      <section className="form-canvas">
+        <div className="form-cover">
+          <p className="text-xs font-black uppercase text-[var(--color-accent)]">Form Builder</p>
+          <h2>{taskType}</h2>
+          <p>User-facing fields for this task type.</p>
+        </div>
+
+        <div className="form-question-card is-new">
+          <div className="form-card-grip" aria-hidden="true">:::</div>
+          <div className="grid gap-3 md:grid-cols-[1fr_13rem_auto] md:items-end">
+            <Input label="Question title" value={label} onChange={setLabel} placeholder="Testing result" />
+            <Select label="Question type" value={questionType} onChange={setQuestionType} options={["Short answer", "Paragraph", "Multiple choice", "Checkboxes", "Dropdown", "File upload", "Date", "Time"]} />
+            <button className="btn-primary" onClick={addField}><Plus size={16} /> Add Question</button>
+          </div>
+        </div>
+
+        {visibleFields.map((field) => (
+          <div key={field.id} className={`form-question-card ${field.visible ? "" : "is-muted"}`}>
+            <div className="form-card-grip" aria-hidden="true">:::</div>
+            <div className="grid gap-3 md:grid-cols-[1fr_13rem]">
+              <Input label="Question" value={field.label} onChange={(value) => updateField(field.id, { label: value })} />
+              <Select label="Question type" value={field.fieldKey === "file_upload" ? "File upload" : field.fieldKey.includes("date") ? "Date" : "Short answer"} onChange={(value) => updateField(field.id, { fieldKey: value === "File upload" ? "file_upload" : value === "Date" ? "date" : slug(field.label) })} options={["Short answer", "Paragraph", "Multiple choice", "Checkboxes", "Dropdown", "File upload", "Date", "Time"]} />
+            </div>
+            <div className="form-answer-preview">{field.fieldKey === "file_upload" ? "File upload control" : "Short answer text"}</div>
+            <div className="form-question-actions">
+              <label><input type="checkbox" checked={field.visible} onChange={(event) => updateField(field.id, { visible: event.target.checked })} /> Visible</label>
+              <label><input type="checkbox" checked={field.required} onChange={(event) => updateField(field.id, { required: event.target.checked })} /> Required</label>
+              <Input label="Order" value={String(field.displayOrder)} onChange={(value) => updateField(field.id, { displayOrder: Number(value || 0) })} type="number" />
+              <button className="mini-icon-btn" onClick={() => duplicateField(field)} title="Duplicate question"><FileText size={15} /></button>
+              <button className="mini-icon-btn text-[var(--color-important)]" onClick={() => hideField(field)} title="Hide question"><Trash2 size={15} /></button>
+            </div>
+          </div>
+        ))}
+        {!visibleFields.length ? <EmptyState title="No questions yet" body="Add the first question for this task type above." /> : null}
+      </section>
     </div>
   );
 }
@@ -4468,6 +4542,12 @@ function normalizePriority(value: string) {
 
 function roleLabel(role: UserRole) {
   return role.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" ");
+}
+
+function profileInitials(profile: Profile) {
+  const source = profile.fullName || profile.email || "User";
+  const parts = source.replace(/@.*/, "").split(/[\s._-]+/).filter(Boolean);
+  return (parts.length > 1 ? `${parts[0][0]}${parts[1][0]}` : source.slice(0, 2)).toUpperCase();
 }
 
 function unique(values: string[]) {
