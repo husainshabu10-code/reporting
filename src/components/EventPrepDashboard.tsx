@@ -419,7 +419,7 @@ export default function EventPrepDashboard() {
 
         {sidebarOpen ? <button className="motion-overlay fixed inset-0 z-30 bg-black/20 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close menu" /> : null}
 
-        <section className={`min-w-0 flex-1 transition-[margin] duration-300 ${sidebarCollapsed ? "lg:ml-20" : "lg:ml-80"}`}>
+        <section className={`app-content min-w-0 flex-1 transition-[margin] duration-300 ${sidebarCollapsed ? "app-content-sidebar-collapsed lg:ml-20" : "app-content-sidebar-expanded lg:ml-80"}`}>
           <header className="sticky top-0 z-20 border-b border-[var(--color-border)] bg-[rgba(250,247,239,0.96)] px-4 py-4 backdrop-blur">
             <div className="flex w-full flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex items-center gap-3">

@@ -1557,7 +1557,6 @@ table {
   .reports-workspace {
     display: grid;
     gap: 1rem;
-    overflow-x: auto;
     align-items: start;
   }
 
@@ -2133,6 +2132,7 @@ table {
     .reports-workspace {
       grid-template-columns: 22rem minmax(44rem, 1fr);
       align-items: start;
+      overflow-x: visible;
     }
 
     .reports-control-panel {
@@ -2149,6 +2149,34 @@ table {
 
     .reports-preview-column {
       min-width: 44rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .reports-workspace {
+      display: block;
+      padding-left: 23rem;
+    }
+
+    .reports-control-panel {
+      position: fixed;
+      top: 5.7rem;
+      left: 21rem;
+      width: 22rem;
+      min-width: 22rem;
+      max-height: calc(100dvh - 6.7rem);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      z-index: 18;
+    }
+
+    .app-content-sidebar-collapsed .reports-control-panel {
+      left: 6rem;
+    }
+
+    .reports-preview-column {
+      min-width: 0;
+      overflow-x: auto;
     }
   }
 
