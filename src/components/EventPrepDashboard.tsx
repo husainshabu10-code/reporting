@@ -82,6 +82,8 @@ import {
   updateCredentialAccess,
   uploadTaskEvidence
 } from "@/lib/eventPrepStore";
+import { LoadingScreen, InlineLoader } from "@/components/LoadingScreen";
+import { Logo } from "@/components/Logo";
 
 type AdminTab =
   | "Dashboard"
@@ -319,11 +321,7 @@ export default function EventPrepDashboard() {
   }
 
   if (!state) {
-    return (
-      <main className="min-h-screen bg-[var(--color-bg)] p-4 text-[var(--color-text)]">
-        <DashboardSkeleton />
-      </main>
-    );
+    return <LoadingScreen message={authChecked ? "Loading dashboard..." : "Checking your session..."} helperText="Preparing your workspace" />;
   }
 
   if (!currentProfile) {
@@ -422,11 +420,11 @@ export default function EventPrepDashboard() {
         <aside className={`app-sidebar fixed inset-y-0 left-0 z-40 flex w-80 flex-col border-r border-white/10 bg-[var(--color-primary)] text-white shadow-2xl transition-[transform,width] duration-300 lg:translate-x-0 ${sidebarCollapsed ? "lg:w-20" : "lg:w-80"} ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
           <div className="flex items-start justify-between gap-3 px-5 py-6">
             <div className={sidebarCollapsed ? "lg:hidden" : ""}>
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-white/85">ASHARA MUBARAKAH</p>
-              <h1 className="mt-2 text-2xl font-black leading-tight text-white">IT / Event Preparation</h1>
+              <Logo variant="horizontal-white" className="sidebar-brand-logo" priority />
+              <p className="mt-3 text-xs font-black uppercase tracking-[0.16em] text-white/75">IT / Event Preparation</p>
             </div>
-            <div className={`hidden h-10 w-10 items-center justify-center rounded-xl bg-[var(--color-accent)] text-[var(--color-primary)] lg:flex ${sidebarCollapsed ? "" : "lg:hidden"}`}>
-              <BarChart3 size={19} />
+            <div className={`hidden h-11 w-11 items-center justify-center rounded-xl bg-white/10 p-2 lg:flex ${sidebarCollapsed ? "" : "lg:hidden"}`}>
+              <Logo variant="emblem" className="h-full w-full object-contain" />
             </div>
             <button className="mini-icon-btn border-white/20 bg-white/10 text-white hover:bg-white/20 lg:hidden" onClick={() => setSidebarOpen(false)} aria-label="Close navigation">
               <X size={18} />
@@ -844,6 +842,8 @@ function LoginScreen({
   const [requestAreas, setRequestAreas] = useState<string[]>([]);
   const [areaOptions, setAreaOptions] = useState<PublicAreaOption[]>([]);
   const [requestMessage, setRequestMessage] = useState("");
+  const signingIn = authMessage === "Signing in...";
+  const requestSubmitting = requestMessage === "Submitting access request...";
 
   useEffect(() => {
     fetch("/api/event-prep/access-request")
@@ -887,6 +887,7 @@ function LoginScreen({
     <main className="login-page text-[var(--color-text)]">
       <div className="login-shell">
         <section className="login-card">
+          <Logo variant="vertical" className="login-brand-logo" priority />
           <p className="login-eyebrow">ASHARA MUBARAKAH</p>
           <h1>IT Event Preparation</h1>
           <p className="login-helper">Sign in with your Login ID and password.</p>
@@ -912,8 +913,8 @@ function LoginScreen({
             </label>
             <button className="login-link" type="button" onClick={() => setRequestMessage("Ask the Super Admin to reset your password from Users & Access.")}>Forgot password?</button>
           </div>
-          <button className="btn-primary mt-4 w-full justify-center" onClick={signIn}>
-            <KeyRound size={17} /> Sign In
+          <button className="btn-primary mt-4 w-full justify-center" onClick={signIn} disabled={signingIn}>
+            {signingIn ? <InlineLoader label="Signing in" /> : <KeyRound size={17} />} {signingIn ? "Signing In" : "Sign In"}
           </button>
           <button className="login-access-toggle" type="button" onClick={() => setRequestOpen((current) => !current)}>
             {requestOpen ? "Hide access request" : "Need access? Request from admin"}
@@ -940,7 +941,10 @@ function LoginScreen({
                   {!areaOptions.length ? <p className="text-xs font-bold text-[var(--color-text-muted)]">Area list is unavailable. Check Supabase server settings.</p> : null}
                 </div>
               </div>
-              <button className="btn-secondary mt-3 w-full justify-center" type="button" onClick={submitAccessRequest}>Submit Access Request</button>
+              <button className="btn-secondary mt-3 w-full justify-center" type="button" onClick={submitAccessRequest} disabled={requestSubmitting}>
+                {requestSubmitting ? <InlineLoader label="Submitting access request" /> : null}
+                {requestSubmitting ? "Submitting Request" : "Submit Access Request"}
+              </button>
             </div>
           ) : null}
         </section>
@@ -968,6 +972,7 @@ function PasswordChangeScreen({ profile, onChanged, signOut }: { profile: Profil
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [message, setMessage] = useState("");
+  const updatingPassword = message === "Updating password...";
   const submit = async () => {
     try {
       if (password !== confirm) throw new Error("Passwords do not match.");
@@ -990,7 +995,10 @@ function PasswordChangeScreen({ profile, onChanged, signOut }: { profile: Profil
           <div className="mt-3">
             <Input label="Confirm password" value={confirm} onChange={setConfirm} type="password" />
           </div>
-          <button className="btn-primary mt-4 w-full" onClick={submit}>Change Password</button>
+          <button className="btn-primary mt-4 w-full justify-center" onClick={submit} disabled={updatingPassword}>
+            {updatingPassword ? <InlineLoader label="Updating password" /> : null}
+            {updatingPassword ? "Updating Password" : "Change Password"}
+          </button>
           <button className="btn-secondary mt-2 w-full justify-center" onClick={signOut}>Sign out</button>
           {message ? <p className="mt-3 text-sm font-bold text-[var(--color-primary)]">{message}</p> : null}
         </section>
@@ -1333,6 +1341,7 @@ function RemindersConfig({ state, currentProfile, updateState, showToast }: { st
 
 function MasterTasksTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const [importMessage, setImportMessage] = useState("");
+  const [importingPlan, setImportingPlan] = useState(false);
   const [applyAreaId, setApplyAreaId] = useState(state.areas[0]?.id || "");
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [selectedSuggestionId, setSelectedSuggestionId] = useState("");
@@ -1359,6 +1368,7 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
     const file = event.target.files?.[0];
     if (!file) return;
     try {
+      setImportingPlan(true);
       const templates = await parsePreparationPlan(file);
       updateState((current) => ({
         ...current,
@@ -1370,6 +1380,7 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
       setImportMessage(readError(error, "Import failed."));
       showToast("Import failed", readError(error, "Please check the file and try again."), "error");
     } finally {
+      setImportingPlan(false);
       event.target.value = "";
     }
   };
@@ -1429,8 +1440,9 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
         <div className="grid gap-3">
           <div>
             <label className="field-label">Upload preparation plan</label>
-            <input className="field mt-2" type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} />
+            <input className="field mt-2" type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} disabled={importingPlan} />
             <p className="mt-2 text-xs text-[var(--color-text-muted)]">Imported Day Plan rows are kept as optional suggestions while creating custom live tasks. They do not become live tasks by themselves.</p>
+            {importingPlan ? <p className="mt-2 inline-flex items-center gap-2 text-xs font-black text-[var(--color-primary)]"><InlineLoader label="Importing preparation plan" /> Importing preparation plan</p> : null}
           </div>
         </div>
         {importMessage ? <p className="mt-3 rounded-lg bg-[var(--color-accent-light)] p-3 text-sm font-bold text-[var(--color-primary)]">{importMessage}</p> : null}
@@ -2940,6 +2952,7 @@ function ReportsTab({ state, currentProfile, updateState, showToast }: { state: 
   const [dueFrom, setDueFrom] = useState("");
   const [dueTo, setDueTo] = useState("");
   const [reportDate, setReportDate] = useState(todayIso());
+  const [excelExporting, setExcelExporting] = useState(false);
   const canPdf = isAdmin || viewerAccess.canExportPdf;
   const canExcel = isAdmin || viewerAccess.canExportExcel;
   const canDaily = isAdmin || viewerAccess.reportTypes.includes("Daily Area Report PDF");
@@ -3009,11 +3022,14 @@ function ReportsTab({ state, currentProfile, updateState, showToast }: { state: 
       return;
     }
     try {
+      setExcelExporting(true);
       await exportAdminWorkbook(state, allowedAreas.map((area) => area.id), isAdmin);
       recordExport(isAdmin ? "Admin Excel Export" : "Viewer Excel Export");
       showToast("Excel exported", "The workbook download has started.", "success");
     } catch (error) {
       showToast("Excel export failed", readError(error, "Could not generate workbook."), "error");
+    } finally {
+      setExcelExporting(false);
     }
   };
 
@@ -3046,7 +3062,10 @@ function ReportsTab({ state, currentProfile, updateState, showToast }: { state: 
         <div className="grid gap-2">
           <button className="btn-primary" disabled={!canPdf} onClick={printReport}><FileDown size={16} /> Export PDF / Print</button>
           <button className="btn-secondary" disabled={!canPdf} onClick={printReport}><Download size={16} /> Print Preview</button>
-          <button className="btn-secondary" disabled={!canExcel} onClick={exportExcel}><FileSpreadsheet size={16} /> Export Data CSV / Excel</button>
+          <button className="btn-secondary" disabled={!canExcel || excelExporting} onClick={exportExcel}>
+            {excelExporting ? <InlineLoader label="Generating Excel export" /> : <FileSpreadsheet size={16} />}
+            {excelExporting ? "Generating Export" : "Export Data CSV / Excel"}
+          </button>
           <button className="btn-secondary" disabled={!canExcel} onClick={() => exportLiveTasksCsv({ ...state, liveTasks: previewData.tasks })}><Download size={16} /> Export Task CSV</button>
         </div>
       </aside>
