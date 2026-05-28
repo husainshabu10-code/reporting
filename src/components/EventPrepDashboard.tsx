@@ -1163,12 +1163,33 @@ function NotificationCenter({ state, currentProfile, updateState, showToast }: {
   const stored = unreadNotificationsFor(state, currentProfile);
   const generated = buildUserAlerts(state, currentProfile);
   const count = stored.length + generated.length;
-  const markRead = (notificationId: string) => {
+  const markRead = (target: InAppNotification) => {
     updateState((current) => ({
       ...current,
-      notifications: current.notifications.map((notification) => (notification.id === notificationId ? { ...notification, isRead: true } : notification))
+      notifications: current.notifications.some((notification) => notification.id === target.id)
+        ? current.notifications.map((notification) => (notification.id === target.id ? { ...notification, isRead: true } : notification))
+        : [{ ...target, isRead: true, createdAt: new Date().toISOString() }, ...current.notifications]
     }));
     showToast("Notification marked read", "This alert is now cleared from your unread list.");
+  };
+  const markAllRead = () => {
+    const targets = [...generated, ...stored];
+    if (!targets.length) return;
+    updateState((current) => {
+      const existingIds = new Set(current.notifications.map((notification) => notification.id));
+      const targetIds = new Set(targets.map((notification) => notification.id));
+      const inserted = targets
+        .filter((notification) => !existingIds.has(notification.id))
+        .map((notification) => ({ ...notification, isRead: true, createdAt: new Date().toISOString() }));
+      return {
+        ...current,
+        notifications: [
+          ...inserted,
+          ...current.notifications.map((notification) => (targetIds.has(notification.id) ? { ...notification, isRead: true } : notification))
+        ]
+      };
+    });
+    showToast("Notifications marked read", `${targets.length} alert(s) cleared.`);
   };
   return (
     <div className="notification-panel">
@@ -1177,7 +1198,10 @@ function NotificationCenter({ state, currentProfile, updateState, showToast }: {
           <p className="text-xs font-black uppercase text-[var(--color-accent)]">Alerts & Notifications</p>
           <h3 className="mt-1 text-lg font-black text-[var(--color-primary)]">Notifications</h3>
         </div>
-        <Badge>{count} item(s)</Badge>
+        <div className="flex flex-col items-end gap-2">
+          <Badge>{count} item(s)</Badge>
+          {count ? <button className="btn-compact" onClick={markAllRead}>Mark all read</button> : null}
+        </div>
       </div>
       <div className="grid max-h-[28rem] gap-2 overflow-y-auto p-3">
         {!count ? <EmptyState title="No unread notifications" body="You are clear for now." /> : null}
@@ -1189,6 +1213,7 @@ function NotificationCenter({ state, currentProfile, updateState, showToast }: {
             </div>
             <p className="mt-2 font-black text-[var(--color-primary)]">{notification.title}</p>
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">{notification.message}</p>
+            <button className="btn-compact mt-3" onClick={() => markRead(notification)}>Mark Read</button>
           </div>
         ))}
         {stored.map((notification) => (
@@ -1199,7 +1224,7 @@ function NotificationCenter({ state, currentProfile, updateState, showToast }: {
             </div>
             <p className="mt-2 font-black text-[var(--color-primary)]">{notification.title}</p>
             <p className="mt-1 text-sm text-[var(--color-text-muted)]">{notification.message}</p>
-            <button className="btn-compact mt-3" onClick={() => markRead(notification.id)}>Mark Read</button>
+            <button className="btn-compact mt-3" onClick={() => markRead(notification)}>Mark Read</button>
           </div>
         ))}
       </div>
@@ -4717,10 +4742,12 @@ function buildUserAlerts(state: EventPrepState, profile: Profile): InAppNotifica
   const today = todayIso();
   const allowedAreas = getAllowedAreas(state, profile);
   const allowedAreaIds = allowedAreas.map((area) => area.id);
+  const readGeneratedIds = new Set(state.notifications.filter((notification) => notification.userId === profile.id && notification.isRead).map((notification) => notification.id));
   const notifications: InAppNotification[] = [];
   const push = (type: InAppNotification["type"], title: string, message: string, extra: Partial<InAppNotification> = {}) => {
+    const generatedKey = extra.relatedTaskId || extra.relatedRequestId || extra.relatedDailyReportId || slug(message);
     notifications.push({
-      id: `generated-${type}-${slug(title)}-${extra.relatedTaskId || extra.relatedRequestId || extra.relatedDailyReportId || ""}`,
+      id: `generated-${type}-${slug(title)}-${generatedKey}`,
       userId: profile.id,
       type,
       title,
@@ -4735,7 +4762,7 @@ function buildUserAlerts(state: EventPrepState, profile: Profile): InAppNotifica
     buildAttention(state).forEach((item) => {
       if (item.count > 0) push(item.type, item.label, `${item.count} item(s) need attention.`);
     });
-    return notifications;
+    return notifications.filter((notification) => !readGeneratedIds.has(notification.id));
   }
 
   if (profile.role === "verifier") {
@@ -4766,7 +4793,7 @@ function buildUserAlerts(state: EventPrepState, profile: Profile): InAppNotifica
     .filter((request) => request.requestedBy === profile.id && request.status === "Need More Info")
     .forEach((request) => push("Request status changed", "Request needs more info", request.title, { areaId: request.areaId, relatedRequestId: request.id }));
 
-  return notifications;
+  return notifications.filter((notification) => !readGeneratedIds.has(notification.id));
 }
 
 function createInAppNotification(
