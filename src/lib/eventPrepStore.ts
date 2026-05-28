@@ -472,7 +472,8 @@ function fromDbRow<T>(row: Record<string, unknown>, table: string) {
         submittedAt: row.submitted_at ? String(row.submitted_at) : undefined,
         updatedAt: String(row.updated_at || new Date().toISOString())
       } as T;
-    case "task_updates":
+    case "task_updates": {
+      const updateData = row.data && typeof row.data === "object" ? row.data as Partial<TaskUpdate> : {};
       return {
         id: String(row.id || ""),
         liveTaskId: String(row.live_task_id || ""),
@@ -485,9 +486,11 @@ function fromDbRow<T>(row: Record<string, unknown>, table: string) {
         userRoleStanding: String(row.user_role_standing || ""),
         escalationPoints: Array.isArray(row.escalation_points) ? row.escalation_points : [],
         supportingPersonnel: Array.isArray(row.supporting_personnel) ? row.supporting_personnel : [],
+        customFields: updateData.customFields || {},
         correctionComment: row.correction_comment ? String(row.correction_comment) : undefined,
         updatedAt: String(row.updated_at || new Date().toISOString())
       } as T;
+    }
     case "task_files":
       return {
         id: String(row.id || ""),
@@ -585,16 +588,21 @@ function fromDbRow<T>(row: Record<string, unknown>, table: string) {
       } as T;
     case "global_options":
       return { id: String(row.id || ""), group: String(row.option_group || ""), value: String(row.value || ""), active: Boolean(row.active ?? true) } as T;
-    case "form_fields":
+    case "form_fields": {
+      const fieldData = row.data && typeof row.data === "object" ? row.data as Partial<FormField> : {};
       return {
         id: String(row.id || ""),
         taskType: row.task_type,
         fieldKey: String(row.field_key || ""),
         label: String(row.label || ""),
+        questionType: fieldData.questionType || "Short answer",
+        options: Array.isArray(fieldData.options) ? fieldData.options.map(String) : [],
+        globalOptionGroup: fieldData.globalOptionGroup,
         required: Boolean(row.required),
         visible: Boolean(row.visible ?? true),
         displayOrder: Number(row.display_order || 0)
       } as T;
+    }
     default:
       return row as T;
   }

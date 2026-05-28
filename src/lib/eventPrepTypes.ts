@@ -158,6 +158,7 @@ export type TaskUpdate = {
   userRoleStanding: string;
   escalationPoints: EscalationPoint[];
   supportingPersonnel: SupportingPerson[];
+  customFields?: Record<string, string | string[]>;
   correctionComment?: string;
   updatedAt: string;
 };
@@ -296,6 +297,9 @@ export type FormField = {
   taskType: TaskTypeName;
   fieldKey: string;
   label: string;
+  questionType?: "Short answer" | "Paragraph" | "Multiple choice" | "Checkboxes" | "Dropdown" | "File upload" | "Date" | "Time";
+  options?: string[];
+  globalOptionGroup?: string;
   required: boolean;
   visible: boolean;
   displayOrder: number;

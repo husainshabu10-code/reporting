@@ -3,6 +3,7 @@ import {
   TASK_TYPES,
   TEAM_TYPES,
   UNIT_OPTIONS,
+  USER_TASK_STATUSES,
   ZONE_TYPES,
   type Area,
   type AreaAccess,
@@ -188,6 +189,8 @@ export const seedFormFields: FormField[] = TASK_TYPES.flatMap((taskType) =>
     taskType,
     fieldKey,
     label: fieldKey.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" "),
+    questionType: fieldKey === "remarks" ? "Paragraph" : fieldKey === "file_upload" ? "File upload" : fieldKey === "status" ? "Dropdown" : "Short answer",
+    options: fieldKey === "status" ? [...USER_TASK_STATUSES] : [],
     required: fieldKey === "status",
     visible: true,
     displayOrder: index + 1

@@ -155,6 +155,8 @@ const SIDEBAR_SECTIONS: Array<{ title: string; tabs: AnyTab[] }> = [
   { title: "Administration", tabs: ["Users & Access", "Forms", "Global Fields", "Profile / Access"] },
   { title: "Insights", tabs: ["Reports", "Activity Log"] }
 ];
+const QUESTION_TYPES: NonNullable<FormField["questionType"]>[] = ["Short answer", "Paragraph", "Multiple choice", "Checkboxes", "Dropdown", "File upload", "Date", "Time"];
+const BUILTIN_FORM_FIELD_KEYS = new Set(["status", "user_role_standing", "completed_quantity", "remarks", "escalation_points", "supporting_personnel", "file_upload"]);
 
 export default function EventPrepDashboard() {
   const [state, setState] = useState<EventPrepState | null>(null);
@@ -1149,6 +1151,7 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
   const [customUnit, setCustomUnit] = useState("Item");
   const unitOptions = activeOptions(state, "Units", UNIT_OPTIONS);
   const priorityOptions = activeOptions(state, "Priority options", PRIORITY_OPTIONS);
+  const workstreamOptions = activeOptions(state, "Workstreams", ["General"]);
   const referenceTemplates = state.taskTemplates.filter((template) => template.source !== "custom");
   const selectedTask = state.liveTasks.find((task) => task.id === selectedTaskId);
   const selectedSuggestion = referenceTemplates.find((template) => template.id === selectedSuggestionId);
@@ -1250,7 +1253,7 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
             ]}
           />
           <Input label="Task title" value={customTitle} onChange={setCustomTitle} placeholder="Install backup router" />
-          <Input label="Workstream" value={customWorkstream} onChange={setCustomWorkstream} placeholder="Network" />
+          <WorkstreamSelect label="Workstream" value={customWorkstream} onChange={setCustomWorkstream} options={workstreamOptions} />
           <Select label="Task Type" value={customTaskType} onChange={(value) => setCustomTaskType(value as typeof customTaskType)} options={[...TASK_TYPES]} />
           <Input label="Prep Day" value={customPrepDay} onChange={setCustomPrepDay} type="number" />
           <Input label="Start date" value={customStartDate} onChange={setCustomStartDate} type="date" />
@@ -1464,6 +1467,7 @@ function LiveTaskEditorModal({
   const details = taskDetails(state, draft);
   const priorityOptions = activeOptions(state, "Priority options", PRIORITY_OPTIONS);
   const unitOptions = activeOptions(state, "Units", UNIT_OPTIONS);
+  const workstreamOptions = activeOptions(state, "Workstreams", ["General"]);
   const areaUsers = state.areaAccess
     .filter((access) => access.areaId === draft.areaId && access.role === "report_user")
     .map((access) => state.profiles.find((profile) => profile.id === access.profileId))
@@ -1531,7 +1535,7 @@ function LiveTaskEditorModal({
               <Input label="Task title" value={details.taskDetails} onChange={(value) => updateDraft({ taskDetails: value })} />
               <Input label="Main objective" value={details.mainObjective} onChange={(value) => updateDraft({ mainObjective: value })} />
                 <div className="grid gap-3 md:grid-cols-2">
-                <Input label="Workstream" value={details.workstream} onChange={(value) => updateDraft({ workstream: value })} />
+                <WorkstreamSelect label="Workstream" value={details.workstream} onChange={(value) => updateDraft({ workstream: value })} options={workstreamOptions} />
                 <Input label="Responsible team" value={details.responsibleTeam} onChange={(value) => updateDraft({ responsibleTeam: value })} />
                 <Input label="Required equipment" value={details.requiredEquipment} onChange={(value) => updateDraft({ requiredEquipment: value })} />
                 <Input label="Testing required" value={details.testingRequired} onChange={(value) => updateDraft({ testingRequired: value })} />
@@ -1922,6 +1926,7 @@ function TaskCard({
   const showEscalations = isFormFieldVisible(state, task.taskType, "escalation_points");
   const showSupport = isFormFieldVisible(state, task.taskType, "supporting_personnel");
   const showUpload = isFormFieldVisible(state, task.taskType, "file_upload");
+  const customFormFields = getCustomFormFields(state, task.taskType);
   const teamTypeOptions = activeOptions(state, "Team Types", TEAM_TYPES);
   const previousUserUpdates = state.taskUpdates.filter((update) => update.updatedBy === currentProfile.id && update.id !== draft.id);
   const escalationSuggestions = uniquePeopleRows(previousUserUpdates.flatMap((update) => update.escalationPoints));
@@ -1933,6 +1938,11 @@ function TaskCard({
   }, [existing?.id, report.id, task.id]);
 
   const saveTask = () => {
+    const missingRequiredCustom = customFormFields.find((field) => field.required && !hasCustomFieldValue(draft.customFields?.[field.fieldKey]));
+    if (missingRequiredCustom) {
+      showToast("Required field missing", `${missingRequiredCustom.label} must be filled before saving this task.`, "warning");
+      return;
+    }
     const nextVerification: VerificationStatus = draft.status === "Completed" ? (task.verificationRequired ? "Needs Verification" : "Verified Completed") : draft.verificationStatus === "Rejected / Needs Correction" ? "Needs Verification" : draft.verificationStatus;
     const completedQuantity = task.taskType === "Quantity-Based Task" ? Math.max(0, Math.min(Number(draft.completedQuantity || 0), Number(task.requiredQuantity || draft.completedQuantity || 0))) : draft.completedQuantity;
     const next = { ...draft, completedQuantity, verificationStatus: nextVerification, updatedAt: new Date().toISOString() };
@@ -2068,6 +2078,20 @@ function TaskCard({
             <span className="field-label">Remarks</span>
             <textarea className="field mt-2 min-h-20" value={draft.remarks} onChange={(event) => setDraft({ ...draft, remarks: event.target.value })} />
           </label>
+        ) : null}
+
+        {customFormFields.length ? (
+          <div className="custom-form-field-grid mt-3">
+            {customFormFields.map((field) => (
+              <DynamicTaskField
+                key={field.id}
+                field={field}
+                state={state}
+                value={draft.customFields?.[field.fieldKey]}
+                onChange={(value) => setDraft({ ...draft, customFields: { ...(draft.customFields || {}), [field.fieldKey]: value } })}
+              />
+            ))}
+          </div>
         ) : null}
 
         {showEscalations ? <PeopleEditor
@@ -3387,11 +3411,14 @@ function FoundationTab({
 function FormBuilderTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const [taskType, setTaskType] = useState<TaskTypeName>("Simple Task");
   const [label, setLabel] = useState("");
-  const [questionType, setQuestionType] = useState("Short answer");
+  const [questionType, setQuestionType] = useState<NonNullable<FormField["questionType"]>>("Short answer");
+  const [newOptions, setNewOptions] = useState("Option 1\nOption 2");
+  const globalGroups = unique(state.globalOptions.map((option) => option.group));
   const visibleFields = state.formFields
     .filter((field) => field.taskType === taskType)
     .slice()
     .sort((a, b) => a.displayOrder - b.displayOrder);
+  const isChoiceType = ["Multiple choice", "Checkboxes", "Dropdown"].includes(questionType);
   const addField = () => {
     if (!label.trim()) {
       showToast("Field label required", "Add a label before creating the form field.", "warning");
@@ -3400,11 +3427,14 @@ function FormBuilderTab({ state, currentProfile, updateState, showToast }: { sta
     const fieldLabel = label.trim();
     updateState((current) => {
       const fieldsForType = current.formFields.filter((field) => field.taskType === taskType);
+      const fieldKey = uniqueFormFieldKey(fieldsForType, fieldLabel);
       const field: FormField = {
         id: id("field"),
         taskType,
-        fieldKey: questionType === "File upload" ? "file_upload" : questionType === "Date" ? "date" : questionType === "Time" ? "time" : slug(fieldLabel),
+        fieldKey,
         label: fieldLabel,
+        questionType,
+        options: isChoiceType ? optionLines(newOptions) : [],
         required: false,
         visible: true,
         displayOrder: fieldsForType.length + 1
@@ -3412,6 +3442,7 @@ function FormBuilderTab({ state, currentProfile, updateState, showToast }: { sta
       return withActivity({ ...current, formFields: [...current.formFields, field] }, currentProfile, "Form/global field changes", `Added form field ${field.label}`, "form_field", field.id, { visible: true });
     });
     setLabel("");
+    if (isChoiceType) setNewOptions("Option 1\nOption 2");
     showToast("Form field added", `${fieldLabel} was added to ${taskType}.`);
   };
   const updateField = (fieldId: string, patch: Partial<FormField>) => {
@@ -3454,9 +3485,15 @@ function FormBuilderTab({ state, currentProfile, updateState, showToast }: { sta
           <div className="form-card-grip" aria-hidden="true">:::</div>
           <div className="grid gap-3 md:grid-cols-[1fr_13rem_auto] md:items-end">
             <Input label="Question title" value={label} onChange={setLabel} placeholder="Testing result" />
-            <Select label="Question type" value={questionType} onChange={setQuestionType} options={["Short answer", "Paragraph", "Multiple choice", "Checkboxes", "Dropdown", "File upload", "Date", "Time"]} />
+            <Select label="Question type" value={questionType} onChange={(value) => setQuestionType(value as NonNullable<FormField["questionType"]>)} options={QUESTION_TYPES} />
             <button className="btn-primary" onClick={addField}><Plus size={16} /> Add Question</button>
           </div>
+          {isChoiceType ? (
+            <label className="mt-3 block">
+              <span className="field-label">Options, one per line</span>
+              <textarea className="field mt-2 min-h-24" value={newOptions} onChange={(event) => setNewOptions(event.target.value)} />
+            </label>
+          ) : null}
         </div>
 
         {visibleFields.map((field) => (
@@ -3464,13 +3501,30 @@ function FormBuilderTab({ state, currentProfile, updateState, showToast }: { sta
             <div className="form-card-grip" aria-hidden="true">:::</div>
             <div className="grid gap-3 md:grid-cols-[1fr_13rem]">
               <Input label="Question" value={field.label} onChange={(value) => updateField(field.id, { label: value })} />
-              <Select label="Question type" value={field.fieldKey === "file_upload" ? "File upload" : field.fieldKey.includes("date") ? "Date" : "Short answer"} onChange={(value) => updateField(field.id, { fieldKey: value === "File upload" ? "file_upload" : value === "Date" ? "date" : slug(field.label) })} options={["Short answer", "Paragraph", "Multiple choice", "Checkboxes", "Dropdown", "File upload", "Date", "Time"]} />
+              <Select label="Question type" value={field.questionType || "Short answer"} onChange={(value) => updateField(field.id, { questionType: value as NonNullable<FormField["questionType"]>, options: ["Multiple choice", "Checkboxes", "Dropdown"].includes(value) ? field.options || ["Option 1"] : [] })} options={QUESTION_TYPES} />
             </div>
-            <div className="form-answer-preview">{field.fieldKey === "file_upload" ? "File upload control" : "Short answer text"}</div>
+            {["Multiple choice", "Checkboxes", "Dropdown"].includes(field.questionType || "") ? (
+              <div className="mt-3 grid gap-3 md:grid-cols-[1fr_13rem]">
+                <label className="block">
+                  <span className="field-label">Custom options, one per line</span>
+                  <textarea className="field mt-2 min-h-24" value={(field.options || []).join("\n")} onChange={(event) => updateField(field.id, { options: optionLines(event.target.value), globalOptionGroup: undefined })} />
+                </label>
+                <Select
+                  label="Option source"
+                  value={field.globalOptionGroup || ""}
+                  onChange={(value) => updateField(field.id, { globalOptionGroup: value || undefined })}
+                  options={[{ label: "Custom options", value: "" }, ...globalGroups.map((group) => ({ label: group, value: group }))]}
+                />
+              </div>
+            ) : null}
+            <div className="form-answer-preview">{formPreviewText(field)}</div>
             <div className="form-question-actions">
               <label><input type="checkbox" checked={field.visible} onChange={(event) => updateField(field.id, { visible: event.target.checked })} /> Visible</label>
               <label><input type="checkbox" checked={field.required} onChange={(event) => updateField(field.id, { required: event.target.checked })} /> Required</label>
-              <Input label="Order" value={String(field.displayOrder)} onChange={(value) => updateField(field.id, { displayOrder: Number(value || 0) })} type="number" />
+              <label className="form-order-control">
+                <span className="field-label">Order</span>
+                <input className="field" value={String(field.displayOrder)} onChange={(event) => updateField(field.id, { displayOrder: Number(event.target.value || 0) })} type="number" min="1" />
+              </label>
               <button className="mini-icon-btn" onClick={() => duplicateField(field)} title="Duplicate question"><FileText size={15} /></button>
               <button className="mini-icon-btn text-[var(--color-important)]" onClick={() => hideField(field)} title="Hide question"><Trash2 size={15} /></button>
             </div>
@@ -3483,11 +3537,15 @@ function FormBuilderTab({ state, currentProfile, updateState, showToast }: { sta
 }
 
 function GlobalFieldsTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
-  const groups = unique(state.globalOptions.filter((option) => option.active).map((option) => option.group));
+  const groups = unique(state.globalOptions.map((option) => option.group));
   const [groupMode, setGroupMode] = useState(groups[0] || "Workstreams");
   const [newGroup, setNewGroup] = useState("");
   const [value, setValue] = useState("");
   const selectedGroup = groupMode === "__new__" ? newGroup.trim() : groupMode;
+  const selectedOptions = state.globalOptions
+    .filter((option) => option.group === selectedGroup)
+    .slice()
+    .sort((a, b) => a.value.localeCompare(b.value));
   const addOption = () => {
     if (!selectedGroup.trim() || !value.trim()) {
       showToast("Option details required", "Add both the group and value before saving.", "warning");
@@ -3512,30 +3570,49 @@ function GlobalFieldsTab({ state, currentProfile, updateState, showToast }: { st
       globalOptions: current.globalOptions.map((option) => (option.id === optionId ? { ...option, ...patch } : option))
     }, currentProfile, "Form/global field changes", "Updated global option", "global_option", optionId, { changed: true }));
   };
+  const duplicateOption = (option: GlobalOption) => {
+    const nextValue = `${option.value} copy`;
+    updateState((current) => {
+      const copy: GlobalOption = { ...option, id: id("option"), value: nextValue, active: true };
+      return withActivity({ ...current, globalOptions: [...current.globalOptions, copy] }, currentProfile, "Form/global field changes", `Duplicated global option ${option.value}`, "global_option", copy.id, { duplicatedFrom: option.id });
+    });
+    showToast("Global option duplicated", `${nextValue} was added to ${option.group}.`);
+  };
   return (
-    <div className="space-y-4">
-      <Panel title="Add Global Option">
-        <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
-          <Select label="Group" value={groupMode} onChange={setGroupMode} options={[...groups, { label: "+ Add new global field group", value: "__new__" }]} />
+    <div className="form-builder-shell">
+      <div className="form-builder-toolbar dashboard-panel">
+        <div className="grid gap-3 md:grid-cols-2 md:items-end">
+          <Select label="Global field group" value={groupMode} onChange={setGroupMode} options={[...groups, { label: "+ Add new global field group", value: "__new__" }]} />
           {groupMode === "__new__" ? <Input label="New group name" value={newGroup} onChange={setNewGroup} placeholder="Team Types" /> : null}
-          <Input label="Value" value={value} onChange={setValue} placeholder="Fiber Team" />
-          <button className="btn-primary" onClick={addOption}>Add Option</button>
         </div>
-        <p className="mt-3 text-xs text-[var(--color-text-muted)]">Editable options are used by Phase 2 forms and task setup where applicable.</p>
-      </Panel>
-      <Panel title="Global Fields / Options">
-        <ResponsiveTable
-          headers={["Group", "Value", "Active"]}
-          rows={state.globalOptions
-            .slice()
-            .sort((a, b) => a.group.localeCompare(b.group) || a.value.localeCompare(b.value))
-            .map((option) => [
-              option.group,
-              <input key="value" className="field" value={option.value} onChange={(event) => updateOption(option.id, { value: event.target.value })} />,
-              <input key="active" type="checkbox" checked={option.active} onChange={(event) => updateOption(option.id, { active: event.target.checked })} />
-            ])}
-        />
-      </Panel>
+        <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+          <Input label={`New option for ${selectedGroup || "selected group"}`} value={value} onChange={setValue} placeholder="Fiber Team" />
+          <button className="btn-secondary" onClick={addOption}><Plus size={16} /> Add to Group</button>
+        </div>
+        <p className="text-sm font-bold text-[var(--color-text-muted)]">These options feed dropdowns and form-builder option sources for every authorized user after Supabase sync.</p>
+      </div>
+
+      <section className="form-canvas">
+        <div className="form-cover">
+          <p className="text-xs font-black uppercase text-[var(--color-accent)]">Global Fields</p>
+          <h2>{selectedGroup || "Select a group"}</h2>
+          <p>Edit values, toggle availability, or add a new option to the selected group.</p>
+        </div>
+        <div className="global-option-grid">
+          {selectedOptions.map((option) => (
+            <div key={option.id} className={`global-option-card ${option.active ? "" : "is-muted"}`}>
+              <Input label="Option value" value={option.value} onChange={(next) => updateOption(option.id, { value: next })} />
+              <Input label="Group" value={option.group} onChange={(next) => updateOption(option.id, { group: next })} />
+              <div className="form-question-actions">
+                <label><input type="checkbox" checked={option.active} onChange={(event) => updateOption(option.id, { active: event.target.checked })} /> Active</label>
+                <button className="mini-icon-btn" onClick={() => duplicateOption(option)} title="Duplicate option"><FileText size={15} /></button>
+                <button className="mini-icon-btn text-[var(--color-important)]" onClick={() => updateOption(option.id, { active: false })} title="Disable option"><Trash2 size={15} /></button>
+              </div>
+            </div>
+          ))}
+        </div>
+        {!selectedOptions.length ? <EmptyState title="No options in this group" body="Add an option above to make it available in forms and task setup." /> : null}
+      </section>
     </div>
   );
 }
@@ -3842,6 +3919,22 @@ function RoleStandingMultiSelect({ value, onChange }: { value: string; onChange:
   );
 }
 
+function WorkstreamSelect({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: readonly string[] }) {
+  const cleanedOptions = unique(["General", ...options.filter(Boolean)]);
+  const selected = cleanedOptions.includes(value) ? value : "__other__";
+  return (
+    <div className="grid gap-2">
+      <Select
+        label={label}
+        value={selected}
+        onChange={(next) => onChange(next === "__other__" ? "" : next)}
+        options={[...cleanedOptions, { label: "Other / Custom workstream", value: "__other__" }]}
+      />
+      {selected === "__other__" ? <Input label="Custom workstream" value={value} onChange={onChange} placeholder="Enter custom workstream" /> : null}
+    </div>
+  );
+}
+
 function Input({ label, value, onChange, type = "text", placeholder, disabled }: { label: string; value: string; onChange: (value: string) => void; type?: string; placeholder?: string; disabled?: boolean }) {
   return (
     <label className="block">
@@ -3878,6 +3971,109 @@ function EmptyState({ title, body }: { title: string; body: string }) {
       <p className="mt-1 text-sm text-[var(--color-text-muted)]">{body}</p>
     </div>
   );
+}
+
+function DynamicTaskField({
+  field,
+  state,
+  value,
+  onChange
+}: {
+  field: FormField;
+  state: EventPrepState;
+  value?: string | string[];
+  onChange: (value: string | string[]) => void;
+}) {
+  const questionType = field.questionType || "Short answer";
+  const optionSource = field.globalOptionGroup ? activeOptions(state, field.globalOptionGroup, []) : field.options || [];
+  const options = unique(optionSource.filter(Boolean));
+  const stringValue = Array.isArray(value) ? value.join(", ") : value || "";
+  const arrayValue = Array.isArray(value) ? value : [];
+
+  if (questionType === "Paragraph") {
+    return (
+      <label className="block md:col-span-2">
+        <span className="field-label">{field.label}{field.required ? " *" : ""}</span>
+        <textarea className="field mt-2 min-h-24" value={stringValue} onChange={(event) => onChange(event.target.value)} />
+      </label>
+    );
+  }
+
+  if (questionType === "Multiple choice") {
+    return (
+      <fieldset className="dynamic-choice-field">
+        <legend>{field.label}{field.required ? " *" : ""}</legend>
+        {options.map((option) => (
+          <label key={option}>
+            <input type="radio" checked={stringValue === option} onChange={() => onChange(option)} />
+            {option}
+          </label>
+        ))}
+        {!options.length ? <p>No options configured for this question.</p> : null}
+      </fieldset>
+    );
+  }
+
+  if (questionType === "Checkboxes") {
+    return (
+      <fieldset className="dynamic-choice-field md:col-span-2">
+        <legend>{field.label}{field.required ? " *" : ""}</legend>
+        {options.map((option) => (
+          <label key={option}>
+            <input
+              type="checkbox"
+              checked={arrayValue.includes(option)}
+              onChange={(event) => onChange(event.target.checked ? [...arrayValue, option] : arrayValue.filter((item) => item !== option))}
+            />
+            {option}
+          </label>
+        ))}
+        {!options.length ? <p>No options configured for this question.</p> : null}
+      </fieldset>
+    );
+  }
+
+  if (questionType === "Dropdown") {
+    return (
+      <Select
+        label={`${field.label}${field.required ? " *" : ""}`}
+        value={stringValue}
+        onChange={onChange as (value: string) => void}
+        options={[{ label: "Select option", value: "" }, ...options]}
+      />
+    );
+  }
+
+  if (questionType === "File upload") {
+    return (
+      <label className="block md:col-span-2">
+        <span className="field-label">{field.label}{field.required ? " *" : ""}</span>
+        <input className="field mt-2" type="file" multiple onChange={(event) => onChange(Array.from(event.target.files || []).map((file) => file.name))} />
+        {arrayValue.length ? <p className="mt-1 text-xs font-bold text-[var(--color-primary)]">{arrayValue.join(", ")}</p> : null}
+      </label>
+    );
+  }
+
+  return (
+    <Input
+      label={`${field.label}${field.required ? " *" : ""}`}
+      value={stringValue}
+      onChange={onChange as (value: string) => void}
+      type={questionType === "Date" ? "date" : questionType === "Time" ? "time" : "text"}
+    />
+  );
+}
+
+function getCustomFormFields(state: EventPrepState, taskType: TaskTypeName) {
+  return state.formFields
+    .filter((field) => field.taskType === taskType && field.visible && !BUILTIN_FORM_FIELD_KEYS.has(field.fieldKey))
+    .slice()
+    .sort((a, b) => a.displayOrder - b.displayOrder);
+}
+
+function hasCustomFieldValue(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value.length > 0;
+  return Boolean(value?.trim());
 }
 
 function PeopleEditor<T extends EscalationPoint | SupportingPerson>({
@@ -4203,6 +4399,31 @@ function activeOptions(state: EventPrepState, group: string, fallback: readonly 
   return options.length ? options : [...fallback];
 }
 
+function optionLines(value: string) {
+  return unique(value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean));
+}
+
+function uniqueFormFieldKey(fields: FormField[], label: string) {
+  const base = slug(label) || "custom_field";
+  let key = base;
+  let index = 2;
+  while (fields.some((field) => field.fieldKey === key)) {
+    key = `${base}_${index}`;
+    index += 1;
+  }
+  return key;
+}
+
+function formPreviewText(field: FormField) {
+  if (field.globalOptionGroup) return `Options from Global Fields: ${field.globalOptionGroup}`;
+  if (["Multiple choice", "Checkboxes", "Dropdown"].includes(field.questionType || "")) return (field.options || []).join(" / ") || "Add options for this question";
+  if (field.questionType === "Paragraph") return "Paragraph text";
+  if (field.questionType === "File upload") return "File upload control";
+  if (field.questionType === "Date") return "Date picker";
+  if (field.questionType === "Time") return "Time picker";
+  return "Short answer text";
+}
+
 function isFormFieldVisible(state: EventPrepState, taskType: TaskTypeName, fieldKey: string) {
   const field = state.formFields.find((item) => item.taskType === taskType && item.fieldKey === fieldKey);
   return field ? field.visible : true;
@@ -4513,6 +4734,7 @@ function createTaskUpdate(task: LiveTask, report: DailyReport, profileId: string
     userRoleStanding: latest?.userRoleStanding || "",
     escalationPoints: latest?.escalationPoints || [],
     supportingPersonnel: latest?.supportingPersonnel || [],
+    customFields: latest?.customFields || {},
     correctionComment: latest?.correctionComment,
     updatedAt: new Date().toISOString()
   };
