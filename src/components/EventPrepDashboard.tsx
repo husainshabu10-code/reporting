@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, ChangeEvent, ComponentType, ReactNode } from "react";
+import type { CSSProperties, ChangeEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   Activity,
@@ -44,6 +44,7 @@ import {
   Users,
   X
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import {
   PRIORITY_OPTIONS,
   REQUEST_STATUSES,
@@ -126,7 +127,7 @@ type PublicAreaOption = { id: string; name: string; zoneName: string };
 type ToastTone = "success" | "info" | "warning" | "error";
 type ToastMessage = { id: string; title: string; message?: string; tone: ToastTone };
 type ShowToast = (title: string, message?: string, tone?: ToastTone) => void;
-type SectionIcon = ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
+type SectionIcon = LucideIcon;
 
 const DEFAULT_DASHBOARD_CHARTS: DashboardChartSettings = {
   zoneType: "Progress bars",
@@ -1447,6 +1448,10 @@ function RemindersConfig({ state, currentProfile, updateState, showToast }: { st
 function MasterTasksTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const [importMessage, setImportMessage] = useState("");
   const [importingPlan, setImportingPlan] = useState(false);
+  const [customDrawerOpen, setCustomDrawerOpen] = useState(false);
+  const [createAnotherTask, setCreateAnotherTask] = useState(false);
+  const [creatingTask, setCreatingTask] = useState(false);
+  const [portalReady, setPortalReady] = useState(false);
   const [applyAreaId, setApplyAreaId] = useState(state.areas[0]?.id || "");
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [selectedSuggestionId, setSelectedSuggestionId] = useState("");
@@ -1468,6 +1473,16 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
   const referenceTemplates = state.taskTemplates.filter((template) => template.source !== "custom");
   const selectedTask = state.liveTasks.find((task) => task.id === selectedTaskId);
   const selectedSuggestion = referenceTemplates.find((template) => template.id === selectedSuggestionId);
+  const latestUpdates = latestUpdateMap(state.taskUpdates);
+  const totalTasks = state.liveTasks.length;
+  const dueToday = state.liveTasks.filter((task) => task.dueDate === todayIso()).length;
+  const overdueTasks = state.liveTasks.filter((task) => task.dueDate && task.dueDate < todayIso() && latestUpdates.get(task.id)?.verificationStatus !== "Verified Completed").length;
+  const verifiedTasks = state.liveTasks.filter((task) => latestUpdates.get(task.id)?.verificationStatus === "Verified Completed").length;
+  const overallCompletion = totalTasks ? Math.round((verifiedTasks / totalTasks) * 100) : 0;
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
 
   const handleImport = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -1506,11 +1521,28 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
     showToast("Suggestion applied", "The reference suggestion filled the custom task fields. You can edit anything before adding it.", "info");
   };
 
+  const resetCustomTaskForm = () => {
+    setCustomTitle("");
+    setCustomExpectedOutput("");
+    setCustomRequiredEquipment("");
+    setCustomResponsibleTeam("");
+    setSelectedSuggestionId("");
+    setCustomWorkstream("General");
+    setCustomTaskType("Simple Task");
+    setCustomPrepDay("1");
+    setCustomStartDate(state.settings.preparationStartDate);
+    setCustomDueDate(state.settings.preparationStartDate);
+    setCustomPriority("Medium");
+    setCustomQuantity("1");
+    setCustomUnit("Item");
+  };
+
   const addCustomTask = () => {
     if (!applyAreaId || !customTitle.trim()) {
       showToast("Task title required", "Choose an area and enter a custom task title.", "warning");
       return;
     }
+    setCreatingTask(true);
     const prepDay = Math.min(20, Math.max(1, Number(customPrepDay || 1)));
     const template = createCustomTaskTemplate({
       title: customTitle,
@@ -1532,76 +1564,123 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
         liveTasks: [nextTask, ...current.liveTasks]
       }, currentProfile, "Template changes", `Added custom task ${template.taskDetails}`, "live_task", nextTask.id, { custom: true });
     });
-    setCustomTitle("");
-    setCustomExpectedOutput("");
-    setCustomRequiredEquipment("");
-    setSelectedSuggestionId("");
+    resetCustomTaskForm();
+    setCreatingTask(false);
+    if (!createAnotherTask) setCustomDrawerOpen(false);
     showToast("Custom task added", `${template.taskDetails} was added to ${areaName(state, applyAreaId)}.`);
   };
 
   return (
-    <div className="space-y-4">
-      <Panel title="Excel Import Into Reference Suggestions" action={<Badge>Day Plan sheet preferred</Badge>}>
-        <div className="grid gap-3">
-          <div>
-            <label className="field-label">Upload preparation plan</label>
-            <input className="field mt-2" type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} disabled={importingPlan} />
-            <p className="mt-2 text-xs text-[var(--color-text-muted)]">Imported Day Plan rows are kept as optional suggestions while creating custom live tasks. They do not become live tasks by themselves.</p>
-            {importingPlan ? <p className="mt-2 inline-flex items-center gap-2 text-xs font-black text-[var(--color-primary)]"><InlineLoader label="Importing preparation plan" /> Importing preparation plan</p> : null}
-          </div>
+    <div className="master-tasks-page space-y-4">
+      <section className="master-task-header app-card">
+        <div className="min-w-0">
+          <p className="page-kicker">MASTER TASKS</p>
+          <h1>IT / Event Preparation Dashboard</h1>
+          <p>Real-time overview of IT readiness, reporting, and outstanding actions.</p>
         </div>
-        {importMessage ? <p className="mt-3 rounded-lg bg-[var(--color-accent-light)] p-3 text-sm font-bold text-[var(--color-primary)]">{importMessage}</p> : null}
-      </Panel>
+        <div className="master-task-actions">
+          <label className={`btn-secondary ${importingPlan ? "opacity-60" : ""}`}>
+            <FileSpreadsheet size={16} /> {importingPlan ? "Importing..." : "Import Suggestions"}
+            <input className="sr-only" type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} disabled={importingPlan} />
+          </label>
+          <button className="btn-primary" onClick={() => setCustomDrawerOpen(true)}>
+            <Plus size={17} /> Add Custom Task
+          </button>
+        </div>
+      </section>
+      {importMessage ? <p className="master-import-message">{importMessage}</p> : null}
 
-      <Panel title="Add Custom Live Task" action={<Badge>No template required</Badge>}>
-        <div className="grid gap-3 lg:grid-cols-4">
-          <Select label="Area" value={applyAreaId} onChange={setApplyAreaId} options={state.areas.map((area) => ({ label: area.name, value: area.id }))} />
-          <Select
-            label="Use reference suggestion"
-            value={selectedSuggestionId}
-            onChange={applySuggestion}
-            options={[
-              { label: "Start blank custom task", value: "" },
-              ...referenceTemplates.map((template) => ({
-                label: template.taskDetails.length > 90 ? `${template.taskDetails.slice(0, 90)}...` : template.taskDetails,
-                value: template.id
-              }))
-            ]}
-          />
-          <Input label="Task title" value={customTitle} onChange={setCustomTitle} placeholder="Install backup router" />
-          <WorkstreamSelect label="Workstream" value={customWorkstream} onChange={setCustomWorkstream} options={workstreamOptions} />
-          <Select label="Task Type" value={customTaskType} onChange={(value) => setCustomTaskType(value as typeof customTaskType)} options={[...TASK_TYPES]} />
-          <Input label="Prep Day" value={customPrepDay} onChange={setCustomPrepDay} type="number" />
-          <Input label="Start date" value={customStartDate} onChange={setCustomStartDate} type="date" />
-          <Input label="Due date" value={customDueDate} onChange={setCustomDueDate} type="date" />
-          <Select label="Priority" value={customPriority} onChange={(value) => setCustomPriority(value as typeof customPriority)} options={priorityOptions} />
-          {customTaskType === "Quantity-Based Task" ? <Input label="Required quantity" value={customQuantity} onChange={setCustomQuantity} type="number" /> : null}
-          {customTaskType === "Quantity-Based Task" ? <Select label="Unit" value={customUnit} onChange={setCustomUnit} options={unitOptions} /> : null}
-        </div>
-        <div className="mt-3 grid gap-3 md:grid-cols-3">
-          <ResponsibleTeamSelect value={customResponsibleTeam} onChange={setCustomResponsibleTeam} />
-          <Input label="Expected output" value={customExpectedOutput} onChange={setCustomExpectedOutput} placeholder="Task completion criteria" />
-          <Input label="Required equipment" value={customRequiredEquipment} onChange={setCustomRequiredEquipment} placeholder="Routers, cables, tools" />
-        </div>
-        {selectedSuggestion ? (
-          <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-accent-light)]/60 p-3 text-sm">
-            <p className="font-black text-[var(--color-primary)]">Reference suggestion preview</p>
-            <p className="mt-1 text-[var(--color-text)]">{selectedSuggestion.taskDetails}</p>
-            <p className="mt-1 text-xs font-bold text-[var(--color-text-muted)]">{selectedSuggestion.workstream || "General"} | {selectedSuggestion.responsibleTeam || "No team specified"}</p>
-          </div>
-        ) : null}
-        <button className="btn-primary mt-3" onClick={addCustomTask}>
-          <Plus size={17} /> Add Custom Task
-        </button>
-      </Panel>
+      <section className="master-kpi-grid">
+        <MetricCard title="Total Live Tasks" value={String(totalTasks)} helper="Access all areas & workstreams" />
+        <MetricCard title="Due Today" value={String(dueToday)} helper="Tasks due within today" tone={dueToday ? "warning" : "good"} />
+        <MetricCard title="Overdue" value={String(overdueTasks)} helper={overdueTasks ? "Requires immediate attention" : "No overdue tasks"} tone={overdueTasks ? "critical" : "good"} />
+        <MetricCard title="Overall Completion" value={`${overallCompletion}%`} helper="Verified completed across tasks" />
+      </section>
 
-      <Panel title="Live Tasks Area Configuration" action={<Badge>{state.liveTasks.length} live tasks</Badge>}>
+      <Panel title="Live Tasks Area Configuration" action={<Badge>{state.liveTasks.length} tasks</Badge>}>
         <LiveTasksConfigTable
           state={state}
           openTask={setSelectedTaskId}
         />
       </Panel>
       {selectedTask ? <LiveTaskEditorModal state={state} task={selectedTask} updateState={updateState} close={() => setSelectedTaskId("")} showToast={showToast} /> : null}
+      {portalReady && customDrawerOpen ? createPortal(
+        <div className="task-drawer-overlay" onMouseDown={() => setCustomDrawerOpen(false)}>
+          <section className="task-drawer master-task-drawer motion-drawer" onMouseDown={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Create new task">
+            <header className="task-drawer-header">
+              <div>
+                <p className="page-kicker">ADD CUSTOM TASK</p>
+                <h2 className="mt-1 text-xl font-black text-[var(--color-primary)]">Create New Task</h2>
+                <p className="mt-1 text-sm font-bold text-[var(--color-text-muted)]">Add a new task to the live tasks list</p>
+              </div>
+              <button className="mini-icon-btn" onClick={() => setCustomDrawerOpen(false)} aria-label="Close create task drawer"><X size={18} /></button>
+            </header>
+            <div className="task-drawer-body">
+              <section className="drawer-form-section">
+                <div className="drawer-section-heading">
+                  <h3>Task Information</h3>
+                  <p>Choose the area, task details, schedule, and priority.</p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Select label="Area *" value={applyAreaId} onChange={setApplyAreaId} options={state.areas.map((area) => ({ label: area.name, value: area.id }))} />
+                  <Select
+                    label="Use Reference Suggestion"
+                    value={selectedSuggestionId}
+                    onChange={applySuggestion}
+                    options={[
+                      { label: "Start blank custom task", value: "" },
+                      ...referenceTemplates.map((template) => ({
+                        label: template.taskDetails.length > 90 ? `${template.taskDetails.slice(0, 90)}...` : template.taskDetails,
+                        value: template.id
+                      }))
+                    ]}
+                  />
+                  <div className="md:col-span-2">
+                    <Input label="Task Title *" value={customTitle} onChange={setCustomTitle} placeholder="Enter task title" />
+                  </div>
+                  <WorkstreamSelect label="Workstream *" value={customWorkstream} onChange={setCustomWorkstream} options={workstreamOptions} />
+                  <Select label="Task Type *" value={customTaskType} onChange={(value) => setCustomTaskType(value as typeof customTaskType)} options={[...TASK_TYPES]} />
+                  <Input label="Prep Day *" value={customPrepDay} onChange={setCustomPrepDay} type="number" />
+                  <Input label="Due Date *" value={customDueDate} onChange={setCustomDueDate} type="date" />
+                  <Input label="Start Date" value={customStartDate} onChange={setCustomStartDate} type="date" />
+                  <Select label="Priority *" value={customPriority} onChange={(value) => setCustomPriority(value as typeof customPriority)} options={priorityOptions} />
+                  {customTaskType === "Quantity-Based Task" ? <Input label="Required Quantity" value={customQuantity} onChange={setCustomQuantity} type="number" /> : null}
+                  {customTaskType === "Quantity-Based Task" ? <Select label="Unit" value={customUnit} onChange={setCustomUnit} options={unitOptions} /> : null}
+                </div>
+                {selectedSuggestion ? (
+                  <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-accent-light)]/60 p-3 text-sm">
+                    <p className="font-black text-[var(--color-primary)]">Reference suggestion preview</p>
+                    <p className="mt-1 text-[var(--color-text)]">{selectedSuggestion.taskDetails}</p>
+                    <p className="mt-1 text-xs font-bold text-[var(--color-text-muted)]">{selectedSuggestion.workstream || "General"} | {selectedSuggestion.responsibleTeam || "No team specified"}</p>
+                  </div>
+                ) : null}
+              </section>
+              <section className="drawer-form-section">
+                <div className="drawer-section-heading">
+                  <h3>Execution Details</h3>
+                  <p>Define ownership, completion criteria, and equipment needs.</p>
+                </div>
+                <div className="grid gap-3">
+                  <ResponsibleTeamSelect value={customResponsibleTeam} onChange={setCustomResponsibleTeam} />
+                  <Input label="Expected Output *" value={customExpectedOutput} onChange={setCustomExpectedOutput} placeholder="Task completion criteria" />
+                  <Input label="Required Equipment" value={customRequiredEquipment} onChange={setCustomRequiredEquipment} placeholder="Routers, cables, tools" />
+                </div>
+              </section>
+            </div>
+            <footer className="task-drawer-footer master-task-drawer-footer">
+              <label className="drawer-toggle-field mr-auto">
+                <input type="checkbox" checked={createAnotherTask} onChange={(event) => setCreateAnotherTask(event.target.checked)} />
+                Create another task
+              </label>
+              <button className="btn-secondary" onClick={() => setCustomDrawerOpen(false)}>Cancel</button>
+              <button className="btn-primary" onClick={addCustomTask} disabled={creatingTask}>
+                {creatingTask ? <InlineLoader label="Creating task" /> : <Plus size={17} />} Create Task
+              </button>
+            </footer>
+          </section>
+        </div>,
+        document.body
+      ) : null}
     </div>
   );
 }
@@ -1619,8 +1698,6 @@ function LiveTasksConfigTable({
   const [workstreamFilter, setWorkstreamFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
-  const [collapsedAreas, setCollapsedAreas] = useState<string[]>([]);
-  const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
   const workstreamOptions = unique(state.liveTasks.map((task) => taskDetails(state, task).workstream || "General"));
   const visibleTasks = state.liveTasks.filter((task) => {
     const details = taskDetails(state, task);
@@ -1636,16 +1713,13 @@ function LiveTasksConfigTable({
       (priorityFilter === "All" || task.priority === priorityFilter)
     );
   });
-  const grouped = state.areas
-    .map((area) => {
-      const tasks = visibleTasks.filter((task) => task.areaId === area.id);
-      const workstreams = unique(tasks.map((task) => taskDetails(state, task).workstream || "General"));
-      return { area, tasks, workstreams };
-    })
-    .filter((group) => group.tasks.length);
-
-  const toggleArea = (areaId: string) => setCollapsedAreas((current) => (current.includes(areaId) ? current.filter((item) => item !== areaId) : [...current, areaId]));
-  const toggleGroup = (groupKey: string) => setCollapsedGroups((current) => (current.includes(groupKey) ? current.filter((item) => item !== groupKey) : [...current, groupKey]));
+  const clearFilters = () => {
+    setSearch("");
+    setAreaFilter("All");
+    setWorkstreamFilter("All");
+    setStatusFilter("All");
+    setPriorityFilter("All");
+  };
 
   return (
     <div className="space-y-4">
@@ -1658,77 +1732,114 @@ function LiveTasksConfigTable({
         <Select label="Workstream" value={workstreamFilter} onChange={setWorkstreamFilter} options={["All", ...workstreamOptions]} />
         <Select label="Status" value={statusFilter} onChange={setStatusFilter} options={["All", ...unique([...USER_TASK_STATUSES, ...VERIFICATION_STATUSES])]} />
         <Select label="Priority" value={priorityFilter} onChange={setPriorityFilter} options={["All", ...activeOptions(state, "Priority options", PRIORITY_OPTIONS)]} />
+        <button className="btn-secondary self-end" onClick={clearFilters}><Filter size={16} /> Clear</button>
       </div>
-      {!grouped.length ? <EmptyState title="No live tasks found" body="Adjust filters or add a custom live task to an area." /> : null}
-      {grouped.map(({ area, workstreams }) => {
-        const areaTasks = visibleTasks.filter((task) => task.areaId === area.id);
-        const areaCollapsed = collapsedAreas.includes(area.id);
-        return (
-        <section key={area.id} className={`task-group-card motion-card animate-fade-in ${areaCollapsed ? "is-collapsed" : "is-open"}`}>
-          <button className="task-group-main-header" onClick={() => toggleArea(area.id)} aria-expanded={!areaCollapsed}>
-            <div>
-              <p className="text-xs font-black uppercase text-[var(--color-accent)]">Area</p>
-              <h3 className="text-lg font-black text-[var(--color-primary)]">{area.name}</h3>
-            </div>
-            <div className="flex items-center gap-3">
-              <Badge>{areaTasks.length} task(s)</Badge>
-              <span className={`task-collapse-icon ${areaCollapsed ? "is-collapsed" : ""}`} aria-hidden="true">
-                <ChevronDown size={17} />
-              </span>
-            </div>
-          </button>
-          <div className={`task-area-collapse-panel ${areaCollapsed ? "is-collapsed" : ""}`}>
-            <div className="task-area-collapse-inner">
-          {workstreams.map((workstream) => {
-            const groupKey = `${area.id}-${workstream}`;
-            const tasks = visibleTasks.filter((task) => task.areaId === area.id && (taskDetails(state, task).workstream || "General") === workstream);
-            const completedCount = tasks.filter((task) => latestUpdates.get(task.id)?.verificationStatus === "Verified Completed").length;
-            const progress = tasks.length ? Math.round((completedCount / tasks.length) * 100) : 0;
-            const collapsed = collapsedGroups.includes(groupKey);
-            return (
-              <div key={groupKey} className={`task-workstream-block ${collapsed ? "is-collapsed" : "is-open"}`}>
-                <button className="task-workstream-header" onClick={() => toggleGroup(groupKey)} aria-expanded={!collapsed}>
-                  <div className="min-w-0">
-                    <p className="font-black text-[var(--color-primary)]">Workstream: {workstream}</p>
-                    <p className="mt-1 text-xs font-bold text-[var(--color-text-muted)]">{completedCount}/{tasks.length} verified completed</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="hidden w-28 sm:block">
-                      <div className="h-2 overflow-hidden rounded-full bg-[var(--color-accent-light)]">
-                        <div className="progress-fill h-full rounded-full bg-[var(--color-accent)]" style={{ width: `${progress}%` }} />
-                      </div>
-                    </div>
-                    <Badge>{progress}%</Badge>
-                    <span className={`task-collapse-icon ${collapsed ? "is-collapsed" : ""}`} aria-hidden="true">
-                      <ChevronDown size={17} />
-                    </span>
-                  </div>
-                </button>
-                <div className={`task-collapse-panel ${collapsed ? "is-collapsed" : ""}`}>
-                  <div className="task-collapse-inner">
-                    <div className="task-summary-list">
-                      <div className="task-summary-head">
-                        <span>Task</span>
-                        <span>Status</span>
-                        <span>Priority</span>
-                        <span>Due</span>
-                        <span>Progress</span>
-                      </div>
-                      {tasks.map((task) => (
-                        <TaskSummaryRow key={task.id} state={state} task={task} update={latestUpdates.get(task.id)} openTask={openTask} />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-            </div>
+      {!visibleTasks.length ? <EmptyState title="No live tasks found" body="Adjust filters or add a custom live task to an area." /> : null}
+      {visibleTasks.length ? (
+        <>
+          <div className="master-task-table-wrap">
+            <table className="master-task-table">
+              <thead>
+                <tr>
+                  <th>Task Title</th>
+                  <th>Area</th>
+                  <th>Workstream</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Due Date</th>
+                  <th>Progress</th>
+                  <th>Prep Day</th>
+                  <th aria-label="Actions" />
+                </tr>
+              </thead>
+              <tbody>
+                {visibleTasks.map((task) => (
+                  <MasterTaskTableRow key={task.id} state={state} task={task} update={latestUpdates.get(task.id)} openTask={openTask} />
+                ))}
+              </tbody>
+            </table>
           </div>
-        </section>
-        );
-      })}
+          <div className="master-task-mobile-list">
+            {visibleTasks.map((task) => (
+              <MasterTaskMobileCard key={task.id} state={state} task={task} update={latestUpdates.get(task.id)} openTask={openTask} />
+            ))}
+          </div>
+          <p className="text-xs font-bold text-[var(--color-text-muted)]">Showing 1 to {visibleTasks.length} of {state.liveTasks.length} tasks</p>
+        </>
+      ) : null}
     </div>
+  );
+}
+
+function taskProgress(task: LiveTask, update?: TaskUpdate) {
+  if (task.taskType === "Quantity-Based Task" && task.requiredQuantity) {
+    return Math.min(100, Math.round(((update?.completedQuantity || 0) / task.requiredQuantity) * 100));
+  }
+  if (update?.verificationStatus === "Verified Completed") return 100;
+  if (update?.status === "Completed") return 75;
+  if (update?.status === "In Progress") return 45;
+  return 0;
+}
+
+function taskDisplayStatus(update?: TaskUpdate) {
+  return update?.verificationStatus === "Verified Completed" ? "Verified Completed" : update?.status || "Pending";
+}
+
+function MasterTaskTableRow({ state, task, update, openTask }: { state: EventPrepState; task: LiveTask; update?: TaskUpdate; openTask: (taskId: string) => void }) {
+  const details = taskDetails(state, task);
+  const progress = taskProgress(task, update);
+  const status = taskDisplayStatus(update);
+  const overdue = Boolean(task.dueDate && task.dueDate < todayIso() && update?.verificationStatus !== "Verified Completed");
+  return (
+    <tr className={overdue ? "is-overdue" : ""} onClick={() => openTask(task.id)}>
+      <td>
+        <p className="master-task-title">{details.taskDetails}</p>
+        <p className="master-task-subtitle">{details.expectedOutput || details.responsibleTeam || task.taskType}</p>
+      </td>
+      <td><span className="daily-soft-badge">{areaName(state, task.areaId)}</span></td>
+      <td>{details.workstream || "General"}</td>
+      <td><StatusBadge value={status} /></td>
+      <td><StatusBadge value={task.priority} /></td>
+      <td className={overdue ? "text-[var(--color-important)]" : ""}>{task.dueDate || "-"}</td>
+      <td>
+        <span className="master-progress-cell">
+          <span><span className="progress-fill" style={{ width: `${progress}%` }} /></span>
+          <strong>{progress}%</strong>
+        </span>
+      </td>
+      <td>{task.prepDay}</td>
+      <td>
+        <button className="mini-icon-btn" onClick={(event) => { event.stopPropagation(); openTask(task.id); }} aria-label={`Open ${details.taskDetails}`}>
+          <MoreVertical size={16} />
+        </button>
+      </td>
+    </tr>
+  );
+}
+
+function MasterTaskMobileCard({ state, task, update, openTask }: { state: EventPrepState; task: LiveTask; update?: TaskUpdate; openTask: (taskId: string) => void }) {
+  const details = taskDetails(state, task);
+  const progress = taskProgress(task, update);
+  const status = taskDisplayStatus(update);
+  return (
+    <button className="master-task-mobile-card" onClick={() => openTask(task.id)}>
+      <span className="flex items-start justify-between gap-3">
+        <span>
+          <span className="master-task-title">{details.taskDetails}</span>
+          <span className="master-task-subtitle">{areaName(state, task.areaId)} / {details.workstream || "General"}</span>
+        </span>
+        <StatusBadge value={status} />
+      </span>
+      <span className="mt-3 grid gap-2 text-left text-xs font-bold text-[var(--color-text-muted)] sm:grid-cols-3">
+        <span>Priority: {task.priority}</span>
+        <span>Due: {task.dueDate || "-"}</span>
+        <span>Prep Day: {task.prepDay}</span>
+      </span>
+      <span className="master-progress-cell mt-3">
+        <span><span className="progress-fill" style={{ width: `${progress}%` }} /></span>
+        <strong>{progress}%</strong>
+      </span>
+    </button>
   );
 }
 

@@ -2700,6 +2700,198 @@ table {
     display: block;
   }
 
+  .master-tasks-page {
+    container-type: inline-size;
+  }
+
+  .master-task-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: clamp(0.9rem, 2vw, 1.5rem);
+    padding: clamp(1rem, 2vw, 1.35rem);
+  }
+
+  .master-task-header h1 {
+    color: var(--color-primary);
+    font-size: clamp(1.35rem, 2.2vw, 2rem);
+    font-weight: 950;
+    line-height: 1.08;
+  }
+
+  .master-task-header p:not(.page-kicker) {
+    margin-top: 0.35rem;
+    color: var(--color-text-muted);
+    font-size: clamp(0.83rem, 1vw, 0.95rem);
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  .page-kicker {
+    color: var(--color-accent);
+    font-size: 0.72rem;
+    font-weight: 950;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .master-task-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.65rem;
+  }
+
+  .master-task-actions .btn-primary,
+  .master-task-actions .btn-secondary {
+    min-height: 2.85rem;
+    white-space: nowrap;
+  }
+
+  .master-import-message {
+    border-radius: var(--radius-card-sm);
+    border: 1px solid rgba(201, 162, 39, 0.42);
+    background: rgba(243, 231, 195, 0.72);
+    padding: 0.8rem 1rem;
+    color: var(--color-primary);
+    font-size: 0.86rem;
+    font-weight: 800;
+    box-shadow: var(--shadow-card-soft);
+  }
+
+  .master-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+    gap: clamp(0.8rem, 1.3vw, 1rem);
+    align-items: start;
+  }
+
+  .master-task-table-wrap {
+    overflow-x: auto;
+    border-radius: var(--radius-card-sm);
+    border: 1px solid rgba(232, 221, 197, 0.86);
+    background: var(--color-card);
+    box-shadow: var(--shadow-card-soft);
+  }
+
+  .master-task-table {
+    width: 100%;
+    min-width: 58rem;
+    border-collapse: separate;
+    border-spacing: 0;
+    color: var(--color-text);
+  }
+
+  .master-task-table th {
+    background: linear-gradient(180deg, rgba(250, 247, 239, 0.98), rgba(243, 231, 195, 0.54));
+    color: var(--color-primary);
+    font-size: 0.68rem;
+    font-weight: 950;
+    letter-spacing: 0.03em;
+    padding: 0.8rem 0.75rem;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .master-task-table td {
+    border-top: 1px solid rgba(232, 221, 197, 0.72);
+    padding: 0.82rem 0.75rem;
+    vertical-align: middle;
+    font-size: 0.82rem;
+    font-weight: 750;
+  }
+
+  .master-task-table tbody tr {
+    cursor: pointer;
+    transition: background-color 160ms ease, box-shadow 160ms ease;
+  }
+
+  .master-task-table tbody tr:hover {
+    background: rgba(243, 231, 195, 0.24);
+    box-shadow: inset 3px 0 0 var(--color-accent);
+  }
+
+  .master-task-table tbody tr.is-overdue:hover {
+    background: rgba(122, 31, 43, 0.07);
+    box-shadow: inset 3px 0 0 var(--color-important);
+  }
+
+  .master-task-title {
+    display: block;
+    color: var(--color-primary);
+    font-size: 0.88rem;
+    font-weight: 950;
+    line-height: 1.35;
+  }
+
+  .master-task-subtitle {
+    display: block;
+    margin-top: 0.18rem;
+    color: var(--color-text-muted);
+    font-size: 0.72rem;
+    font-weight: 750;
+    line-height: 1.35;
+  }
+
+  .master-progress-cell {
+    display: grid;
+    grid-template-columns: minmax(5rem, 1fr) auto;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 7rem;
+    color: var(--color-primary);
+    font-size: 0.76rem;
+    font-weight: 950;
+  }
+
+  .master-progress-cell > span:first-child {
+    display: block;
+    height: 0.42rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(232, 221, 197, 0.78);
+  }
+
+  .master-progress-cell .progress-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--color-primary);
+  }
+
+  .master-task-mobile-list {
+    display: none;
+  }
+
+  .master-task-mobile-card {
+    width: 100%;
+    border-radius: var(--radius-card-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-card);
+    padding: 0.95rem;
+    text-align: left;
+    box-shadow: var(--shadow-card-soft);
+    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  }
+
+  .master-task-mobile-card:hover,
+  .master-task-mobile-card:focus-visible {
+    border-color: rgba(201, 162, 39, 0.52);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-1px);
+    outline: none;
+  }
+
+  .master-task-drawer {
+    width: min(31rem, 100vw);
+  }
+
+  .master-task-drawer-footer {
+    align-items: center;
+  }
+
   .task-group-card {
     overflow: visible;
     border-radius: var(--radius-card);
@@ -4531,6 +4723,25 @@ table {
       grid-template-columns: 1fr 1fr;
     }
 
+    .master-task-header {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .master-task-actions {
+      width: 100%;
+      justify-content: flex-start;
+    }
+
+    .master-task-drawer-footer {
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .master-task-drawer-footer .drawer-toggle-field {
+      grid-column: 1 / -1;
+      margin-right: 0;
+    }
+
     .report-template-header {
       flex-direction: column;
     }
@@ -4571,6 +4782,26 @@ table {
 
     .daily-reminder-times {
       grid-template-columns: 1fr;
+    }
+
+    .master-task-table-wrap {
+      display: none;
+    }
+
+    .master-task-mobile-list {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .master-task-actions .btn-primary,
+    .master-task-actions .btn-secondary {
+      flex: 1 1 100%;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .master-kpi-grid {
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
     }
   }
 
