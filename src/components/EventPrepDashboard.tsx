@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ChangeEvent, ReactNode } from "react";
+import type { CSSProperties, ChangeEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   BarChart3,
@@ -694,16 +694,13 @@ function DashboardTab({ state, currentProfile, presentationMode = false, chartSe
         <MetricCard title="Pending Requests" value={String(pendingRequestsCount)} helper="Requests needing review" tone="warning" />
       </div>
 
-      <div className="dashboard-main-grid">
+      <div className="dashboard-section-flow">
         <Panel title="Zone Type Progress" action={<Badge>Verified completed only</Badge>}>
           <DashboardChartVisual rows={zoneRows.map((row) => ({ label: row.label, value: row.percent, helper: `${row.verified}/${row.total} tasks`, iconKey: zoneProgressIconKey(row.label) }))} type={chartSettings.zoneType} />
         </Panel>
         <Panel title="Attention Required">
           <DashboardAttentionVisual rows={attention} type={chartSettings.attention} />
         </Panel>
-      </div>
-
-      <div className="dashboard-lower-grid">
         <Panel title="Area-Wise Progress">
           <DashboardChartVisual rows={areaProgressRows} type={chartSettings.area} />
         </Panel>
@@ -747,11 +744,25 @@ function DashboardChartVisual({ rows, type }: { rows: ChartRow[]; type: Dashboar
     return (
       <div className="grid gap-2 sm:grid-cols-2">
         {visibleRows.map((row) => (
-          <div key={row.label} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-            <p className="text-xl font-black text-[var(--color-primary)]">{row.value}%</p>
-            <p className="mt-1 text-sm font-black text-[var(--color-primary)]">{row.label}</p>
-            <p className="mt-1 text-xs font-bold text-[var(--color-text-muted)]">{row.helper}</p>
-          </div>
+          <InsightTrigger
+            key={row.label}
+            title={`${row.label} Progress Insight`}
+            metricLabel="Completion"
+            metricValue={`${row.value}%`}
+            helper={row.helper}
+            chartType="donut"
+            breakdown={[
+              { label: "Completed", value: Math.max(0, Math.min(100, row.value)), color: "#0B4F3A" },
+              { label: "Remaining", value: Math.max(0, 100 - row.value), color: "#F3E7C3" }
+            ]}
+            lastUpdated="Live dashboard data"
+          >
+            <div className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
+              <p className="text-xl font-black text-[var(--color-primary)]">{row.value}%</p>
+              <p className="mt-1 text-sm font-black text-[var(--color-primary)]">{row.label}</p>
+              <p className="mt-1 text-xs font-bold text-[var(--color-text-muted)]">{row.helper}</p>
+            </div>
+          </InsightTrigger>
         ))}
       </div>
     );
@@ -765,20 +776,26 @@ function DashboardAttentionVisual({ rows, type }: { rows: ReturnType<typeof buil
   if (type === "Compact list") {
     return (
       <div className="report-attention-list">
-        {rows.map((item) => <div key={item.label}><span>{item.label}</span><strong>{item.count}</strong></div>)}
+        {rows.map((item) => (
+          <InsightTrigger key={item.label} title={`${item.label} Insight`} metricLabel={item.label} metricValue={String(item.count)} breakdown={[{ label: item.label, value: item.count, color: item.count ? "#C9A227" : "#2E7D5B" }]} lastUpdated="Live dashboard data">
+            <div><span>{item.label}</span><strong>{item.count}</strong></div>
+          </InsightTrigger>
+        ))}
       </div>
     );
   }
   return (
     <div className="attention-card-grid">
       {rows.map((item) => (
-        <div key={item.label} className={`attention-mini-card ${attentionToneClass(item.label)}`}>
-          <span className="attention-mini-icon"><Bell size={16} /></span>
-          <div>
-            <p>{item.count}</p>
-            <span>{item.label}</span>
+        <InsightTrigger key={item.label} title={`${item.label} Insight`} metricLabel={item.label} metricValue={String(item.count)} breakdown={[{ label: item.label, value: item.count, color: item.count ? "#C9A227" : "#2E7D5B" }]} lastUpdated="Live dashboard data">
+          <div className={`attention-mini-card ${attentionToneClass(item.label)}`}>
+            <span className="attention-mini-icon"><Bell size={16} /></span>
+            <div>
+              <p>{item.count}</p>
+              <span>{item.label}</span>
+            </div>
           </div>
-        </div>
+        </InsightTrigger>
       ))}
     </div>
   );
@@ -2953,6 +2970,11 @@ function ReportsTab({ state, currentProfile, updateState, showToast }: { state: 
   const [dueTo, setDueTo] = useState("");
   const [reportDate, setReportDate] = useState(todayIso());
   const [excelExporting, setExcelExporting] = useState(false);
+  const [reportFormat, setReportFormat] = useState<"PDF" | "Excel">("PDF");
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [previewZoom, setPreviewZoom] = useState(100);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [generatedAt, setGeneratedAt] = useState(new Date().toISOString());
   const canPdf = isAdmin || viewerAccess.canExportPdf;
   const canExcel = isAdmin || viewerAccess.canExportExcel;
   const canDaily = isAdmin || viewerAccess.reportTypes.includes("Daily Area Report PDF");
@@ -2989,6 +3011,13 @@ function ReportsTab({ state, currentProfile, updateState, showToast }: { state: 
     dueTo,
     reportDate
   });
+  const reportPages = [
+    { id: "report-page-overview", title: "Overview" },
+    { id: "report-page-area-progress", title: "Area Progress" },
+    { id: "report-page-workstream", title: "Workstream Progress" },
+    { id: "report-page-task-details", title: "Task Details" },
+    { id: "report-page-requests", title: "Requests Summary" }
+  ];
 
   const recordExport = (exportType: string, selectedAreaId?: string) => {
     const createdAt = new Date().toISOString();
@@ -3032,6 +3061,37 @@ function ReportsTab({ state, currentProfile, updateState, showToast }: { state: 
       setExcelExporting(false);
     }
   };
+  const generateReport = () => {
+    setGeneratedAt(new Date().toISOString());
+    showToast("Report generated", "Preview refreshed with the current Supabase-backed filters.", "success");
+  };
+  const resetFilters = () => {
+    setReportType(reportTypes[0] || "Overall Progress Report");
+    setZoneFilter("All");
+    setAreaId("All");
+    setWorkstreamFilter("All");
+    setStatusFilter("All");
+    setPriorityFilter("All");
+    setVerificationFilter("All");
+    setRequestStatusFilter("All");
+    setDueFrom("");
+    setDueTo("");
+    setReportDate(todayIso());
+    setReportFormat("PDF");
+    setGeneratedAt(new Date().toISOString());
+    showToast("Filters reset", "Report preview now uses the default scope.", "info");
+  };
+  const jumpToReportPage = (pageId: string) => {
+    document.getElementById(pageId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  const runSelectedExport = () => {
+    setExportMenuOpen(false);
+    if (reportFormat === "Excel") {
+      exportExcel();
+      return;
+    }
+    printReport();
+  };
 
   return (
     <div className="reports-workspace">
@@ -3054,24 +3114,79 @@ function ReportsTab({ state, currentProfile, updateState, showToast }: { state: 
           <Select label="Priority" value={priorityFilter} onChange={setPriorityFilter} options={["All", ...activeOptions(state, "Priority options", PRIORITY_OPTIONS)]} />
           <Select label="Request Status" value={requestStatusFilter} onChange={setRequestStatusFilter} options={["All", ...REQUEST_STATUSES]} />
           <Input label="Report date" value={reportDate} onChange={setReportDate} type="date" />
+          <div>
+            <p className="field-label">Report Format</p>
+            <div className="report-format-toggle mt-2">
+              <button className={reportFormat === "PDF" ? "is-active" : ""} onClick={() => setReportFormat("PDF")} type="button"><FileText size={16} /> PDF</button>
+              <button className={reportFormat === "Excel" ? "is-active" : ""} onClick={() => setReportFormat("Excel")} type="button" disabled={!canExcel}><FileSpreadsheet size={16} /> Excel</button>
+            </div>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <Input label="Due from" value={dueFrom} onChange={setDueFrom} type="date" />
             <Input label="Due to" value={dueTo} onChange={setDueTo} type="date" />
           </div>
         </div>
         <div className="grid gap-2">
-          <button className="btn-primary" disabled={!canPdf} onClick={printReport}><FileDown size={16} /> Export PDF / Print</button>
-          <button className="btn-secondary" disabled={!canPdf} onClick={printReport}><Download size={16} /> Print Preview</button>
-          <button className="btn-secondary" disabled={!canExcel || excelExporting} onClick={exportExcel}>
-            {excelExporting ? <InlineLoader label="Generating Excel export" /> : <FileSpreadsheet size={16} />}
-            {excelExporting ? "Generating Export" : "Export Data CSV / Excel"}
-          </button>
-          <button className="btn-secondary" disabled={!canExcel} onClick={() => exportLiveTasksCsv({ ...state, liveTasks: previewData.tasks })}><Download size={16} /> Export Task CSV</button>
+          <button className="btn-primary justify-center" onClick={generateReport}><FileText size={16} /> Generate Report</button>
+          <button className="btn-secondary justify-center" onClick={resetFilters}><Filter size={16} /> Reset Filters</button>
         </div>
       </aside>
 
       <section className="reports-preview-column">
-        <ReportPreview state={state} data={previewData} reportType={reportType} reportDate={reportDate} currentProfile={currentProfile} />
+        <div className="report-builder-topbar no-print">
+          <Logo variant="horizontal-green" className="report-builder-logo" priority />
+          <div className="relative">
+            <button className="btn-primary" onClick={() => setExportMenuOpen((open) => !open)} aria-expanded={exportMenuOpen} aria-haspopup="menu">
+              <FileDown size={16} /> Export <ChevronDown size={15} />
+            </button>
+            {exportMenuOpen ? (
+              <div className="report-export-menu" role="menu">
+                {canPdf ? <button onClick={printReport} role="menuitem"><FileDown size={16} /> Export PDF / Print</button> : null}
+                {canExcel ? <button onClick={exportExcel} role="menuitem" disabled={excelExporting}>{excelExporting ? <InlineLoader label="Generating Excel export" /> : <FileSpreadsheet size={16} />} Export Excel</button> : null}
+                {canExcel ? <button onClick={() => exportLiveTasksCsv({ ...state, liveTasks: previewData.tasks })} role="menuitem"><Download size={16} /> Export Task CSV</button> : null}
+                <button onClick={runSelectedExport} role="menuitem"><Download size={16} /> Export Selected Format</button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="report-preview-workspace">
+          <div className="report-preview-toolbar no-print">
+            <div>
+              <h2>Report Preview</h2>
+              <p>This is a preview of how your report will appear when generated.</p>
+            </div>
+            <div className="report-preview-controls">
+              <div className="report-device-toggle" aria-label="Preview device">
+                <button className={previewDevice === "desktop" ? "is-active" : ""} onClick={() => setPreviewDevice("desktop")} type="button"><MonitorPlay size={16} /></button>
+                <button className={previewDevice === "tablet" ? "is-active" : ""} onClick={() => setPreviewDevice("tablet")} type="button"><FileText size={16} /></button>
+                <button className={previewDevice === "mobile" ? "is-active" : ""} onClick={() => setPreviewDevice("mobile")} type="button"><Menu size={16} /></button>
+              </div>
+              <div className="report-zoom-controls">
+                <button onClick={() => setPreviewZoom((value) => Math.max(70, value - 10))} type="button">-</button>
+                <span>{previewZoom}%</span>
+                <button onClick={() => setPreviewZoom((value) => Math.min(140, value + 10))} type="button">+</button>
+              </div>
+            </div>
+          </div>
+          <div className="report-preview-body">
+            <aside className="report-page-thumbnails no-print">
+              <p>Pages</p>
+              {reportPages.map((page, index) => (
+                <button key={page.id} onClick={() => jumpToReportPage(page.id)} type="button">
+                  <span>{index + 1}</span>
+                  <i />
+                  <strong>{page.title}</strong>
+                </button>
+              ))}
+            </aside>
+            <div className="report-document-viewport">
+              <div className={`report-device-frame report-device-${previewDevice}`} style={{ transform: `scale(${previewZoom / 100})` }}>
+                <ReportPreview state={state} data={previewData} reportType={reportType} reportDate={reportDate} currentProfile={currentProfile} generatedAt={generatedAt} />
+              </div>
+            </div>
+          </div>
+        </div>
         <div className="no-print mt-4">
           <Panel title="Export History" action={<Badge>{exportHistory.length} export(s)</Badge>}>
             <ResponsiveTable
@@ -3093,7 +3208,7 @@ function ReportsTab({ state, currentProfile, updateState, showToast }: { state: 
 
 type ReportPreviewData = ReturnType<typeof buildReportPreviewData>;
 
-function ReportPreview({ state, data, reportType, reportDate, currentProfile }: { state: EventPrepState; data: ReportPreviewData; reportType: string; reportDate: string; currentProfile: Profile }) {
+function ReportPreview({ state, data, reportType, reportDate, currentProfile, generatedAt }: { state: EventPrepState; data: ReportPreviewData; reportType: string; reportDate: string; currentProfile: Profile; generatedAt?: string }) {
   const isDaily = reportType === "Area-wise Daily Report";
   const isProject = reportType === "Printable Project Status Report";
   const isRequests = reportType === "Requests Report";
@@ -3103,10 +3218,14 @@ function ReportPreview({ state, data, reportType, reportDate, currentProfile }: 
 
   return (
     <article className="report-preview-shell">
-      <ReportHeader title={title} reportType={reportType} generatedBy={currentProfile.fullName} filters={data.filterLabel} daysToEvent={data.metrics.daysToEvent} />
+      <div id="report-page-overview" className="report-anchor-section">
+        <ReportHeader title={title} reportType={reportType} generatedBy={currentProfile.fullName} filters={data.filterLabel} daysToEvent={data.metrics.daysToEvent} generatedAt={generatedAt} />
+      </div>
       {data.tasks.length || data.requests.length || data.dailyReports.length ? (
         <>
-          <ReportKpiCards data={data} />
+          <div className="report-anchor-section">
+            <ReportKpiCards data={data} />
+          </div>
           {isDaily ? <AreaDailyReportPreview state={state} data={data} reportDate={reportDate} /> : null}
           {isProject ? <ProjectStatusReportPreview state={state} data={data} /> : null}
           {!isDaily && !isProject ? (
@@ -3125,13 +3244,13 @@ function ReportPreview({ state, data, reportType, reportDate, currentProfile }: 
   );
 }
 
-function ReportHeader({ title, reportType, generatedBy, filters, daysToEvent }: { title: string; reportType: string; generatedBy: string; filters: string; daysToEvent: number }) {
+function ReportHeader({ title, reportType, generatedBy, filters, daysToEvent, generatedAt }: { title: string; reportType: string; generatedBy: string; filters: string; daysToEvent: number; generatedAt?: string }) {
   return (
     <header className="report-template-header">
       <div>
         <p className="report-brand">Ashara Mubarakah</p>
         <h1>{title}</h1>
-        <p>{reportType} | Generated {new Date().toLocaleString()} | Prepared by {generatedBy}</p>
+        <p>{reportType} | Generated {new Date(generatedAt || new Date().toISOString()).toLocaleString()} | Prepared by {generatedBy}</p>
         <p className="mt-1">{filters}</p>
       </div>
       <div className="report-countdown">
@@ -3170,7 +3289,7 @@ function ReportKpiCards({ data }: { data: ReportPreviewData }) {
 
 function ReportChartGrid({ data }: { data: ReportPreviewData }) {
   return (
-    <section className="report-chart-grid">
+    <section className="report-chart-grid" id="report-page-area-progress">
       <div className="report-card">
         <h2>Task Status Distribution</h2>
         <DonutChart rows={data.statusRows} />
@@ -3179,7 +3298,7 @@ function ReportChartGrid({ data }: { data: ReportPreviewData }) {
         <h2>Area-wise Progress</h2>
         <BarList rows={data.areaRows.slice(0, 10).map((row) => ({ label: row.area, value: row.progress, helper: `${row.verified}/${row.total} verified` }))} />
       </div>
-      <div className="report-card">
+      <div className="report-card" id="report-page-workstream">
         <h2>Workstream Progress</h2>
         <BarList rows={data.workstreamRows.slice(0, 10).map((row) => ({ label: row.workstream, value: row.progress, helper: `${row.verified}/${row.total} verified` }))} />
       </div>
@@ -3197,7 +3316,7 @@ function ReportChartGrid({ data }: { data: ReportPreviewData }) {
 
 function ProgressReportPreview({ data }: { state: EventPrepState; data: ReportPreviewData }) {
   return (
-    <section className="report-card report-page-break">
+    <section className="report-card report-page-break" id="report-page-task-details">
       <h2>Area Progress Summary</h2>
       <PrintableTable
         headers={["Area", "Zone Type", "Total Tasks", "Verified", "In Progress", "Pending", "Issues", "Progress"]}
@@ -3231,7 +3350,7 @@ function AreaDailyReportPreview({ state, data, reportDate }: { state: EventPrepS
           <p className="mt-1 text-sm text-[var(--color-text)]">{report?.generalRemark || "No general remark available for the selected report date."}</p>
         </div>
       </section>
-      <section className="report-card report-page-break">
+      <section className="report-card report-page-break" id="report-page-task-details">
         <h2>Task Updates</h2>
         <PrintableTable
           headers={["Task", "Workstream", "Priority", "Status", "Progress", "Due Date", "Remarks", "Supporting / POC"]}
@@ -3283,7 +3402,7 @@ function ProjectStatusReportPreview({ state, data }: { state: EventPrepState; da
         <p className="report-body-text">This report gives an overview of IT preparation progress across CMZ, Central Office, and Relay Zones using the current dashboard data.</p>
       </section>
       <ReportChartGrid data={data} />
-      <section className="report-card report-page-break">
+      <section className="report-card report-page-break" id="report-page-task-details">
         <h2>Work Completed</h2>
         <PrintableTable headers={["Task", "Area", "Target Date", "Status"]} rows={completed.map((task) => [taskDetails(state, task).taskDetails, areaName(state, task.areaId), task.dueDate || "-", "Verified Completed"])} />
       </section>
@@ -3305,7 +3424,7 @@ function ProjectStatusReportPreview({ state, data }: { state: EventPrepState; da
 
 function RequestsReportPreview({ state, data }: { state: EventPrepState; data: ReportPreviewData }) {
   return (
-    <section className="report-card report-page-break">
+    <section className="report-card report-page-break" id="report-page-requests">
       <h2>Requests Summary</h2>
       <PrintableTable headers={["Request", "Type", "Area", "Priority", "Required By", "Status", "Decision"]} rows={data.requests.map((request) => [request.title, request.requestType, areaName(state, request.areaId), request.priority, request.requiredByDate, request.status, request.decisionRemarks || "-"])} />
     </section>
@@ -3379,14 +3498,28 @@ function BarList({ rows }: { rows: Array<{ label: string; value: number; helper?
   return (
     <div className="report-bar-list">
       {rows.map((row) => (
-        <div key={row.label}>
-          <div className="flex items-center justify-between gap-3">
-            <p>{row.label}</p>
-            <strong>{row.value}%</strong>
+        <InsightTrigger
+          key={row.label}
+          title={`${row.label} Report Insight`}
+          metricLabel="Progress"
+          metricValue={`${row.value}%`}
+          helper={row.helper}
+          chartType="bar"
+          breakdown={[
+            { label: "Completed", value: Math.max(0, Math.min(100, row.value)), color: "#0B4F3A" },
+            { label: "Remaining", value: Math.max(0, 100 - row.value), color: "#F3E7C3" }
+          ]}
+          lastUpdated="Current report preview"
+        >
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <p>{row.label}</p>
+              <strong>{row.value}%</strong>
+            </div>
+            <div className="report-bar-track"><span style={{ width: `${row.value}%` }} /></div>
+            {row.helper ? <small>{row.helper}</small> : null}
           </div>
-          <div className="report-bar-track"><span style={{ width: `${row.value}%` }} /></div>
-          {row.helper ? <small>{row.helper}</small> : null}
-        </div>
+        </InsightTrigger>
       ))}
     </div>
   );
@@ -3837,6 +3970,37 @@ function GlobalFieldsTab({ state, currentProfile, updateState, showToast }: { st
 
 function ActivityLogTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const activityOptions = state.globalOptions.filter((option) => option.group === "Activity Log Categories");
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [actorFilter, setActorFilter] = useState("All");
+  const [entityFilter, setEntityFilter] = useState("All");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const actorOptions = state.profiles
+    .filter((profile) => state.activityLogs.some((log) => log.actorId === profile.id))
+    .map((profile) => ({ label: profile.fullName, value: profile.id }));
+  const categoryOptions = unique(state.activityLogs.map((log) => log.category).filter(Boolean));
+  const entityOptions = unique(state.activityLogs.map((log) => log.entityType).filter(Boolean));
+  const filteredLogs = state.activityLogs.filter((log) => {
+    const actor = state.profiles.find((profile) => profile.id === log.actorId);
+    const haystack = [log.category, actor?.fullName || "System", actor?.email || "", log.action, log.entityType, log.entityId || "", JSON.stringify(log.metadata || {})].join(" ").toLowerCase();
+    const createdDay = log.createdAt.slice(0, 10);
+    if (search.trim() && !haystack.includes(search.trim().toLowerCase())) return false;
+    if (categoryFilter !== "All" && log.category !== categoryFilter) return false;
+    if (actorFilter !== "All" && log.actorId !== actorFilter) return false;
+    if (entityFilter !== "All" && log.entityType !== entityFilter) return false;
+    if (dateFrom && createdDay < dateFrom) return false;
+    if (dateTo && createdDay > dateTo) return false;
+    return true;
+  });
+  const clearFilters = () => {
+    setSearch("");
+    setCategoryFilter("All");
+    setActorFilter("All");
+    setEntityFilter("All");
+    setDateFrom("");
+    setDateTo("");
+  };
   const updateOption = (optionId: string, active: boolean) => {
     updateState((current) => ({
       ...current,
@@ -3857,9 +4021,29 @@ function ActivityLogTab({ state, currentProfile, updateState, showToast }: { sta
         </div>
       </Panel>
       <Panel title="Activity Log">
+        <div className="activity-filter-card mb-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+            <div className="min-w-0 flex-1">
+              <Input label="Search Activity" value={search} onChange={setSearch} placeholder="Search action, actor, entity, or details" />
+            </div>
+            <div className="activity-filter-grid">
+              <Select label="Category" value={categoryFilter} onChange={setCategoryFilter} options={["All", ...categoryOptions]} />
+              <Select label="Actor" value={actorFilter} onChange={setActorFilter} options={["All", ...actorOptions]} />
+              <Select label="Entity" value={entityFilter} onChange={setEntityFilter} options={["All", ...entityOptions]} />
+              <Input label="From" value={dateFrom} onChange={setDateFrom} type="date" />
+              <Input label="To" value={dateTo} onChange={setDateTo} type="date" />
+            </div>
+            <button className="btn-secondary whitespace-nowrap" onClick={clearFilters}>
+              <Filter size={16} /> Clear Filters
+            </button>
+          </div>
+          <p className="mt-3 text-xs font-bold text-[var(--color-text-muted)]">
+            Showing {filteredLogs.length} of {state.activityLogs.length} Supabase-backed activity item(s).
+          </p>
+        </div>
         <ResponsiveTable
           headers={["Time", "Category", "Actor", "Action", "Entity"]}
-          rows={state.activityLogs.map((log) => [
+          rows={filteredLogs.map((log) => [
             new Date(log.createdAt).toLocaleString(),
             log.category,
             state.profiles.find((profile) => profile.id === log.actorId)?.fullName || "System",
@@ -3867,6 +4051,7 @@ function ActivityLogTab({ state, currentProfile, updateState, showToast }: { sta
             `${log.entityType}${log.entityId ? ` / ${log.entityId}` : ""}`
           ])}
         />
+        {!filteredLogs.length ? <EmptyState title="No activity found" body="Adjust or clear the filters to see more activity." /> : null}
       </Panel>
       <Panel title="In-App Notifications">
         <ResponsiveTable headers={["User", "Type", "Title", "Read"]} rows={state.notifications.map((notification) => [state.profiles.find((profile) => profile.id === notification.userId)?.fullName || "User", notification.type, notification.title, notification.isRead ? "Yes" : "No"])} />
@@ -3977,16 +4162,328 @@ function MetricCard({ title, value, helper, tone }: { title: string; value: stri
   const normalizedTone = tone || "good";
   const icon = metricIconFor(title);
   return (
-    <div className={`metric-card metric-${normalizedTone} motion-card animate-fade-in`}>
-      <span className="metric-icon">{icon}</span>
-      <div className="min-w-0">
-        <p className="metric-label">{title}</p>
-        <p className="metric-value">{value}</p>
-        <p className="metric-helper">{helper}</p>
+    <InsightTrigger
+      title={`${title} Insight`}
+      metricLabel={title}
+      metricValue={value}
+      helper={helper}
+      chartType={metricChartType(value)}
+      breakdown={metricInsightRows(title, value)}
+      lastUpdated="Live dashboard data"
+    >
+      <div className={`metric-card metric-${normalizedTone} motion-card animate-fade-in`}>
+        <span className="metric-icon">{icon}</span>
+        <div className="min-w-0">
+          <p className="metric-label">{title}</p>
+          <p className="metric-value">{value}</p>
+          <p className="metric-helper">{helper}</p>
+        </div>
+        <span className="metric-line" aria-hidden="true" />
       </div>
-      <span className="metric-line" aria-hidden="true" />
+    </InsightTrigger>
+  );
+}
+
+type InsightChartType = "donut" | "bar" | "line";
+type InsightBreakdownRow = { label: string; value: number; helper?: string; color?: string };
+type InsightAction = { label: string; onClick: () => void; primary?: boolean; disabled?: boolean };
+
+function InsightTrigger({
+  title,
+  subtitle,
+  metricLabel,
+  metricValue,
+  helper,
+  chartType = "bar",
+  breakdown = [],
+  lastUpdated,
+  actions = [],
+  inline = false,
+  children
+}: {
+  title: string;
+  subtitle?: string;
+  metricLabel?: string;
+  metricValue?: string;
+  helper?: string;
+  chartType?: InsightChartType;
+  breakdown?: InsightBreakdownRow[];
+  lastUpdated?: string;
+  actions?: InsightAction[];
+  inline?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const hoverTimer = useRef<number | null>(null);
+  const closeTimer = useRef<number | null>(null);
+  const insightId = useRef(`insight-${Math.random().toString(36).slice(2)}`);
+
+  const clearTimers = () => {
+    if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
+    if (closeTimer.current) window.clearTimeout(closeTimer.current);
+  };
+
+  const openInsight = () => {
+    clearTimers();
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (rect) {
+      const width = Math.min(window.innerWidth - 24, 380);
+      const left = Math.min(Math.max(12, rect.left + rect.width / 2 - width / 2), window.innerWidth - width - 12);
+      const top = rect.bottom + 12 > window.innerHeight - 280 ? Math.max(12, rect.top - 300) : rect.bottom + 12;
+      setPosition({ top, left });
+    }
+    window.dispatchEvent(new CustomEvent("ashara-insight-open", { detail: insightId.current }));
+    setOpen(true);
+  };
+
+  const scheduleOpen = () => {
+    if (window.matchMedia?.("(hover: hover)").matches) {
+      clearTimers();
+      hoverTimer.current = window.setTimeout(openInsight, 170);
+    }
+  };
+
+  const scheduleClose = () => {
+    clearTimers();
+    closeTimer.current = window.setTimeout(() => setOpen(false), 170);
+  };
+
+  useEffect(() => {
+    const handleGlobalOpen = (event: Event) => {
+      if ((event as CustomEvent<string>).detail !== insightId.current) setOpen(false);
+    };
+    window.addEventListener("ashara-insight-open", handleGlobalOpen);
+    return () => window.removeEventListener("ashara-insight-open", handleGlobalOpen);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (triggerRef.current?.contains(event.target as Node)) return;
+      const popover = document.querySelector("[data-insight-popover='true']");
+      if (popover?.contains(event.target as Node)) return;
+      setOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  useEffect(() => () => clearTimers(), []);
+  const Shell = inline ? "span" : "div";
+
+  return (
+    <>
+      <Shell
+        ref={(node) => {
+          triggerRef.current = node;
+        }}
+        className={`insight-trigger-shell ${inline ? "is-inline" : ""}`}
+        tabIndex={0}
+        aria-label={`Show ${title}`}
+        onMouseEnter={scheduleOpen}
+        onMouseLeave={scheduleClose}
+        onFocus={openInsight}
+        onBlur={scheduleClose}
+        onClick={(event) => {
+          event.stopPropagation();
+          open ? setOpen(false) : openInsight();
+        }}
+      >
+        {children}
+      </Shell>
+      {open
+        ? createPortal(
+            <InsightPopover
+              title={title}
+              subtitle={subtitle}
+              metricLabel={metricLabel}
+              metricValue={metricValue}
+              helper={helper}
+              chartType={chartType}
+              breakdown={breakdown}
+              lastUpdated={lastUpdated}
+              actions={actions}
+              position={position}
+              onMouseEnter={clearTimers}
+              onMouseLeave={scheduleClose}
+              onClose={() => setOpen(false)}
+            />,
+            document.body
+          )
+        : null}
+    </>
+  );
+}
+
+function InsightPopover({
+  title,
+  subtitle,
+  metricLabel,
+  metricValue,
+  helper,
+  chartType,
+  breakdown,
+  lastUpdated,
+  actions,
+  position,
+  onMouseEnter,
+  onMouseLeave,
+  onClose
+}: {
+  title: string;
+  subtitle?: string;
+  metricLabel?: string;
+  metricValue?: string;
+  helper?: string;
+  chartType: InsightChartType;
+  breakdown: InsightBreakdownRow[];
+  lastUpdated?: string;
+  actions: InsightAction[];
+  position: { top: number; left: number };
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+  onClose: () => void;
+}) {
+  const chartRows = breakdown.filter((row) => Number.isFinite(row.value));
+  return (
+    <div
+      className="insight-popover"
+      data-insight-popover="true"
+      role="tooltip"
+      style={{ top: position.top, left: position.left }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      <div className="insight-popover-header">
+        <div>
+          <p>{title}</p>
+          {subtitle ? <span>{subtitle}</span> : null}
+        </div>
+        <button type="button" onClick={onClose} aria-label="Close insight"><X size={14} /></button>
+      </div>
+      {metricValue ? (
+        <div className="insight-main-metric">
+          <span>{metricLabel || "Current value"}</span>
+          <strong>{metricValue}</strong>
+        </div>
+      ) : null}
+      {chartRows.length ? <InsightChart type={chartType} rows={chartRows} /> : <InsightEmptyState />}
+      {helper ? <p className="insight-helper">{helper}</p> : null}
+      {lastUpdated ? <p className="insight-updated">Last updated: {lastUpdated}</p> : null}
+      {actions.length ? (
+        <div className="insight-actions">
+          {actions.map((action) => (
+            <button key={action.label} type="button" className={action.primary ? "is-primary" : ""} disabled={action.disabled} onClick={action.onClick}>
+              {action.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function InsightChart({ type, rows }: { type: InsightChartType; rows: InsightBreakdownRow[] }) {
+  if (type === "donut") return <MiniDonutChart rows={rows} />;
+  if (type === "line") return <MiniLineChart rows={rows} />;
+  return <MiniBarChart rows={rows} />;
+}
+
+function MiniDonutChart({ rows }: { rows: InsightBreakdownRow[] }) {
+  const total = rows.reduce((sum, row) => sum + Math.max(0, row.value), 0);
+  let cursor = 0;
+  const segments = rows.map((row, index) => {
+    const start = total ? (cursor / total) * 100 : 0;
+    cursor += Math.max(0, row.value);
+    const end = total ? (cursor / total) * 100 : 0;
+    return `${row.color || insightColor(index)} ${start}% ${end}%`;
+  });
+  const style: CSSProperties = { background: total ? `conic-gradient(${segments.join(", ")})` : "var(--color-accent-light)" };
+  return (
+    <div className="insight-donut-wrap">
+      <div className="insight-donut" style={style}><span>{total}</span></div>
+      <InsightBreakdown rows={rows} />
+    </div>
+  );
+}
+
+function MiniBarChart({ rows }: { rows: InsightBreakdownRow[] }) {
+  const max = Math.max(1, ...rows.map((row) => row.value));
+  return (
+    <div className="insight-bars">
+      {rows.map((row, index) => (
+        <div key={row.label} className="insight-bar-row">
+          <div>
+            <span>{row.label}</span>
+            <strong>{row.value}</strong>
+          </div>
+          <i><b style={{ width: `${Math.max(4, (row.value / max) * 100)}%`, background: row.color || insightColor(index) }} /></i>
+          {row.helper ? <small>{row.helper}</small> : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MiniLineChart({ rows }: { rows: InsightBreakdownRow[] }) {
+  const max = Math.max(1, ...rows.map((row) => row.value));
+  const points = rows.map((row, index) => `${(index / Math.max(1, rows.length - 1)) * 100},${100 - (row.value / max) * 90}`).join(" ");
+  return (
+    <div className="insight-line-chart">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <polyline points={points} fill="none" stroke="#0B4F3A" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <InsightBreakdown rows={rows} />
+    </div>
+  );
+}
+
+function InsightBreakdown({ rows }: { rows: InsightBreakdownRow[] }) {
+  return (
+    <div className="insight-breakdown">
+      {rows.map((row, index) => (
+        <div key={row.label}>
+          <span style={{ background: row.color || insightColor(index) }} />
+          <p>{row.label}</p>
+          <strong>{row.value}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InsightEmptyState() {
+  return <div className="insight-empty">No additional breakdown available.</div>;
+}
+
+function metricChartType(value: string): InsightChartType {
+  return value.includes("%") ? "donut" : "bar";
+}
+
+function metricInsightRows(title: string, value: string): InsightBreakdownRow[] {
+  const numeric = Number.parseInt(value.replace(/[^0-9-]/g, ""), 10);
+  if (!Number.isFinite(numeric)) return [];
+  if (value.includes("%")) {
+    const bounded = Math.max(0, Math.min(100, numeric));
+    return [
+      { label: title, value: bounded, color: "#0B4F3A" },
+      { label: "Remaining", value: Math.max(0, 100 - bounded), color: "#F3E7C3" }
+    ];
+  }
+  return [{ label: title, value: numeric, color: "#0B4F3A" }];
+}
+
+function insightColor(index: number) {
+  return ["#0B4F3A", "#2E7D5B", "#C9A227", "#F3E7C3", "#7A1F2B"][index % 5];
 }
 
 function metricIconFor(title: string) {
@@ -4008,19 +4505,32 @@ function attentionToneClass(label: string) {
 
 function ProgressRow({ label, value, helper, iconKey }: ChartRow) {
   return (
-    <div className={iconKey ? "chart-progress-row has-icon" : "chart-progress-row"}>
-      <div className="chart-progress-row-head">
-        <div className="chart-progress-label-wrap">
-          {iconKey ? <span className={`zone-progress-icon zone-${iconKey}`}>{zoneProgressIcon(iconKey)}</span> : null}
-          <p className="chart-progress-label">{label}</p>
+    <InsightTrigger
+      title={`${label} Progress Insight`}
+      metricLabel="Completion"
+      metricValue={`${value}%`}
+      helper={helper}
+      chartType="donut"
+      breakdown={[
+        { label: "Completed", value: Math.max(0, Math.min(100, value)), color: "#0B4F3A" },
+        { label: "Remaining", value: Math.max(0, 100 - value), color: "#F3E7C3" }
+      ]}
+      lastUpdated="Live dashboard data"
+    >
+      <div className={iconKey ? "chart-progress-row has-icon" : "chart-progress-row"}>
+        <div className="chart-progress-row-head">
+          <div className="chart-progress-label-wrap">
+            {iconKey ? <span className={`zone-progress-icon zone-${iconKey}`}>{zoneProgressIcon(iconKey)}</span> : null}
+            <p className="chart-progress-label">{label}</p>
+          </div>
+          <p className="chart-progress-value">{value}%</p>
         </div>
-        <p className="chart-progress-value">{value}%</p>
+        <div className="chart-progress-track">
+          <div className="progress-fill h-2 rounded-full bg-[var(--color-secondary)]" style={{ width: `${value}%` }} />
+        </div>
+        <p className="chart-progress-helper">{helper}</p>
       </div>
-      <div className="chart-progress-track">
-        <div className="progress-fill h-2 rounded-full bg-[var(--color-secondary)]" style={{ width: `${value}%` }} />
-      </div>
-      <p className="chart-progress-helper">{helper}</p>
-    </div>
+    </InsightTrigger>
   );
 }
 
@@ -4029,17 +4539,31 @@ function DashboardBarChart({ rows, compact = false }: { rows: ChartRow[]; compac
   return (
     <div className={compact ? "space-y-2" : "space-y-3"}>
       {rows.map((row) => (
-        <div key={row.label} className="grid gap-2 sm:grid-cols-[11rem_1fr_5rem] sm:items-center">
-          <div className="chart-progress-label-wrap">
-            {row.iconKey ? <span className={`zone-progress-icon zone-${row.iconKey}`}>{zoneProgressIcon(row.iconKey)}</span> : null}
-            <p className="truncate text-sm font-bold text-[var(--color-text-muted)]">{row.label}</p>
+        <InsightTrigger
+          key={row.label}
+          title={`${row.label} Progress Insight`}
+          metricLabel="Completion"
+          metricValue={`${row.value}%`}
+          helper={row.helper}
+          chartType="bar"
+          breakdown={[
+            { label: "Completed", value: Math.max(0, Math.min(100, row.value)), color: "#0B4F3A" },
+            { label: "Remaining", value: Math.max(0, 100 - row.value), color: "#F3E7C3" }
+          ]}
+          lastUpdated="Live dashboard data"
+        >
+          <div className="grid gap-2 sm:grid-cols-[11rem_1fr_5rem] sm:items-center">
+            <div className="chart-progress-label-wrap">
+              {row.iconKey ? <span className={`zone-progress-icon zone-${row.iconKey}`}>{zoneProgressIcon(row.iconKey)}</span> : null}
+              <p className="truncate text-sm font-bold text-[var(--color-text-muted)]">{row.label}</p>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-[var(--color-accent-light)]">
+              <div className="progress-fill h-full rounded-full bg-[var(--color-accent)]" style={{ width: `${row.value}%` }} />
+            </div>
+            <p className="text-sm font-black text-[var(--color-primary)]">{row.value}%</p>
+            {!compact ? <p className="text-xs text-[var(--color-text-muted)] sm:col-start-2">{row.helper}</p> : null}
           </div>
-          <div className="h-3 overflow-hidden rounded-full bg-[var(--color-accent-light)]">
-            <div className="progress-fill h-full rounded-full bg-[var(--color-accent)]" style={{ width: `${row.value}%` }} />
-          </div>
-          <p className="text-sm font-black text-[var(--color-primary)]">{row.value}%</p>
-          {!compact ? <p className="text-xs text-[var(--color-text-muted)] sm:col-start-2">{row.helper}</p> : null}
-        </div>
+        </InsightTrigger>
       ))}
     </div>
   );
@@ -4233,10 +4757,22 @@ function StatusBadge({ value }: { value: string }) {
       ? "bg-[var(--color-important)] text-white"
       : lower.includes("needs verification") || lower.includes("partially verified") || lower.includes("partially updated") || lower.includes("draft saved")
         ? "bg-[var(--color-accent)] text-[var(--color-primary)]"
-        : lower.includes("progress")
+      : lower.includes("progress")
           ? "bg-[rgba(46,125,91,0.12)] text-[var(--color-secondary)]"
           : "bg-[var(--color-accent-light)] text-[var(--color-text)]";
-  return <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-black ${cls}`}>{value}</span>;
+  return (
+    <InsightTrigger
+      inline
+      title="Status Insight"
+      metricLabel="Current status"
+      metricValue={value}
+      helper="This value is shown from the current Supabase-backed record."
+      breakdown={[{ label: value, value: 1, color: lower.includes("issue") || lower.includes("rejected") || lower.includes("overdue") ? "#7A1F2B" : lower.includes("pending") || lower.includes("draft") || lower.includes("partial") ? "#C9A227" : "#0B4F3A" }]}
+      lastUpdated="Live record value"
+    >
+      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-black ${cls}`}>{value}</span>
+    </InsightTrigger>
+  );
 }
 
 function EmptyState({ title, body }: { title: string; body: string }) {
