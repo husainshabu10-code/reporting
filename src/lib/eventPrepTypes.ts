@@ -146,6 +146,14 @@ export type DailyReport = {
   updatedAt: string;
 };
 
+export type CustomFieldResponse =
+  | string
+  | string[]
+  | {
+      selected: string | string[];
+      otherText?: string;
+    };
+
 export type TaskUpdate = {
   id: string;
   liveTaskId: string;
@@ -158,7 +166,7 @@ export type TaskUpdate = {
   userRoleStanding: string;
   escalationPoints: EscalationPoint[];
   supportingPersonnel: SupportingPerson[];
-  customFields?: Record<string, string | string[]>;
+  customFields?: Record<string, CustomFieldResponse>;
   correctionComment?: string;
   updatedAt: string;
 };
@@ -300,6 +308,7 @@ export type FormField = {
   questionType?: "Short answer" | "Paragraph" | "Multiple choice" | "Checkboxes" | "Dropdown" | "File upload" | "Date" | "Time";
   options?: string[];
   globalOptionGroup?: string;
+  allowOther?: boolean;
   required: boolean;
   visible: boolean;
   displayOrder: number;

@@ -45,6 +45,7 @@ import {
   ZONE_TYPES,
   type ActivityLog,
   type AreaRequest,
+  type CustomFieldResponse,
   type DashboardMetrics,
   type DailyReport,
   type EscalationPoint,
@@ -3763,16 +3764,22 @@ function FormBuilderTab({ state, currentProfile, updateState, showToast }: { sta
   const [taskType, setTaskType] = useState<TaskTypeName>("Simple Task");
   const [label, setLabel] = useState("");
   const [questionType, setQuestionType] = useState<NonNullable<FormField["questionType"]>>("Short answer");
-  const [newOptions, setNewOptions] = useState("Option 1\nOption 2");
+  const [newOptions, setNewOptions] = useState<string[]>(["Option 1", "Option 2"]);
+  const [newAllowOther, setNewAllowOther] = useState(false);
   const globalGroups = unique(state.globalOptions.map((option) => option.group));
   const visibleFields = state.formFields
     .filter((field) => field.taskType === taskType)
     .slice()
     .sort((a, b) => a.displayOrder - b.displayOrder);
   const isChoiceType = ["Multiple choice", "Checkboxes", "Dropdown"].includes(questionType);
+  const isGoogleChoiceType = ["Multiple choice", "Checkboxes"].includes(questionType);
   const addField = () => {
     if (!label.trim()) {
       showToast("Field label required", "Add a label before creating the form field.", "warning");
+      return;
+    }
+    if (isChoiceType && !cleanOptionList(newOptions).length && !newAllowOther) {
+      showToast("Options required", "Add at least one non-empty option before creating this question.", "warning");
       return;
     }
     const fieldLabel = label.trim();
@@ -3785,7 +3792,8 @@ function FormBuilderTab({ state, currentProfile, updateState, showToast }: { sta
         fieldKey,
         label: fieldLabel,
         questionType,
-        options: isChoiceType ? optionLines(newOptions) : [],
+        options: isChoiceType ? cleanOptionList(newOptions) : [],
+        allowOther: isGoogleChoiceType ? newAllowOther : false,
         required: false,
         visible: true,
         displayOrder: fieldsForType.length + 1
@@ -3793,7 +3801,8 @@ function FormBuilderTab({ state, currentProfile, updateState, showToast }: { sta
       return withActivity({ ...current, formFields: [...current.formFields, field] }, currentProfile, "Form/global field changes", `Added form field ${field.label}`, "form_field", field.id, { visible: true });
     });
     setLabel("");
-    if (isChoiceType) setNewOptions("Option 1\nOption 2");
+    if (isChoiceType) setNewOptions(["Option 1", "Option 2"]);
+    setNewAllowOther(false);
     showToast("Form field added", `${fieldLabel} was added to ${taskType}.`);
   };
   const updateField = (fieldId: string, patch: Partial<FormField>) => {
@@ -3814,7 +3823,36 @@ function FormBuilderTab({ state, currentProfile, updateState, showToast }: { sta
     updateField(field.id, { visible: false });
     showToast("Question hidden", `${field.label} is hidden from ${taskType}.`, "info");
   };
-  const saveForm = () => showToast("Form saved", `${taskType} form changes are queued for Supabase sync.`, "success");
+  const saveForm = () => {
+    const invalid = visibleFields.find((field) => ["Multiple choice", "Checkboxes", "Dropdown"].includes(field.questionType || "") && !cleanOptionList(field.options || []).length && !field.globalOptionGroup && !field.allowOther);
+    if (invalid) {
+      showToast("Options required", `${invalid.label} needs at least one non-empty option before saving.`, "warning");
+      return;
+    }
+    const duplicate = visibleFields.find((field) => hasDuplicateOptions(field.options || []));
+    if (duplicate) {
+      showToast("Duplicate options found", `${duplicate.label} has duplicate option labels. Rename or remove duplicates before saving.`, "warning");
+      return;
+    }
+    updateState((current) => withActivity({
+      ...current,
+      formFields: current.formFields.map((field) => (field.taskType === taskType ? { ...field, options: cleanOptionList(field.options || []) } : field))
+    }, currentProfile, "Form/global field changes", `Saved ${taskType} form configuration`, "form_field", taskType, { saved: true }));
+    showToast("Form saved", `${taskType} form changes are queued for Supabase sync.`, "success");
+  };
+  const changeQuestionType = (field: FormField, value: string) => {
+    const nextType = value as NonNullable<FormField["questionType"]>;
+    const wasOptionType = ["Multiple choice", "Checkboxes", "Dropdown"].includes(field.questionType || "");
+    const isNextOptionType = ["Multiple choice", "Checkboxes", "Dropdown"].includes(value);
+    if (wasOptionType && !isNextOptionType && (field.options?.length || field.allowOther)) {
+      showToast("Options preserved", "This question type will not show options, but the saved option list is kept if you switch back.", "info");
+    }
+    updateField(field.id, {
+      questionType: nextType,
+      options: isNextOptionType ? field.options?.length ? field.options : ["Option 1"] : field.options || [],
+      allowOther: ["Multiple choice", "Checkboxes"].includes(value) ? Boolean(field.allowOther) : field.allowOther
+    });
+  };
   return (
     <div className="form-builder-shell">
       <div className="form-builder-toolbar dashboard-panel">
@@ -3840,10 +3878,13 @@ function FormBuilderTab({ state, currentProfile, updateState, showToast }: { sta
             <button className="btn-primary" onClick={addField}><Plus size={16} /> Add Question</button>
           </div>
           {isChoiceType ? (
-            <label className="mt-3 block">
-              <span className="field-label">Options, one per line</span>
-              <textarea className="field mt-2 min-h-24" value={newOptions} onChange={(event) => setNewOptions(event.target.value)} />
-            </label>
+            <OptionEditor
+              questionType={questionType}
+              options={newOptions}
+              allowOther={newAllowOther}
+              onOptionsChange={setNewOptions}
+              onAllowOtherChange={setNewAllowOther}
+            />
           ) : null}
         </div>
 
@@ -3852,14 +3893,29 @@ function FormBuilderTab({ state, currentProfile, updateState, showToast }: { sta
             <div className="form-card-grip" aria-hidden="true">:::</div>
             <div className="grid gap-3 md:grid-cols-[1fr_13rem]">
               <Input label="Question" value={field.label} onChange={(value) => updateField(field.id, { label: value })} />
-              <Select label="Question type" value={field.questionType || "Short answer"} onChange={(value) => updateField(field.id, { questionType: value as NonNullable<FormField["questionType"]>, options: ["Multiple choice", "Checkboxes", "Dropdown"].includes(value) ? field.options || ["Option 1"] : [] })} options={QUESTION_TYPES} />
+              <Select label="Question type" value={field.questionType || "Short answer"} onChange={(value) => changeQuestionType(field, value)} options={QUESTION_TYPES} />
             </div>
             {["Multiple choice", "Checkboxes", "Dropdown"].includes(field.questionType || "") ? (
-              <div className="mt-3 grid gap-3 md:grid-cols-[1fr_13rem]">
-                <label className="block">
-                  <span className="field-label">Custom options, one per line</span>
-                  <textarea className="field mt-2 min-h-24" value={(field.options || []).join("\n")} onChange={(event) => updateField(field.id, { options: optionLines(event.target.value), globalOptionGroup: undefined })} />
-                </label>
+              <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_13rem]">
+                <div>
+                  {field.globalOptionGroup ? (
+                    <div className="option-source-note">
+                      <p>Using options from Global Fields: <strong>{field.globalOptionGroup}</strong>{field.allowOther ? " + Other" : ""}</p>
+                      <span className="flex flex-wrap gap-3">
+                        {["Multiple choice", "Checkboxes"].includes(field.questionType || "") ? <button type="button" onClick={() => updateField(field.id, { allowOther: !field.allowOther })}>{field.allowOther ? "Remove Other" : "Add Other"}</button> : null}
+                        <button type="button" onClick={() => updateField(field.id, { globalOptionGroup: undefined })}>Use custom options</button>
+                      </span>
+                    </div>
+                  ) : (
+                    <OptionEditor
+                      questionType={field.questionType || "Short answer"}
+                      options={field.options || []}
+                      allowOther={Boolean(field.allowOther)}
+                      onOptionsChange={(options) => updateField(field.id, { options, globalOptionGroup: undefined })}
+                      onAllowOtherChange={(allowOther) => updateField(field.id, { allowOther })}
+                    />
+                  )}
+                </div>
                 <Select
                   label="Option source"
                   value={field.globalOptionGroup || ""}
@@ -3885,6 +3941,112 @@ function FormBuilderTab({ state, currentProfile, updateState, showToast }: { sta
       </section>
     </div>
   );
+}
+
+function OptionEditor({
+  questionType,
+  options,
+  allowOther,
+  onOptionsChange,
+  onAllowOtherChange
+}: {
+  questionType: string;
+  options: string[];
+  allowOther: boolean;
+  onOptionsChange: (options: string[]) => void;
+  onAllowOtherChange: (allowOther: boolean) => void;
+}) {
+  const focusIndexRef = useRef<number | null>(null);
+  const optionInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const isCheckboxes = questionType === "Checkboxes";
+  const canUseOther = ["Multiple choice", "Checkboxes"].includes(questionType);
+  const duplicateLabels = duplicateOptionLabels(options);
+
+  useEffect(() => {
+    if (focusIndexRef.current === null) return;
+    optionInputRefs.current[focusIndexRef.current]?.focus();
+    optionInputRefs.current[focusIndexRef.current]?.select();
+    focusIndexRef.current = null;
+  }, [options.length]);
+
+  const updateOption = (index: number, value: string) => {
+    onOptionsChange(options.map((option, optionIndex) => (optionIndex === index ? value : option)));
+  };
+  const addOption = () => {
+    focusIndexRef.current = options.length;
+    onOptionsChange([...options, `Option ${options.length + 1}`]);
+  };
+  const deleteOption = (index: number) => {
+    onOptionsChange(options.filter((_, optionIndex) => optionIndex !== index));
+  };
+  const moveOption = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= options.length) return;
+    const next = [...options];
+    const [item] = next.splice(index, 1);
+    next.splice(target, 0, item);
+    focusIndexRef.current = target;
+    onOptionsChange(next);
+  };
+
+  return (
+    <div className="google-option-editor">
+      <div className="google-option-editor-head">
+        <span className="field-label">Options</span>
+        <small>{isCheckboxes ? "Checkboxes allow multiple answers." : questionType === "Multiple choice" ? "Multiple choice allows one answer." : "Dropdown options"}</small>
+      </div>
+      <div className="google-option-list">
+        {options.map((option, index) => {
+          const trimmed = option.trim().toLowerCase();
+          const isDuplicate = Boolean(trimmed && duplicateLabels.has(trimmed));
+          return (
+            <div key={index} className={`google-option-row ${isDuplicate ? "has-warning" : ""}`}>
+              <button type="button" className="option-move-handle" aria-label="Move option up" onClick={() => moveOption(index, -1)} disabled={index === 0}><ChevronDown size={14} className="rotate-180" /></button>
+              <span className="option-choice-icon" aria-hidden="true">{isCheckboxes ? <CheckSquareIcon /> : <RadioCircleIcon />}</span>
+              <input
+                ref={(node) => {
+                  optionInputRefs.current[index] = node;
+                }}
+                value={option}
+                placeholder={`Option ${index + 1}`}
+                onChange={(event) => updateOption(index, event.target.value)}
+                onBlur={(event) => {
+                  if (!event.target.value.trim()) updateOption(index, `Option ${index + 1}`);
+                }}
+              />
+              <button type="button" className="option-move-handle" aria-label="Move option down" onClick={() => moveOption(index, 1)} disabled={index === options.length - 1}><ChevronDown size={14} /></button>
+              <button type="button" className="option-delete-btn" aria-label="Delete option" onClick={() => deleteOption(index)}><X size={16} /></button>
+              {isDuplicate ? <small>Duplicate option</small> : null}
+            </div>
+          );
+        })}
+        {!options.length ? <p className="option-empty-note">No options yet. Add the first option below.</p> : null}
+      </div>
+      <div className="google-option-actions">
+        <button type="button" onClick={addOption}>Add option</button>
+        {canUseOther && !allowOther ? <button type="button" onClick={() => onAllowOtherChange(true)}>Add "Other"</button> : null}
+      </div>
+      {allowOther && canUseOther ? (
+        <div className="google-option-row is-other">
+          <span className="option-move-handle" aria-hidden="true" />
+          <span className="option-choice-icon" aria-hidden="true">{isCheckboxes ? <CheckSquareIcon /> : <RadioCircleIcon />}</span>
+          <input value="Other" readOnly />
+          <span className="option-move-handle" aria-hidden="true" />
+          <button type="button" className="option-delete-btn" aria-label="Remove Other option" onClick={() => onAllowOtherChange(false)}><X size={16} /></button>
+        </div>
+      ) : null}
+      {options.some((option) => !option.trim()) ? <p className="option-warning-text">Empty option labels must be filled before saving.</p> : null}
+      {duplicateLabels.size ? <p className="option-warning-text">Duplicate option labels should be renamed or removed before saving.</p> : null}
+    </div>
+  );
+}
+
+function RadioCircleIcon() {
+  return <span className="radio-circle-icon" />;
+}
+
+function CheckSquareIcon() {
+  return <span className="check-square-icon" />;
 }
 
 function GlobalFieldsTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
@@ -4792,14 +4954,16 @@ function DynamicTaskField({
 }: {
   field: FormField;
   state: EventPrepState;
-  value?: string | string[];
-  onChange: (value: string | string[]) => void;
+  value?: CustomFieldResponse;
+  onChange: (value: CustomFieldResponse) => void;
 }) {
   const questionType = field.questionType || "Short answer";
   const optionSource = field.globalOptionGroup ? activeOptions(state, field.globalOptionGroup, []) : field.options || [];
   const options = unique(optionSource.filter(Boolean));
-  const stringValue = Array.isArray(value) ? value.join(", ") : value || "";
-  const arrayValue = Array.isArray(value) ? value : [];
+  const selectedValues = selectedCustomValues(value);
+  const stringValue = typeof value === "string" ? value : selectedValues.join(", ");
+  const arrayValue = selectedValues;
+  const otherText = customOtherText(value);
 
   if (questionType === "Paragraph") {
     return (
@@ -4811,21 +4975,33 @@ function DynamicTaskField({
   }
 
   if (questionType === "Multiple choice") {
+    const selected = selectedValues[0] || "";
+    const otherSelected = selected === "Other";
     return (
       <fieldset className="dynamic-choice-field">
         <legend>{field.label}{field.required ? " *" : ""}</legend>
         {options.map((option) => (
           <label key={option}>
-            <input type="radio" checked={stringValue === option} onChange={() => onChange(option)} />
+            <input type="radio" checked={selected === option} onChange={() => onChange(option)} />
             {option}
           </label>
         ))}
+        {field.allowOther ? (
+          <label>
+            <input type="radio" checked={otherSelected} onChange={() => onChange({ selected: "Other", otherText })} />
+            Other
+          </label>
+        ) : null}
+        {otherSelected ? (
+          <Input label="Specify Other" value={otherText} onChange={(next) => onChange({ selected: "Other", otherText: next })} placeholder="Enter other response" />
+        ) : null}
         {!options.length ? <p>No options configured for this question.</p> : null}
       </fieldset>
     );
   }
 
   if (questionType === "Checkboxes") {
+    const otherSelected = arrayValue.includes("Other");
     return (
       <fieldset className="dynamic-choice-field md:col-span-2">
         <legend>{field.label}{field.required ? " *" : ""}</legend>
@@ -4834,11 +5010,30 @@ function DynamicTaskField({
             <input
               type="checkbox"
               checked={arrayValue.includes(option)}
-              onChange={(event) => onChange(event.target.checked ? [...arrayValue, option] : arrayValue.filter((item) => item !== option))}
+              onChange={(event) => {
+                const nextSelected = event.target.checked ? unique([...arrayValue, option]) : arrayValue.filter((item) => item !== option);
+                onChange(otherSelected ? { selected: nextSelected, otherText } : nextSelected);
+              }}
             />
             {option}
           </label>
         ))}
+        {field.allowOther ? (
+          <label>
+            <input
+              type="checkbox"
+              checked={otherSelected}
+              onChange={(event) => {
+                const nextSelected = event.target.checked ? unique([...arrayValue, "Other"]) : arrayValue.filter((item) => item !== "Other");
+                onChange({ selected: nextSelected, otherText: event.target.checked ? otherText : "" });
+              }}
+            />
+            Other
+          </label>
+        ) : null}
+        {otherSelected ? (
+          <Input label="Specify Other" value={otherText} onChange={(next) => onChange({ selected: arrayValue, otherText: next })} placeholder="Enter other response" />
+        ) : null}
         {!options.length ? <p>No options configured for this question.</p> : null}
       </fieldset>
     );
@@ -4849,7 +5044,7 @@ function DynamicTaskField({
       <Select
         label={`${field.label}${field.required ? " *" : ""}`}
         value={stringValue}
-        onChange={onChange as (value: string) => void}
+        onChange={(next) => onChange(next)}
         options={[{ label: "Select option", value: "" }, ...options]}
       />
     );
@@ -4882,9 +5077,16 @@ function getCustomFormFields(state: EventPrepState, taskType: TaskTypeName) {
     .sort((a, b) => a.displayOrder - b.displayOrder);
 }
 
-function hasCustomFieldValue(value: string | string[] | undefined) {
+function hasCustomFieldValue(value: CustomFieldResponse | undefined) {
+  if (!value) return false;
   if (Array.isArray(value)) return value.length > 0;
-  return Boolean(value?.trim());
+  if (typeof value === "object") {
+    const selected = Array.isArray(value.selected) ? value.selected : value.selected ? [value.selected] : [];
+    if (!selected.length) return false;
+    if (selected.includes("Other")) return Boolean(value.otherText?.trim());
+    return true;
+  }
+  return Boolean(value.trim());
 }
 
 function PeopleEditor<T extends EscalationPoint | SupportingPerson>({
@@ -5210,8 +5412,33 @@ function activeOptions(state: EventPrepState, group: string, fallback: readonly 
   return options.length ? options : [...fallback];
 }
 
-function optionLines(value: string) {
-  return unique(value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean));
+function cleanOptionList(options: string[]) {
+  return unique(options.map((item) => item.trim()).filter(Boolean));
+}
+
+function duplicateOptionLabels(options: string[]) {
+  const seen = new Set<string>();
+  const duplicates = new Set<string>();
+  options.map((option) => option.trim().toLowerCase()).filter(Boolean).forEach((option) => {
+    if (seen.has(option)) duplicates.add(option);
+    seen.add(option);
+  });
+  return duplicates;
+}
+
+function hasDuplicateOptions(options: string[]) {
+  return duplicateOptionLabels(options).size > 0;
+}
+
+function selectedCustomValues(value: CustomFieldResponse | undefined) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === "object") return Array.isArray(value.selected) ? value.selected : value.selected ? [value.selected] : [];
+  return value ? [value] : [];
+}
+
+function customOtherText(value: CustomFieldResponse | undefined) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value.otherText || "" : "";
 }
 
 function uniqueFormFieldKey(fields: FormField[], label: string) {
@@ -5227,7 +5454,7 @@ function uniqueFormFieldKey(fields: FormField[], label: string) {
 
 function formPreviewText(field: FormField) {
   if (field.globalOptionGroup) return `Options from Global Fields: ${field.globalOptionGroup}`;
-  if (["Multiple choice", "Checkboxes", "Dropdown"].includes(field.questionType || "")) return (field.options || []).join(" / ") || "Add options for this question";
+  if (["Multiple choice", "Checkboxes", "Dropdown"].includes(field.questionType || "")) return [...(field.options || []).filter(Boolean), field.allowOther ? "Other" : ""].filter(Boolean).join(" / ") || "Add options for this question";
   if (field.questionType === "Paragraph") return "Paragraph text";
   if (field.questionType === "File upload") return "File upload control";
   if (field.questionType === "Date") return "Date picker";

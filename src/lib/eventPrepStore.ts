@@ -598,6 +598,7 @@ function fromDbRow<T>(row: Record<string, unknown>, table: string) {
         questionType: fieldData.questionType || "Short answer",
         options: Array.isArray(fieldData.options) ? fieldData.options.map(String) : [],
         globalOptionGroup: fieldData.globalOptionGroup,
+        allowOther: Boolean(fieldData.allowOther),
         required: Boolean(row.required),
         visible: Boolean(row.visible ?? true),
         displayOrder: Number(row.display_order || 0)
