@@ -19,6 +19,28 @@
   --line: var(--color-border);
   --panel: var(--color-card);
   --mist: var(--color-bg);
+  --radius-card: 1rem;
+  --radius-card-sm: 0.78rem;
+  --shadow-card:
+    0 10px 24px rgba(31, 41, 51, 0.075),
+    0 2px 7px rgba(31, 41, 51, 0.045),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  --shadow-card-hover:
+    0 16px 34px rgba(31, 41, 51, 0.105),
+    0 4px 12px rgba(31, 41, 51, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+  --shadow-card-soft:
+    0 8px 18px rgba(31, 41, 51, 0.055),
+    0 1px 4px rgba(31, 41, 51, 0.035),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  --shadow-card-strong:
+    0 22px 58px rgba(31, 41, 51, 0.14),
+    0 8px 22px rgba(11, 79, 58, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  --shadow-icon:
+    0 8px 18px rgba(31, 41, 51, 0.11),
+    0 2px 5px rgba(31, 41, 51, 0.055),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
 }
 
 * {
@@ -1023,10 +1045,10 @@ table {
 
   .notification-panel {
     overflow: hidden;
-    border-radius: 0.75rem;
+    border-radius: var(--radius-card-sm);
     border: 1px solid var(--color-border);
     background: var(--color-card);
-    box-shadow: 0 24px 58px rgba(11, 79, 58, 0.16);
+    box-shadow: var(--shadow-card-strong);
   }
 
   .btn-secondary {
@@ -1146,7 +1168,7 @@ table {
     border: 1px solid rgba(232, 221, 197, 0.8);
     background: linear-gradient(135deg, rgba(243, 231, 195, 0.78), rgba(255, 255, 255, 0.92));
     color: var(--color-primary);
-    box-shadow: 0 8px 20px rgba(11, 79, 58, 0.05);
+    box-shadow: var(--shadow-icon);
   }
 
   .section-header-icon svg {
@@ -1160,29 +1182,59 @@ table {
     justify-content: flex-end;
   }
 
+  .app-card,
+  .app-card-soft,
+  .app-card-interactive,
+  .app-card-nested {
+    border: 1px solid var(--color-border);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.9));
+  }
+
+  .app-card,
+  .app-card-interactive {
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  .app-card-soft,
+  .app-card-nested {
+    border-radius: var(--radius-card-sm);
+    box-shadow: var(--shadow-card-soft);
+  }
+
+  .app-card-interactive {
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease, background-color 180ms ease;
+  }
+
+  .app-card-interactive:hover {
+    border-color: rgba(201, 162, 39, 0.56);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
+  }
+
   .dashboard-panel {
     display: block;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-card);
     border: 1px solid var(--color-border);
-    background: var(--color-card);
-    box-shadow: 0 14px 38px rgba(11, 79, 58, 0.06);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.91));
+    box-shadow: var(--shadow-card);
     transform: translateZ(0);
     transition: border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease, background-color 220ms ease;
   }
 
   .dashboard-panel:hover {
     border-color: rgba(201, 162, 39, 0.48);
-    box-shadow: 0 18px 42px rgba(11, 79, 58, 0.09);
-    transform: translateY(-1px);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
   }
 
   .premium-dashboard {
-    --dashboard-card-shadow: 0 18px 42px rgba(11, 79, 58, 0.06);
+    --dashboard-card-shadow: var(--shadow-card);
   }
 
   .dashboard-filter-card,
   .dashboard-alerts-card {
-    border-radius: 0.78rem;
+    border-radius: var(--radius-card);
     border: 1px solid var(--color-border);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.86));
     padding: 1rem;
@@ -1203,7 +1255,7 @@ table {
     grid-template-columns: auto minmax(0, 1fr);
     gap: 0.9rem;
     overflow: hidden;
-    border-radius: 0.82rem;
+    border-radius: var(--radius-card);
     border: 1px solid var(--color-border);
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.88));
     padding: 1rem 1rem 1.55rem;
@@ -1234,19 +1286,19 @@ table {
   .insight-trigger-shell:hover > *,
   .insight-trigger-shell:focus-visible > * {
     border-color: rgba(201, 162, 39, 0.85);
-    box-shadow: 0 14px 32px rgba(11, 79, 58, 0.1);
-    transform: translateY(-1px);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
   }
 
   .insight-popover {
     position: fixed;
     z-index: 100;
     width: min(23.75rem, calc(100vw - 1.5rem));
-    border-radius: 0.82rem;
+    border-radius: var(--radius-card);
     border: 1px solid var(--color-border);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 247, 239, 0.98));
     padding: 0.85rem;
-    box-shadow: 0 24px 65px rgba(11, 79, 58, 0.18);
+    box-shadow: var(--shadow-card-strong);
     animation: insight-pop 160ms ease both;
   }
 
@@ -1510,6 +1562,7 @@ table {
     border-radius: 999px;
     background: rgba(46, 125, 91, 0.12);
     color: var(--color-primary);
+    box-shadow: var(--shadow-icon);
   }
 
   .metric-warning .metric-icon {
@@ -1621,17 +1674,18 @@ table {
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.9rem;
-    border-radius: 0.7rem;
+    border-radius: var(--radius-card-sm);
     border: 1px solid rgba(232, 221, 197, 0.9);
     background: linear-gradient(135deg, rgba(243, 231, 195, 0.28), rgba(255, 255, 255, 0.92));
     padding: 0.9rem 1rem;
+    box-shadow: var(--shadow-card-soft);
     transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
   }
 
   .dashboard-alert-item:hover {
     border-color: rgba(201, 162, 39, 0.55);
-    box-shadow: 0 14px 30px rgba(11, 79, 58, 0.07);
-    transform: translateY(-1px);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
   }
 
   .dashboard-alert-icon {
@@ -1643,6 +1697,7 @@ table {
     border-radius: 999px;
     background: rgba(201, 162, 39, 0.16);
     color: var(--color-accent);
+    box-shadow: var(--shadow-icon);
   }
 
   .dashboard-alert-type {
@@ -1760,6 +1815,7 @@ table {
     border-radius: 999px;
     background: rgba(46, 125, 91, 0.12);
     color: var(--color-primary);
+    box-shadow: var(--shadow-icon);
   }
 
   .zone-progress-icon.zone-central-office {
@@ -1782,11 +1838,12 @@ table {
     display: flex;
     align-items: center;
     gap: 0.78rem;
-    border-radius: 0.72rem;
+    border-radius: var(--radius-card-sm);
     border: 1px solid var(--color-border);
-    background: rgba(250, 247, 239, 0.72);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(250, 247, 239, 0.72));
     padding: 0.82rem;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.78);
+    box-shadow: var(--shadow-card-soft);
+    transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
   }
 
   .attention-mini-icon {
@@ -1799,6 +1856,7 @@ table {
     border-radius: 0.65rem;
     background: rgba(46, 125, 91, 0.12);
     color: var(--color-secondary);
+    box-shadow: var(--shadow-icon);
   }
 
   .attention-mini-card.is-warning .attention-mini-icon {
@@ -1841,10 +1899,11 @@ table {
     grid-template-columns: auto minmax(0, 1fr);
     gap: 0.75rem;
     align-items: center;
-    border-radius: 0.75rem;
+    border-radius: var(--radius-card-sm);
     border: 1px solid var(--color-border);
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(243, 231, 195, 0.18));
     padding: 0.9rem;
+    box-shadow: var(--shadow-card-soft);
   }
 
   .quick-status-icon {
@@ -1856,6 +1915,7 @@ table {
     border-radius: 999px;
     background: rgba(46, 125, 91, 0.12);
     color: var(--color-secondary);
+    box-shadow: var(--shadow-icon);
   }
 
   .quick-status-item.tone-warning .quick-status-icon {
@@ -1888,7 +1948,7 @@ table {
   }
 
   .daily-reports-page {
-    --daily-shadow: 0 18px 44px rgba(11, 79, 58, 0.065);
+    --daily-shadow: var(--shadow-card);
   }
 
   .daily-report-kpis {
@@ -1899,7 +1959,7 @@ table {
 
   .daily-reports-page .metric-card {
     min-height: 8.9rem;
-    border-radius: 0.62rem;
+    border-radius: var(--radius-card);
     padding: 1rem;
     box-shadow: var(--daily-shadow);
   }
@@ -1938,9 +1998,9 @@ table {
   }
 
   .daily-card {
-    border-radius: 0.72rem;
+    border-radius: var(--radius-card);
     border: 1px solid var(--color-border);
-    background: rgba(255, 255, 255, 0.94);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.9));
     padding: 1rem;
     box-shadow: var(--daily-shadow);
   }
@@ -2007,11 +2067,12 @@ table {
     align-items: center;
     gap: 0.9rem;
     min-height: 5.2rem;
-    border-radius: 0.62rem;
+    border-radius: var(--radius-card-sm);
     border: 1px solid rgba(232, 221, 197, 0.92);
     background: linear-gradient(135deg, rgba(243, 231, 195, 0.35), rgba(255, 255, 255, 0.94));
     padding: 0.85rem 1rem;
     color: var(--color-text);
+    box-shadow: var(--shadow-card-soft);
     transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
   }
 
@@ -2021,8 +2082,8 @@ table {
 
   .daily-alert-card:hover {
     border-color: rgba(201, 162, 39, 0.58);
-    box-shadow: 0 16px 34px rgba(11, 79, 58, 0.08);
-    transform: translateY(-1px);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
   }
 
   .daily-alert-icon {
@@ -2034,6 +2095,7 @@ table {
     border-radius: 999px;
     background: rgba(201, 162, 39, 0.15);
     color: var(--color-accent);
+    box-shadow: var(--shadow-icon);
   }
 
   .daily-alert-card.is-info .daily-alert-icon {
@@ -2143,10 +2205,11 @@ table {
   }
 
   .daily-report-mobile-card {
-    border-radius: 0.62rem;
+    border-radius: var(--radius-card-sm);
     border: 1px solid var(--color-border);
     background: rgba(250, 247, 239, 0.56);
     padding: 0.9rem;
+    box-shadow: var(--shadow-card-soft);
   }
 
   .daily-reminder-form {
@@ -2164,18 +2227,18 @@ table {
   }
 
   .daily-reminder-card {
-    border-radius: 0.72rem;
+    border-radius: var(--radius-card-sm);
     border: 1px solid var(--color-border);
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(250, 247, 239, 0.44));
     padding: 0.95rem;
-    box-shadow: 0 12px 28px rgba(11, 79, 58, 0.055);
+    box-shadow: var(--shadow-card-soft);
     transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
   }
 
   .daily-reminder-card:hover {
     border-color: rgba(201, 162, 39, 0.54);
-    box-shadow: 0 16px 34px rgba(11, 79, 58, 0.08);
-    transform: translateY(-1px);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
   }
 
   .daily-reminder-head {
@@ -2615,21 +2678,22 @@ table {
   }
 
   .live-task-group {
-    border-radius: 0.5rem;
+    border-radius: var(--radius-card-sm);
     border: 1px solid var(--color-border);
     background: var(--color-card);
     padding: 1rem;
+    box-shadow: var(--shadow-card-soft);
   }
 
   .task-filter-bar {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
     gap: 0.75rem;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-card-sm);
     border: 1px solid var(--color-border);
     background: rgba(255, 255, 255, 0.84);
     padding: 1rem;
-    box-shadow: 0 10px 28px rgba(11, 79, 58, 0.04);
+    box-shadow: var(--shadow-card-soft);
   }
 
   .task-search {
@@ -2638,15 +2702,10 @@ table {
 
   .task-group-card {
     overflow: visible;
-    border-radius: 0.86rem;
+    border-radius: var(--radius-card);
     border: 1px solid rgba(201, 162, 39, 0.58);
     background: var(--color-card);
-    box-shadow:
-      0 22px 52px rgba(11, 79, 58, 0.11),
-      0 5px 16px rgba(201, 162, 39, 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.98),
-      inset 0 -2px 0 rgba(201, 162, 39, 0.22),
-      inset 1px 0 0 rgba(255, 255, 255, 0.72);
+    box-shadow: var(--shadow-card);
   }
 
   .task-group-main-header {
@@ -2657,18 +2716,17 @@ table {
     gap: 1rem;
     text-align: left;
     border-bottom: 1px solid rgba(201, 162, 39, 0.34);
-    border-radius: 0.86rem 0.86rem 0 0;
+    border-radius: var(--radius-card) var(--radius-card) 0 0;
     background:
       linear-gradient(180deg, rgba(243, 231, 195, 0.94), rgba(232, 221, 197, 0.78));
     padding: 1.18rem 1.05rem 1rem;
     box-shadow:
       inset 0 1px 0 rgba(255, 255, 255, 0.96),
-      inset 0 -1px 0 rgba(255, 255, 255, 0.7),
-      0 12px 28px rgba(11, 79, 58, 0.065);
+      0 8px 18px rgba(31, 41, 51, 0.045);
   }
 
   .task-group-card.is-collapsed .task-group-main-header {
-    border-radius: 0.86rem;
+    border-radius: var(--radius-card);
     border-bottom-color: transparent;
   }
 
@@ -2694,22 +2752,15 @@ table {
     margin: 1.12rem 0.95rem 0;
     overflow: hidden;
     border: 1px solid rgba(201, 162, 39, 0.3);
-    border-radius: 0.74rem;
+    border-radius: var(--radius-card-sm);
     background: var(--color-card);
-    box-shadow:
-      0 13px 28px rgba(11, 79, 58, 0.06),
-      0 2px 8px rgba(201, 162, 39, 0.08),
-      inset 0 1px 0 rgba(255, 255, 255, 0.95),
-      inset 0 -1px 0 rgba(232, 221, 197, 0.6);
+    box-shadow: var(--shadow-card-soft);
   }
 
   .task-workstream-block.is-collapsed {
     margin-bottom: 0.22rem;
     border-color: rgba(201, 162, 39, 0.36);
-    box-shadow:
-      0 10px 24px rgba(11, 79, 58, 0.055),
-      inset 0 1px 0 rgba(255, 255, 255, 0.96),
-      inset 0 -2px 0 rgba(255, 255, 255, 0.72);
+    box-shadow: var(--shadow-card-soft);
   }
 
   .task-workstream-block:last-child {
@@ -3002,11 +3053,11 @@ table {
   }
 
   .drawer-form-section {
-    border-radius: 0.5rem;
+    border-radius: var(--radius-card-sm);
     border: 1px solid var(--color-border);
     background: var(--color-card);
     padding: 1.05rem;
-    box-shadow: 0 10px 24px rgba(11, 79, 58, 0.04);
+    box-shadow: var(--shadow-card-soft);
   }
 
   .drawer-form-section + .drawer-form-section {
@@ -3069,10 +3120,10 @@ table {
   .settings-modal {
     width: min(34rem, 100%);
     overflow: hidden;
-    border-radius: 0.75rem;
+    border-radius: var(--radius-card);
     border: 1px solid var(--color-border);
     background: var(--color-card);
-    box-shadow: 0 28px 80px rgba(11, 79, 58, 0.22);
+    box-shadow: var(--shadow-card-strong);
   }
 
   .settings-modal-header,
@@ -3130,11 +3181,11 @@ table {
     display: grid;
     align-content: start;
     gap: 1rem;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-card);
     border: 1px solid var(--color-border);
     background: var(--color-card);
     padding: 1rem;
-    box-shadow: 0 14px 34px rgba(11, 79, 58, 0.06);
+    box-shadow: var(--shadow-card);
   }
 
   .reports-preview-column {
@@ -3162,11 +3213,11 @@ table {
     display: grid;
     width: 15rem;
     gap: 0.25rem;
-    border-radius: 0.72rem;
+    border-radius: var(--radius-card-sm);
     border: 1px solid var(--color-border);
     background: var(--color-card);
     padding: 0.4rem;
-    box-shadow: 0 18px 46px rgba(11, 79, 58, 0.16);
+    box-shadow: var(--shadow-card-strong);
     animation: menu-pop 160ms ease both;
   }
 
@@ -3227,10 +3278,10 @@ table {
 
   .report-preview-workspace {
     overflow: hidden;
-    border-radius: 0.82rem;
+    border-radius: var(--radius-card);
     border: 1px solid var(--color-border);
     background: rgba(255, 255, 255, 0.72);
-    box-shadow: 0 18px 48px rgba(11, 79, 58, 0.08);
+    box-shadow: var(--shadow-card);
   }
 
   .report-preview-toolbar {
@@ -3390,10 +3441,11 @@ table {
   }
 
   .activity-filter-card {
-    border-radius: 0.78rem;
+    border-radius: var(--radius-card);
     border: 1px solid var(--color-border);
     background: linear-gradient(180deg, rgba(250, 247, 239, 0.72), rgba(255, 255, 255, 0.78));
     padding: 1rem;
+    box-shadow: var(--shadow-card-soft);
   }
 
   .activity-filter-grid {
@@ -3413,11 +3465,11 @@ table {
 
   .form-cover {
     border-top: 0.45rem solid var(--color-primary);
-    border-radius: 0.65rem;
+    border-radius: var(--radius-card);
     border: 1px solid var(--color-border);
     background: var(--color-card);
     padding: 1.35rem;
-    box-shadow: 0 14px 34px rgba(11, 79, 58, 0.06);
+    box-shadow: var(--shadow-card);
   }
 
   .form-cover h2 {
@@ -3438,13 +3490,13 @@ table {
     position: relative;
     margin-top: 1rem;
     border-left: 0.28rem solid var(--color-secondary);
-    border-radius: 0.65rem;
+    border-radius: var(--radius-card-sm);
     border-top: 1px solid var(--color-border);
     border-right: 1px solid var(--color-border);
     border-bottom: 1px solid var(--color-border);
     background: var(--color-card);
     padding: 1rem;
-    box-shadow: 0 14px 34px rgba(11, 79, 58, 0.07);
+    box-shadow: var(--shadow-card);
   }
 
   .form-question-card.is-new {
@@ -3476,10 +3528,11 @@ table {
     display: grid;
     gap: 0.65rem;
     margin-top: 0.85rem;
-    border-radius: 0.72rem;
+    border-radius: var(--radius-card-sm);
     border: 1px solid rgba(232, 221, 197, 0.8);
     background: linear-gradient(180deg, rgba(250, 247, 239, 0.52), rgba(255, 255, 255, 0.82));
     padding: 0.85rem;
+    box-shadow: var(--shadow-card-soft);
   }
 
   .google-option-editor-head {
@@ -3733,13 +3786,13 @@ table {
 
   .global-option-card {
     border-left: 0.28rem solid var(--color-secondary);
-    border-radius: 0.65rem;
+    border-radius: var(--radius-card-sm);
     border-top: 1px solid var(--color-border);
     border-right: 1px solid var(--color-border);
     border-bottom: 1px solid var(--color-border);
     background: var(--color-card);
     padding: 1rem;
-    box-shadow: 0 14px 34px rgba(11, 79, 58, 0.06);
+    box-shadow: var(--shadow-card);
   }
 
   .global-option-card.is-muted {
@@ -3748,12 +3801,12 @@ table {
   }
 
   .report-preview-shell {
-    border-radius: 0.2rem;
+    border-radius: 0.35rem;
     border: 1px solid var(--color-border);
     background: var(--color-card);
     min-height: 72rem;
     padding: clamp(1rem, 2.4vw, 2rem);
-    box-shadow: 0 20px 50px rgba(31, 41, 51, 0.12);
+    box-shadow: var(--shadow-card-strong);
   }
 
   .report-template-header {
@@ -3824,14 +3877,14 @@ table {
   .report-kpi-card,
   .report-card,
   .mini-report-fact {
-    border-radius: 0.5rem;
+    border-radius: var(--radius-card-sm);
     border: 1px solid var(--color-border);
     background: var(--color-card);
   }
 
   .report-kpi-card {
     padding: 0.9rem;
-    box-shadow: 0 8px 20px rgba(11, 79, 58, 0.04);
+    box-shadow: var(--shadow-card-soft);
   }
 
   .report-kpi-card p,
@@ -3869,6 +3922,7 @@ table {
     margin-top: 1rem;
     padding: 1rem;
     break-inside: avoid;
+    box-shadow: var(--shadow-card-soft);
   }
 
   .report-card h2 {
@@ -3893,6 +3947,7 @@ table {
   .mini-report-fact {
     padding: 0.8rem;
     background: var(--color-bg);
+    box-shadow: var(--shadow-card-soft);
   }
 
   .mini-report-fact strong {
@@ -4051,9 +4106,10 @@ table {
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-card-sm);
     background: var(--color-bg);
     padding: 0.7rem;
+    box-shadow: var(--shadow-card-soft);
   }
 
   .report-attention-list span {
@@ -4191,17 +4247,17 @@ table {
 
   .reference-task-card {
     overflow: hidden;
-    border-radius: 0.5rem;
+    border-radius: var(--radius-card-sm);
     border: 1px solid var(--color-border);
     background: var(--color-card);
-    box-shadow: 0 12px 28px rgba(11, 79, 58, 0.06);
+    box-shadow: var(--shadow-card);
     transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
   }
 
   .reference-task-card:hover {
     border-color: rgba(201, 162, 39, 0.58);
-    box-shadow: 0 18px 38px rgba(11, 79, 58, 0.09);
-    transform: translateY(-1px);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
   }
 
   .reference-task-card-missing {
@@ -4537,8 +4593,8 @@ table {
 
   .motion-card:hover {
     border-color: rgba(201, 162, 39, 0.52);
-    box-shadow: 0 16px 36px rgba(11, 79, 58, 0.09);
-    transform: translateY(-1px);
+    box-shadow: var(--shadow-card-hover);
+    transform: translateY(-2px);
   }
 
   .motion-overlay {

@@ -11,7 +11,7 @@ const config: Config = {
         line: "var(--color-border)"
       },
       boxShadow: {
-        soft: "0 18px 45px rgba(11, 79, 58, 0.08)"
+        soft: "0 10px 24px rgba(31, 41, 51, 0.075), 0 2px 7px rgba(31, 41, 51, 0.045), inset 0 1px 0 rgba(255, 255, 255, 0.78)"
       }
     }
   },
