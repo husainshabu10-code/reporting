@@ -1638,18 +1638,23 @@ table {
     align-items: start;
   }
 
-  .dashboard-section-flow {
-    column-width: 22rem;
-    column-gap: 1rem;
+  .dashboard-balanced-grid {
+    display: grid;
+    gap: 1rem;
+    align-items: start;
+    width: 100%;
   }
 
-  .dashboard-section-flow > .dashboard-panel {
-    display: inline-block;
-    width: 100%;
-    margin: 0 0 1rem;
-    break-inside: avoid;
-    page-break-inside: avoid;
-    vertical-align: top;
+  .dashboard-balanced-column {
+    display: grid;
+    min-width: 0;
+    gap: 1rem;
+    align-content: start;
+  }
+
+  .dashboard-balanced-column > div,
+  .dashboard-balanced-column .dashboard-panel {
+    min-width: 0;
   }
 
   .chart-progress-list {

@@ -658,6 +658,77 @@ function DashboardTab({ state, currentProfile, presentationMode = false, chartSe
     { label: "Verified Tasks", value: String(scopedVerified), helper: "Counts as complete", tone: "good" as const },
     { label: "In Progress", value: String(scopedTasks.filter((task) => latest.get(task.id)?.status === "In Progress").length), helper: "Currently active", tone: "warning" as const }
   ];
+  const dashboardSections = [
+    {
+      key: "zone-type",
+      weight: Math.max(2.4, zoneRows.length * 0.85 + 1.2),
+      content: (
+        <Panel title="Zone Type Progress" action={<Badge>Verified completed only</Badge>}>
+          <DashboardChartVisual rows={zoneRows.map((row) => ({ label: row.label, value: row.percent, helper: `${row.verified}/${row.total} tasks`, iconKey: zoneProgressIconKey(row.label) }))} type={chartSettings.zoneType} />
+        </Panel>
+      )
+    },
+    {
+      key: "attention",
+      weight: Math.max(2.8, attention.length * 0.62 + 1.4),
+      content: (
+        <Panel title="Attention Required">
+          <DashboardAttentionVisual rows={attention} type={chartSettings.attention} />
+        </Panel>
+      )
+    },
+    {
+      key: "area",
+      weight: Math.max(1.8, areaProgressRows.length * 0.58 + 1.1),
+      content: (
+        <Panel title="Area-Wise Progress">
+          <DashboardChartVisual rows={areaProgressRows} type={chartSettings.area} />
+        </Panel>
+      )
+    },
+    {
+      key: "day",
+      weight: Math.max(1.4, dayRows.length * 0.42 + 0.9),
+      content: (
+        <Panel title="Day-Wise Progress">
+          <DashboardChartVisual rows={dayRows} type={chartSettings.day} />
+        </Panel>
+      )
+    },
+    {
+      key: "workstream",
+      weight: Math.max(2.2, workstreamRows.length * 0.52 + 1.15),
+      content: (
+        <Panel title="Workstream Progress">
+          <DashboardChartVisual rows={workstreamRows} type={chartSettings.workstream} />
+        </Panel>
+      )
+    },
+    {
+      key: "quick-status",
+      weight: 2.5,
+      content: (
+        <Panel title="Quick Status">
+          <div className="quick-status-grid">
+            {quickStatusRows.map((item) => (
+              <div key={item.label} className={`quick-status-item tone-${item.tone}`}>
+                <span className="quick-status-icon"><CheckCircle2 size={18} /></span>
+                <div>
+                  <p>{item.label}</p>
+                  <strong>{item.value}</strong>
+                  <small>{item.helper}</small>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex items-center justify-between border-t border-[var(--color-border)] pt-3 text-xs font-bold text-[var(--color-text-muted)]">
+            <span>Last updated: {new Date().toLocaleDateString()}</span>
+            <span className="text-[var(--color-secondary)]">Auto refresh: On</span>
+          </div>
+        </Panel>
+      )
+    }
+  ];
 
   return (
     <div className="premium-dashboard space-y-5">
@@ -695,41 +766,45 @@ function DashboardTab({ state, currentProfile, presentationMode = false, chartSe
         <MetricCard title="Pending Requests" value={String(pendingRequestsCount)} helper="Requests needing review" tone="warning" />
       </div>
 
-      <div className="dashboard-section-flow">
-        <Panel title="Zone Type Progress" action={<Badge>Verified completed only</Badge>}>
-          <DashboardChartVisual rows={zoneRows.map((row) => ({ label: row.label, value: row.percent, helper: `${row.verified}/${row.total} tasks`, iconKey: zoneProgressIconKey(row.label) }))} type={chartSettings.zoneType} />
-        </Panel>
-        <Panel title="Attention Required">
-          <DashboardAttentionVisual rows={attention} type={chartSettings.attention} />
-        </Panel>
-        <Panel title="Area-Wise Progress">
-          <DashboardChartVisual rows={areaProgressRows} type={chartSettings.area} />
-        </Panel>
-        <Panel title="Day-Wise Progress">
-          <DashboardChartVisual rows={dayRows} type={chartSettings.day} />
-        </Panel>
-        <Panel title="Workstream Progress">
-          <DashboardChartVisual rows={workstreamRows} type={chartSettings.workstream} />
-        </Panel>
-        <Panel title="Quick Status">
-          <div className="quick-status-grid">
-            {quickStatusRows.map((item) => (
-              <div key={item.label} className={`quick-status-item tone-${item.tone}`}>
-                <span className="quick-status-icon"><CheckCircle2 size={18} /></span>
-                <div>
-                  <p>{item.label}</p>
-                  <strong>{item.value}</strong>
-                  <small>{item.helper}</small>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 flex items-center justify-between border-t border-[var(--color-border)] pt-3 text-xs font-bold text-[var(--color-text-muted)]">
-            <span>Last updated: {new Date().toLocaleDateString()}</span>
-            <span className="text-[var(--color-secondary)]">Auto refresh: On</span>
-          </div>
-        </Panel>
-      </div>
+      <DashboardMasonry items={dashboardSections} />
+    </div>
+  );
+}
+
+function DashboardMasonry({ items }: { items: Array<{ key: string; weight: number; content: ReactNode }> }) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [columnCount, setColumnCount] = useState(1);
+
+  useEffect(() => {
+    const calculateColumns = () => {
+      const width = containerRef.current?.clientWidth || 0;
+      const next = Math.max(1, Math.min(5, Math.floor((width + 16) / 300)));
+      setColumnCount(next);
+    };
+    calculateColumns();
+    if (!containerRef.current || typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", calculateColumns);
+      return () => window.removeEventListener("resize", calculateColumns);
+    }
+    const observer = new ResizeObserver(calculateColumns);
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const columns = Array.from({ length: columnCount }, () => ({ weight: 0, items: [] as typeof items }));
+  items.forEach((item) => {
+    const target = columns.reduce((best, column, index) => (column.weight < columns[best].weight ? index : best), 0);
+    columns[target].items.push(item);
+    columns[target].weight += item.weight;
+  });
+
+  return (
+    <div ref={containerRef} className="dashboard-balanced-grid" style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}>
+      {columns.map((column, index) => (
+        <div key={index} className="dashboard-balanced-column">
+          {column.items.map((item) => <div key={item.key}>{item.content}</div>)}
+        </div>
+      ))}
     </div>
   );
 }
