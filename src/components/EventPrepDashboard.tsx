@@ -1,16 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, ChangeEvent, ReactNode } from "react";
+import type { CSSProperties, ChangeEvent, ComponentType, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
+  Activity,
+  AlarmClock,
   BarChart3,
   Bell,
   Building2,
   CalendarClock,
+  ChartPie,
   CheckCircle2,
   ChevronDown,
   ClipboardCheck,
+  ClipboardList,
   ClipboardPlus,
   Download,
   Eye,
@@ -18,8 +22,14 @@ import {
   FileSpreadsheet,
   FileText,
   Filter,
+  Gauge,
+  History,
+  Inbox,
   KeyRound,
   Landmark,
+  Layers,
+  LayoutDashboard,
+  ListChecks,
   LogOut,
   MapPinPlus,
   Menu,
@@ -30,6 +40,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Trash2,
+  TriangleAlert,
   Users,
   X
 } from "lucide-react";
@@ -115,6 +126,7 @@ type PublicAreaOption = { id: string; name: string; zoneName: string };
 type ToastTone = "success" | "info" | "warning" | "error";
 type ToastMessage = { id: string; title: string; message?: string; tone: ToastTone };
 type ShowToast = (title: string, message?: string, tone?: ToastTone) => void;
+type SectionIcon = ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
 
 const DEFAULT_DASHBOARD_CHARTS: DashboardChartSettings = {
   zoneType: "Progress bars",
@@ -4297,18 +4309,54 @@ function ActivityLogTab({ state, currentProfile, updateState, showToast }: { sta
   );
 }
 
+function sectionIconFor(title: string): SectionIcon {
+  const normalized = title.toLowerCase();
+
+  if (normalized.includes("zone type")) return RadioTower;
+  if (normalized.includes("area-wise") || normalized.includes("area progress") || normalized.includes("my area")) return ChartPie;
+  if (normalized.includes("day-wise") || normalized.includes("event date")) return CalendarClock;
+  if (normalized.includes("workstream")) return Layers;
+  if (normalized.includes("quick status")) return Gauge;
+  if (normalized.includes("attention") || normalized.includes("correction") || normalized.includes("issue")) return TriangleAlert;
+  if (normalized.includes("alert") || normalized.includes("notification") || normalized.includes("reminder")) return Bell;
+  if (normalized.includes("daily report")) return ClipboardList;
+  if (normalized.includes("task")) return ClipboardCheck;
+  if (normalized.includes("verification")) return ShieldCheck;
+  if (normalized.includes("request")) return Inbox;
+  if (normalized.includes("user") || normalized.includes("access") || normalized.includes("credential") || normalized.includes("profile")) return Users;
+  if (normalized.includes("area") || normalized.includes("zone")) return MapPinPlus;
+  if (normalized.includes("form")) return FileText;
+  if (normalized.includes("global field") || normalized.includes("setting") || normalized.includes("filter")) return SlidersHorizontal;
+  if (normalized.includes("activity") || normalized.includes("history")) return History;
+  if (normalized.includes("report") || normalized.includes("export")) return FileDown;
+  if (normalized.includes("import") || normalized.includes("excel")) return FileSpreadsheet;
+  if (normalized.includes("dashboard") || normalized.includes("overview")) return LayoutDashboard;
+  if (normalized.includes("status")) return ListChecks;
+  if (normalized.includes("date") || normalized.includes("time")) return AlarmClock;
+  if (normalized.includes("log")) return Activity;
+  if (normalized.includes("office")) return Building2;
+  if (normalized.includes("location")) return MapPinPlus;
+  return FileText;
+}
+
+function SectionHeader({ title, action, icon: Icon = sectionIconFor(title) }: { title: string; action?: ReactNode; icon?: SectionIcon }) {
+  return (
+    <div className="section-header mb-4">
+      <div className="section-heading">
+        <span className="section-header-icon" aria-hidden="true">
+          <Icon size={18} strokeWidth={2.35} />
+        </span>
+        <h2 className="section-title">{title}</h2>
+      </div>
+      {action ? <div className="section-header-action">{action}</div> : null}
+    </div>
+  );
+}
+
 function Panel({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
     <section className="dashboard-panel motion-card animate-fade-in p-4">
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <span className="panel-grip" aria-hidden="true">
-            <span /><span /><span /><span /><span /><span />
-          </span>
-          <h2 className="section-title">{title}</h2>
-        </div>
-        {action}
-      </div>
+      <SectionHeader title={title} action={action} />
       {children}
     </section>
   );
