@@ -1698,6 +1698,8 @@ function LiveTasksConfigTable({
   const [workstreamFilter, setWorkstreamFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [priorityFilter, setPriorityFilter] = useState("All");
+  const [collapsedAreas, setCollapsedAreas] = useState<string[]>([]);
+  const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
   const workstreamOptions = unique(state.liveTasks.map((task) => taskDetails(state, task).workstream || "General"));
   const visibleTasks = state.liveTasks.filter((task) => {
     const details = taskDetails(state, task);
@@ -1720,6 +1722,16 @@ function LiveTasksConfigTable({
     setStatusFilter("All");
     setPriorityFilter("All");
   };
+  const grouped = state.areas
+    .map((area) => {
+      const tasks = visibleTasks.filter((task) => task.areaId === area.id);
+      const workstreams = unique(tasks.map((task) => taskDetails(state, task).workstream || "General"));
+      return { area, tasks, workstreams };
+    })
+    .filter((group) => group.tasks.length);
+
+  const toggleArea = (areaId: string) => setCollapsedAreas((current) => (current.includes(areaId) ? current.filter((item) => item !== areaId) : [...current, areaId]));
+  const toggleGroup = (groupKey: string) => setCollapsedGroups((current) => (current.includes(groupKey) ? current.filter((item) => item !== groupKey) : [...current, groupKey]));
 
   return (
     <div className="space-y-4">
@@ -1735,37 +1747,82 @@ function LiveTasksConfigTable({
         <button className="btn-secondary self-end" onClick={clearFilters}><Filter size={16} /> Clear</button>
       </div>
       {!visibleTasks.length ? <EmptyState title="No live tasks found" body="Adjust filters or add a custom live task to an area." /> : null}
-      {visibleTasks.length ? (
-        <>
-          <div className="master-task-table-wrap">
-            <table className="master-task-table">
-              <thead>
-                <tr>
-                  <th>Task Title</th>
-                  <th>Area</th>
-                  <th>Workstream</th>
-                  <th>Status</th>
-                  <th>Priority</th>
-                  <th>Due Date</th>
-                  <th>Progress</th>
-                  <th>Prep Day</th>
-                  <th aria-label="Actions" />
-                </tr>
-              </thead>
-              <tbody>
-                {visibleTasks.map((task) => (
-                  <MasterTaskTableRow key={task.id} state={state} task={task} update={latestUpdates.get(task.id)} openTask={openTask} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="master-task-mobile-list">
-            {visibleTasks.map((task) => (
-              <MasterTaskMobileCard key={task.id} state={state} task={task} update={latestUpdates.get(task.id)} openTask={openTask} />
-            ))}
-          </div>
+      {grouped.length ? (
+        <div className="task-group-stack">
+          {grouped.map(({ area, tasks, workstreams }) => {
+            const areaCollapsed = collapsedAreas.includes(area.id);
+            const areaCompleted = tasks.filter((task) => latestUpdates.get(task.id)?.verificationStatus === "Verified Completed").length;
+            return (
+              <section key={area.id} className={`task-group-card motion-card animate-fade-in ${areaCollapsed ? "is-collapsed" : "is-open"}`}>
+                <button className="task-group-main-header" onClick={() => toggleArea(area.id)} aria-expanded={!areaCollapsed}>
+                  <div>
+                    <p className="text-xs font-black uppercase text-[var(--color-accent)]">Area</p>
+                    <h3 className="text-lg font-black text-[var(--color-primary)]">{area.name}</h3>
+                    <p className="mt-1 text-xs font-bold text-[var(--color-text-muted)]">{areaCompleted}/{tasks.length} verified completed in filtered scope</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge>{tasks.length} task(s)</Badge>
+                    <span className={`task-collapse-icon ${areaCollapsed ? "is-collapsed" : ""}`} aria-hidden="true">
+                      <ChevronDown size={17} />
+                    </span>
+                  </div>
+                </button>
+                <div className={`task-area-collapse-panel ${areaCollapsed ? "is-collapsed" : ""}`}>
+                  <div className="task-area-collapse-inner">
+                    {workstreams.map((workstream) => {
+                      const groupKey = `${area.id}-${workstream}`;
+                      const workstreamTasks = tasks.filter((task) => (taskDetails(state, task).workstream || "General") === workstream);
+                      const completedCount = workstreamTasks.filter((task) => latestUpdates.get(task.id)?.verificationStatus === "Verified Completed").length;
+                      const progress = workstreamTasks.length ? Math.round((completedCount / workstreamTasks.length) * 100) : 0;
+                      const collapsed = collapsedGroups.includes(groupKey);
+                      return (
+                        <div key={groupKey} className={`task-workstream-block ${collapsed ? "is-collapsed" : "is-open"}`}>
+                          <button className="task-workstream-header" onClick={() => toggleGroup(groupKey)} aria-expanded={!collapsed}>
+                            <div className="min-w-0">
+                              <p className="font-black text-[var(--color-primary)]">Workstream: {workstream}</p>
+                              <p className="mt-1 text-xs font-bold text-[var(--color-text-muted)]">{completedCount}/{workstreamTasks.length} verified completed</p>
+                            </div>
+                            <div className="flex min-w-0 flex-wrap items-center justify-end gap-3">
+                              <div className="w-32 max-w-full">
+                                <div className="h-2 overflow-hidden rounded-full bg-[var(--color-accent-light)]">
+                                  <div className="progress-fill h-full rounded-full bg-[var(--color-accent)]" style={{ width: `${progress}%` }} />
+                                </div>
+                              </div>
+                              <Badge>{progress}%</Badge>
+                              <Badge>{workstreamTasks.length} task(s)</Badge>
+                              <span className={`task-collapse-icon ${collapsed ? "is-collapsed" : ""}`} aria-hidden="true">
+                                <ChevronDown size={17} />
+                              </span>
+                            </div>
+                          </button>
+                          <div className={`task-collapse-panel ${collapsed ? "is-collapsed" : ""}`}>
+                            <div className="task-collapse-inner">
+                              <div className="task-summary-list">
+                                <div className="task-summary-head">
+                                  <span>Task</span>
+                                  <span>Area</span>
+                                  <span>Status</span>
+                                  <span>Priority</span>
+                                  <span>Due</span>
+                                  <span>Progress</span>
+                                  <span>Prep Day</span>
+                                </div>
+                                {workstreamTasks.map((task) => (
+                                  <TaskSummaryRow key={task.id} state={state} task={task} update={latestUpdates.get(task.id)} openTask={openTask} />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </section>
+            );
+          })}
           <p className="text-xs font-bold text-[var(--color-text-muted)]">Showing 1 to {visibleTasks.length} of {state.liveTasks.length} tasks</p>
-        </>
+        </div>
       ) : null}
     </div>
   );
@@ -1845,24 +1902,17 @@ function MasterTaskMobileCard({ state, task, update, openTask }: { state: EventP
 
 function TaskSummaryRow({ state, task, update, openTask }: { state: EventPrepState; task: LiveTask; update?: TaskUpdate; openTask: (taskId: string) => void }) {
   const details = taskDetails(state, task);
-  const status = update?.verificationStatus === "Verified Completed" ? "Verified Completed" : update?.status || "Pending";
-  const progress = task.taskType === "Quantity-Based Task" && task.requiredQuantity
-    ? Math.min(100, Math.round(((update?.completedQuantity || 0) / task.requiredQuantity) * 100))
-    : update?.verificationStatus === "Verified Completed"
-      ? 100
-      : update?.status === "Completed"
-        ? 75
-        : update?.status === "In Progress"
-          ? 45
-          : 0;
+  const status = taskDisplayStatus(update);
+  const progress = taskProgress(task, update);
   const isOverdue = Boolean(task.dueDate && task.dueDate < todayIso() && update?.verificationStatus !== "Verified Completed");
 
   return (
     <button className={`task-summary-row ${isOverdue ? "is-overdue" : ""}`} onClick={() => openTask(task.id)} title="Open task detail drawer">
       <span className="task-summary-title-cell">
         <span className="task-summary-title">{details.taskDetails}</span>
-        <span className="task-summary-meta">{areaName(state, task.areaId)} | {details.workstream || "General"} | {task.taskType}</span>
+        <span className="task-summary-meta">{details.expectedOutput || details.responsibleTeam || task.taskType}</span>
       </span>
+      <span><span className="daily-soft-badge">{areaName(state, task.areaId)}</span></span>
       <span><StatusBadge value={status} /></span>
       <span><StatusBadge value={task.priority} /></span>
       <span className="task-summary-muted">{task.dueDate || "No due date"}</span>
@@ -1872,6 +1922,7 @@ function TaskSummaryRow({ state, task, update, openTask }: { state: EventPrepSta
         </span>
         <strong>{progress}%</strong>
       </span>
+      <span className="task-summary-muted">{task.prepDay}</span>
     </button>
   );
 }
