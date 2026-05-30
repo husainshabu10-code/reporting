@@ -3588,7 +3588,11 @@ function ReportsTab({ state, currentProfile, updateState, showToast }: { state: 
       return;
     }
     recordExport(`${reportType} PDF`, areaId === "All" ? undefined : areaId);
-    showToast("Print dialog opening", "Choose Save as PDF in the browser print dialog.", "info");
+    if (openReportPrintWindow(`${reportType} - Ashara Mubarakah IT Preparation`, ".report-print-root")) {
+      showToast("Print dialog opening", "A report-only print window is opening for PDF export.", "info");
+      return;
+    }
+    showToast("Print fallback opening", "Popup blocked, using page print with report-only print styles.", "warning");
     window.setTimeout(() => window.print(), 120);
   };
 
@@ -3757,6 +3761,70 @@ function ReportsTab({ state, currentProfile, updateState, showToast }: { state: 
 }
 
 type ReportPreviewData = ReturnType<typeof buildReportPreviewData>;
+
+function openReportPrintWindow(title: string, selector: string) {
+  if (typeof window === "undefined" || typeof document === "undefined") return false;
+  const root = document.querySelector<HTMLElement>(selector);
+  if (!root) return false;
+  const printWindow = window.open("", "ashara-report-print", "width=980,height=1200");
+  if (!printWindow) return false;
+  const styles = collectDocumentCss();
+  printWindow.document.open();
+  printWindow.document.write(`<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <base href="${window.location.origin}" />
+    <title>${escapeHtml(title)}</title>
+    <style>${styles}</style>
+    <style>
+      html, body { margin: 0 !important; background: #ffffff !important; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .report-print-root { display: block !important; position: static !important; width: 100% !important; margin: 0 !important; visibility: visible !important; }
+      .report-print-root * { visibility: visible !important; }
+      .report-preview-shell { border: 0 !important; box-shadow: none !important; background: #ffffff !important; padding: 0 !important; }
+      .report-page { box-shadow: none !important; margin: 0 auto !important; break-inside: avoid; page-break-inside: avoid; }
+      .no-print, .report-preview-toolbar, .report-page-thumbnails, .report-control-sidebar, .reports-control-panel { display: none !important; }
+      @page { size: A4; margin: 12mm; }
+    </style>
+  </head>
+  <body>
+    <div class="report-print-root">${root.innerHTML}</div>
+    <script>
+      window.addEventListener("load", function () {
+        window.focus();
+        setTimeout(function () { window.print(); }, 180);
+      });
+    </script>
+  </body>
+</html>`);
+  printWindow.document.close();
+  return true;
+}
+
+function collectDocumentCss() {
+  const chunks: string[] = [];
+  Array.from(document.styleSheets).forEach((sheet) => {
+    try {
+      Array.from(sheet.cssRules || []).forEach((rule) => chunks.push(rule.cssText));
+    } catch {
+      if (sheet.href) chunks.push(`@import url("${sheet.href}");`);
+    }
+  });
+  return chunks.join("\n");
+}
+
+function escapeHtml(value: string) {
+  const entities: Record<string, string> = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  };
+  return value.replace(/[&<>"']/g, (char) => entities[char] || char);
+}
 
 function ReportPreview({ state, data, reportType, reportDate, currentProfile, generatedAt }: { state: EventPrepState; data: ReportPreviewData; reportType: string; reportDate: string; currentProfile: Profile; generatedAt?: string }) {
   const isDaily = reportType === "Area-wise Daily Report";
