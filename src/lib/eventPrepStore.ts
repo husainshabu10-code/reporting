@@ -65,6 +65,7 @@ export async function createCredentialUser(payload: {
   email: string;
   role: Profile["role"];
   areaId: string;
+  workstreams?: string[];
   password?: string;
 }) {
   return credentialRequest<{ profile: Profile; temporaryPassword: string }>({ action: "createUser", ...payload });
@@ -87,6 +88,7 @@ export async function updateCredentialAccess(payload: {
   role: Profile["role"];
   status: Profile["status"];
   areaIds: string[];
+  accessScopes?: AreaAccess[];
   viewerAccess?: Profile["viewerAccess"];
 }) {
   return credentialRequest<{ profile: Profile; areaAccess: AreaAccess[] }>({ action: "updateAccess", ...payload });
@@ -291,7 +293,7 @@ async function saveToSupabase(db: SupabaseClient, state: EventPrepState, profile
   const isAdmin = Boolean(profile && ["super_admin", "admin"].includes(profile.role));
   if (!isAdmin && profile) {
     const allowedAreaIds = new Set(state.areaAccess.filter((access) => access.profileId === profile.id).map((access) => access.areaId));
-    const allowedTaskIds = new Set(state.liveTasks.filter((task) => allowedAreaIds.has(task.areaId)).map((task) => task.id));
+    const allowedTaskIds = scopedTaskIdsForProfile(state, profile, profile.role === "verifier" ? "verify" : "update");
     const reviewRequestIds = new Set(state.requestReviews.filter((review) => review.reviewerId === profile.id).map((review) => review.requestId));
     await upsertRows(db, "daily_reports", state.dailyReports.filter((report) => allowedAreaIds.has(report.areaId)).map(reportToDb));
     await upsertRows(db, "task_updates", state.taskUpdates.filter((update) => allowedTaskIds.has(update.liveTaskId) && (update.updatedBy === profile.id || profile.role === "verifier")).map(updateToDb));
@@ -330,6 +332,45 @@ async function saveToSupabase(db: SupabaseClient, state: EventPrepState, profile
   await upsertRows(db, "report_exports", state.reportExports.map(reportExportToDb));
   await upsertRows(db, "global_options", state.globalOptions.map(globalOptionToDb));
   await upsertRows(db, "form_fields", state.formFields.map(formFieldToDb));
+}
+
+function scopedTaskIdsForProfile(state: EventPrepState, profile: Profile, intent: "view" | "update" | "verify" = "view") {
+  if (["super_admin", "admin"].includes(profile.role)) return new Set(state.liveTasks.map((task) => task.id));
+  return new Set(state.liveTasks.filter((task) => hasTaskScopeAccess(state, profile, task, intent)).map((task) => task.id));
+}
+
+function hasTaskScopeAccess(state: EventPrepState, profile: Profile, task: LiveTask, intent: "view" | "update" | "verify" = "view") {
+  if (["super_admin", "admin"].includes(profile.role)) return true;
+  if (intent === "verify" && task.assignedVerifierIds.includes(profile.id)) return true;
+  if (intent !== "verify" && task.assignedProfileIds.includes(profile.id)) return true;
+
+  const workstream = taskWorkstream(state, task);
+  return state.areaAccess.some((access) => {
+    if (access.profileId !== profile.id || access.areaId !== task.areaId || access.role !== profile.role) return false;
+    if (access.role === "area_admin") return matchesAccessWorkstream(access, workstream, "workstreams") && (intent !== "verify" || Boolean(access.data?.canVerify)) && (intent !== "update" || access.data?.canUpdateTasks !== false);
+    if (access.role === "report_user") return intent !== "verify" && matchesAccessWorkstream(access, workstream, "workstreams") && access.data?.canViewTasks !== false && (intent !== "update" || access.data?.canUpdateTasks !== false);
+    if (access.role === "verifier") return matchesAccessWorkstream(access, workstream, "verificationWorkstreams", "workstreams") && (intent !== "verify" || access.data?.canVerify !== false);
+    if (access.role === "viewer") return intent === "view" && matchesAccessWorkstream(access, workstream, "workstreams") && access.data?.canViewTasks !== false;
+    return false;
+  });
+}
+
+function taskWorkstream(state: EventPrepState, task: LiveTask) {
+  const template = state.taskTemplates.find((item) => item.id === task.templateId);
+  return task.workstream || template?.workstream || "General";
+}
+
+function matchesAccessWorkstream(access: AreaAccess, workstream: string, primaryKey: "workstreams" | "verificationWorkstreams", fallbackKey?: "workstreams") {
+  const normalizedWorkstream = normalizeScopeValue(workstream || "General");
+  const primary = access.data?.[primaryKey];
+  const fallback = fallbackKey ? access.data?.[fallbackKey] : undefined;
+  const list = Array.isArray(primary) ? primary : Array.isArray(fallback) ? fallback : undefined;
+  if (!Array.isArray(list)) return true;
+  return list.some((item) => normalizeScopeValue(item) === normalizedWorkstream);
+}
+
+function normalizeScopeValue(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 async function upsertRows(db: SupabaseClient, table: string, rows: Array<Record<string, unknown>>) {
@@ -407,8 +448,16 @@ function fromDbRow<T>(row: Record<string, unknown>, table: string) {
         reminderTime: String(row.reminder_time || "18:30").slice(0, 5),
         escalationTime: String(row.escalation_time || "21:00").slice(0, 5)
       } as T;
-    case "area_access":
-      return { id: String(row.id || ""), profileId: String(row.profile_id || ""), areaId: String(row.area_id || ""), role: row.role } as T;
+    case "area_access": {
+      const accessData = row.data && typeof row.data === "object" ? row.data as Partial<AreaAccess> : {};
+      return {
+        id: String(row.id || ""),
+        profileId: String(row.profile_id || ""),
+        areaId: String(row.area_id || ""),
+        role: row.role,
+        data: accessData.data || {}
+      } as T;
+    }
     case "task_templates": {
       const templateData = row.data && typeof row.data === "object" ? row.data as Partial<TaskTemplate> : {};
       return {

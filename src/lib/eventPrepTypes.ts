@@ -81,6 +81,25 @@ export type AreaAccess = {
   profileId: string;
   areaId: string;
   role: UserRole;
+  data?: AreaAccessScope;
+};
+
+export type AreaAccessScope = {
+  workstreams?: string[];
+  verificationWorkstreams?: string[];
+  zoneTypeIds?: string[];
+  canViewTasks?: boolean;
+  canUpdateTasks?: boolean;
+  canSubmitReports?: boolean;
+  canVerify?: boolean;
+  canRequestCorrection?: boolean;
+  canReject?: boolean;
+  canViewEvidence?: boolean;
+  canRaiseRequests?: boolean;
+  canManageUsers?: boolean;
+  canViewReports?: boolean;
+  canViewDashboard?: boolean;
+  readOnly?: boolean;
 };
 
 export type TaskTemplate = {

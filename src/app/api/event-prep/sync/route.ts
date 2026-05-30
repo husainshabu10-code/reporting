@@ -45,7 +45,7 @@ async function saveState(db: ServerDb, state: EventPrepState, actor: Profile) {
 
   if (!isAdmin) {
     const allowedAreaIds = new Set(state.areaAccess.filter((access) => access.profileId === actor.id).map((access) => access.areaId));
-    const allowedTaskIds = new Set(state.liveTasks.filter((task) => allowedAreaIds.has(task.areaId)).map((task) => task.id));
+    const allowedTaskIds = scopedTaskIdsForProfile(state, actor, actor.role === "verifier" ? "verify" : "update");
     const reviewRequestIds = new Set(state.requestReviews.filter((review) => review.reviewerId === actor.id).map((review) => review.requestId));
     const writableNotifications = state.notifications.filter((notification) => notification.userId === actor.id || (notification.areaId && allowedAreaIds.has(notification.areaId)));
 
@@ -87,6 +87,45 @@ async function saveState(db: ServerDb, state: EventPrepState, actor: Profile) {
   await upsertRows(db, "report_exports", state.reportExports.map(reportExportToDb));
   await upsertRows(db, "global_options", state.globalOptions.map(globalOptionToDb));
   await upsertRows(db, "form_fields", state.formFields.map(formFieldToDb));
+}
+
+function scopedTaskIdsForProfile(state: EventPrepState, profile: Profile, intent: "view" | "update" | "verify" = "view") {
+  if (["super_admin", "admin"].includes(profile.role)) return new Set(state.liveTasks.map((task) => task.id));
+  return new Set(state.liveTasks.filter((task) => hasTaskScopeAccess(state, profile, task, intent)).map((task) => task.id));
+}
+
+function hasTaskScopeAccess(state: EventPrepState, profile: Profile, task: LiveTask, intent: "view" | "update" | "verify" = "view") {
+  if (["super_admin", "admin"].includes(profile.role)) return true;
+  if (intent === "verify" && task.assignedVerifierIds.includes(profile.id)) return true;
+  if (intent !== "verify" && task.assignedProfileIds.includes(profile.id)) return true;
+
+  const workstream = taskWorkstream(state, task);
+  return state.areaAccess.some((access) => {
+    if (access.profileId !== profile.id || access.areaId !== task.areaId || access.role !== profile.role) return false;
+    if (access.role === "area_admin") return matchesAccessWorkstream(access, workstream, "workstreams") && (intent !== "verify" || Boolean(access.data?.canVerify)) && (intent !== "update" || access.data?.canUpdateTasks !== false);
+    if (access.role === "report_user") return intent !== "verify" && matchesAccessWorkstream(access, workstream, "workstreams") && access.data?.canViewTasks !== false && (intent !== "update" || access.data?.canUpdateTasks !== false);
+    if (access.role === "verifier") return matchesAccessWorkstream(access, workstream, "verificationWorkstreams", "workstreams") && (intent !== "verify" || access.data?.canVerify !== false);
+    if (access.role === "viewer") return intent === "view" && matchesAccessWorkstream(access, workstream, "workstreams") && access.data?.canViewTasks !== false;
+    return false;
+  });
+}
+
+function taskWorkstream(state: EventPrepState, task: LiveTask) {
+  const template = state.taskTemplates.find((item) => item.id === task.templateId);
+  return task.workstream || template?.workstream || "General";
+}
+
+function matchesAccessWorkstream(access: AreaAccess, workstream: string, primaryKey: "workstreams" | "verificationWorkstreams", fallbackKey?: "workstreams") {
+  const normalizedWorkstream = normalizeScopeValue(workstream || "General");
+  const primary = access.data?.[primaryKey];
+  const fallback = fallbackKey ? access.data?.[fallbackKey] : undefined;
+  const list = Array.isArray(primary) ? primary : Array.isArray(fallback) ? fallback : undefined;
+  if (!Array.isArray(list)) return true;
+  return list.some((item) => normalizeScopeValue(item) === normalizedWorkstream);
+}
+
+function normalizeScopeValue(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 async function getActorProfile(db: ServerDb, request: Request) {

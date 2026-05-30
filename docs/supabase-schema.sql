@@ -412,6 +412,56 @@ as $$
     )
 $$;
 
+create or replace function public.has_live_task_access(target_task_id text, target_intent text default 'view')
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  with task_scope as (
+    select
+      lt.id,
+      lt.area_id,
+      lower(coalesce(nullif(lt.data->>'workstream', ''), 'General')) as workstream,
+      lt.assigned_profile_ids,
+      lt.assigned_verifier_ids
+    from public.live_tasks lt
+    where lt.id = target_task_id
+  )
+  select public.is_admin()
+    or exists (
+      select 1
+      from task_scope lt
+      where (target_intent <> 'verify' and public.current_profile_id() = any(lt.assigned_profile_ids))
+         or (target_intent = 'verify' and public.current_profile_id() = any(lt.assigned_verifier_ids))
+    )
+    or exists (
+      select 1
+      from task_scope lt
+      join public.area_access aa on aa.area_id = lt.area_id and aa.profile_id = public.current_profile_id()
+      cross join lateral (select coalesce(aa.data->'data', aa.data, '{}'::jsonb) as scope) scope_data
+      cross join lateral (
+        select case
+          when target_intent = 'verify' then coalesce(scope_data.scope->'verificationWorkstreams', scope_data.scope->'workstreams')
+          else scope_data.scope->'workstreams'
+        end as workstreams
+      ) scope_workstreams
+      where (
+        (target_intent = 'verify' and aa.role = 'verifier')
+        or (target_intent <> 'verify' and aa.role in ('area_admin','report_user','viewer','verifier'))
+      )
+      and (
+        scope_workstreams.workstreams is null
+        or exists (
+          select 1
+          from jsonb_array_elements_text(scope_workstreams.workstreams) ws(value)
+          where lower(ws.value) = lt.workstream
+        )
+      )
+    )
+$$;
+
 alter table public.event_settings enable row level security;
 alter table public.profiles enable row level security;
 alter table public.roles enable row level security;
@@ -574,7 +624,7 @@ create policy "Area users read applied templates" on public.task_templates for s
   )
 );
 
-create policy "Area users read live tasks" on public.live_tasks for select using (public.has_area_access(area_id));
+create policy "Area users read live tasks" on public.live_tasks for select using (public.has_live_task_access(id, 'view'));
 create policy "Admins manage live tasks" on public.live_tasks for all using (public.is_admin()) with check (public.is_admin());
 
 create policy "Area users read reports" on public.daily_reports for select using (public.has_area_access(area_id));
@@ -583,11 +633,11 @@ create policy "Area users update reports" on public.daily_reports for update usi
 create policy "Admins delete reports" on public.daily_reports for delete using (public.is_admin());
 
 create policy "Area users read task updates" on public.task_updates for select using (
-  exists (select 1 from public.live_tasks lt where lt.id = live_task_id and public.has_area_access(lt.area_id))
+  public.has_live_task_access(live_task_id, 'view') or public.has_live_task_access(live_task_id, 'verify')
 );
 create policy "Area users write task updates" on public.task_updates for insert with check (
   updated_by = public.current_profile_id()
-  and exists (select 1 from public.live_tasks lt where lt.id = live_task_id and public.has_area_access(lt.area_id))
+  and public.has_live_task_access(live_task_id, 'view')
 );
 create policy "Area users update task updates" on public.task_updates for update using (
   public.is_admin()
@@ -595,8 +645,7 @@ create policy "Area users update task updates" on public.task_updates for update
   or exists (
     select 1 from public.live_tasks lt
     where lt.id = live_task_id
-      and public.current_profile_id() = any(lt.assigned_verifier_ids)
-      and public.has_area_access(lt.area_id)
+      and public.has_live_task_access(lt.id, 'verify')
   )
 ) with check (
   public.is_admin()
@@ -604,8 +653,7 @@ create policy "Area users update task updates" on public.task_updates for update
   or exists (
     select 1 from public.live_tasks lt
     where lt.id = live_task_id
-      and public.current_profile_id() = any(lt.assigned_verifier_ids)
-      and public.has_area_access(lt.area_id)
+      and public.has_live_task_access(lt.id, 'verify')
   )
 );
 

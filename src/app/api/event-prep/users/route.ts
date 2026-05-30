@@ -5,11 +5,11 @@ import type { AreaAccess, Profile, UserRole } from "@/lib/eventPrepTypes";
 export const dynamic = "force-dynamic";
 
 type ActionBody =
-  | { action: "createUser"; fullName: string; email: string; role: UserRole; areaId: string; password?: string }
+  | { action: "createUser"; fullName: string; email: string; role: UserRole; areaId: string; workstreams?: string[]; password?: string }
   | { action: "approveUser"; profileId: string }
   | { action: "resetPassword"; profileId: string }
   | { action: "changePassword"; password: string }
-  | { action: "updateAccess"; profileId: string; role: UserRole; status: Profile["status"]; areaIds: string[]; viewerAccess?: Profile["viewerAccess"] };
+  | { action: "updateAccess"; profileId: string; role: UserRole; status: Profile["status"]; areaIds: string[]; accessScopes?: AreaAccess[]; viewerAccess?: Profile["viewerAccess"] };
 
 type ServerDb = ReturnType<typeof serverSupabase>;
 
@@ -69,7 +69,7 @@ async function createUser(db: ServerDb, actor: Profile & { authUserId?: string }
     createdBy: actor.id
   };
   await upsertProfile(db, profile);
-  await upsertAreaAccess(db, profile.id, body.areaId, role);
+  await upsertAreaAccess(db, profile.id, body.areaId, role, body.workstreams || []);
   await createInAppNotification(db, profile.id, body.areaId, "Access request approved/rejected", "Credentials created", "Your login credentials have been created. Change your temporary password after first login.");
   return { profile, temporaryPassword };
 }
@@ -124,8 +124,12 @@ async function updateAccess(db: ServerDb, actor: Profile & { authUserId?: string
     viewerAccess: body.role === "viewer" ? body.viewerAccess : undefined
   };
   await upsertProfile(db, profile);
-  await replaceAreaAccess(db, profile, areaIds);
-  return { profile, areaAccess: ["super_admin", "admin"].includes(profile.role) ? [] : areaIds.map((areaId) => areaAccessRow(profile.id, areaId, profile.role)) };
+  const accessScopes = (body.accessScopes || []).filter((access) => access.profileId === profile.id && areaIds.includes(access.areaId));
+  const nextAccess = ["super_admin", "admin"].includes(profile.role)
+    ? []
+    : areaIds.map((areaId) => accessScopes.find((access) => access.areaId === areaId && access.role === profile.role) || areaAccessRow(profile.id, areaId, profile.role));
+  await replaceAreaAccess(db, profile, nextAccess);
+  return { profile, areaAccess: nextAccess };
 }
 
 async function getActorProfile(db: ServerDb, request: Request) {
@@ -197,23 +201,25 @@ async function upsertProfile(db: ServerDb, profile: Profile) {
   if (error) throw new Error(error.message);
 }
 
-async function upsertAreaAccess(db: ServerDb, profileId: string, areaId: string, role: UserRole) {
+async function upsertAreaAccess(db: ServerDb, profileId: string, areaId: string, role: UserRole, workstreams: string[] = []) {
   const row = areaAccessRow(profileId, areaId, role);
+  if (role === "verifier") row.data = { ...row.data, verificationWorkstreams: workstreams };
+  else if (!["super_admin", "admin"].includes(role)) row.data = { ...row.data, workstreams };
   const { error } = await db.from("area_access").upsert(areaAccessToDb(row), { onConflict: "id" });
   if (error) throw new Error(error.message);
 }
 
-async function replaceAreaAccess(db: ServerDb, profile: Profile, areaIds: string[]) {
+async function replaceAreaAccess(db: ServerDb, profile: Profile, accessRows: AreaAccess[]) {
   const { error: deleteError } = await db.from("area_access").delete().eq("profile_id", profile.id);
   if (deleteError) throw new Error(deleteError.message);
-  if (["super_admin", "admin"].includes(profile.role) || !areaIds.length) return;
-  const rows = areaIds.map((areaId) => areaAccessToDb(areaAccessRow(profile.id, areaId, profile.role)));
+  if (["super_admin", "admin"].includes(profile.role) || !accessRows.length) return;
+  const rows = accessRows.map(areaAccessToDb);
   const { error } = await db.from("area_access").insert(rows);
   if (error) throw new Error(error.message);
 }
 
 function areaAccessRow(profileId: string, areaId: string, role: UserRole): AreaAccess {
-  return { id: `access-${profileId}-${areaId}-${role}`, profileId, areaId, role };
+  return { id: `access-${profileId}-${areaId}-${role}`, profileId, areaId, role, data: defaultAreaAccessScope(role) };
 }
 
 function areaAccessToDb(item: AreaAccess) {
@@ -225,6 +231,14 @@ function areaAccessToDb(item: AreaAccess) {
     data: item,
     updated_at: new Date().toISOString()
   };
+}
+
+function defaultAreaAccessScope(role: UserRole): AreaAccess["data"] {
+  if (role === "report_user") return { workstreams: [], canViewTasks: true, canUpdateTasks: true, canSubmitReports: true, canRaiseRequests: true };
+  if (role === "verifier") return { verificationWorkstreams: [], canVerify: true, canRequestCorrection: true, canReject: true, canViewEvidence: true };
+  if (role === "viewer") return { workstreams: [], canViewTasks: true, canViewReports: true, canViewDashboard: true, readOnly: true };
+  if (role === "area_admin") return { workstreams: [], canViewTasks: true, canUpdateTasks: true, canSubmitReports: true, canRaiseRequests: true, canManageUsers: true };
+  return {};
 }
 
 async function resolveAuthUserId(db: ServerDb, profile: Profile) {
