@@ -311,6 +311,7 @@ async function saveToSupabase(db: SupabaseClient, state: EventPrepState, profile
   });
   if (settingsError) throw settingsError;
   await deleteMissingRows(db, "areas", state.areas.map((area) => area.id));
+  await deleteMissingRows(db, "live_tasks", state.liveTasks.map((task) => task.id));
   await upsertRows(db, "profiles", state.profiles.map(profileToDb));
   await upsertRows(db, "zone_types", state.zoneTypes.map(zoneTypeToDb));
   await upsertRows(db, "areas", state.areas.map(areaToDb));

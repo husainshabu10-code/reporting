@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, ChangeEvent, ReactNode } from "react";
+import type { CSSProperties, ChangeEvent, KeyboardEvent, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   Activity,
@@ -123,7 +123,6 @@ type DashboardChartSettings = {
   attention: AttentionChartKind;
 };
 type ChartRow = { label: string; value: number; helper: string; iconKey?: string };
-type PublicAreaOption = { id: string; name: string; zoneName: string };
 type ToastTone = "success" | "info" | "warning" | "error";
 type ToastMessage = { id: string; title: string; message?: string; tone: ToastTone };
 type ShowToast = (title: string, message?: string, tone?: ToastTone) => void;
@@ -968,54 +967,8 @@ function LoginScreen({
   signIn: () => void;
 }) {
   const [passwordVisible, setPasswordVisible] = useState(false);
-  const [requestOpen, setRequestOpen] = useState(false);
-  const [requestName, setRequestName] = useState("");
-  const [requestPost, setRequestPost] = useState("");
-  const [requestPhone, setRequestPhone] = useState("");
-  const [requestNotes, setRequestNotes] = useState("");
-  const [requestAreas, setRequestAreas] = useState<string[]>([]);
-  const [areaOptions, setAreaOptions] = useState<PublicAreaOption[]>([]);
   const [requestMessage, setRequestMessage] = useState("");
   const signingIn = authMessage === "Signing in...";
-  const requestSubmitting = requestMessage === "Submitting access request...";
-
-  useEffect(() => {
-    fetch("/api/event-prep/access-request")
-      .then((response) => response.json())
-      .then((json) => setAreaOptions(Array.isArray(json.areas) ? json.areas : []))
-      .catch(() => setAreaOptions([]));
-  }, []);
-
-  const toggleAreaRequest = (areaId: string, checked: boolean) => {
-    setRequestAreas((current) => checked ? unique([...current, areaId]) : current.filter((idValue) => idValue !== areaId));
-  };
-  const submitAccessRequest = async () => {
-    try {
-      setRequestMessage("Submitting access request...");
-      const response = await fetch("/api/event-prep/access-request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: requestName,
-          loginId,
-          post: requestPost,
-          phone: requestPhone,
-          areaIds: requestAreas,
-          notes: requestNotes
-        })
-      });
-      const json = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(String(json.error || "Could not submit access request."));
-      setRequestMessage("Access request submitted. An admin can review it inside Requests.");
-      setRequestName("");
-      setRequestPost("");
-      setRequestPhone("");
-      setRequestNotes("");
-      setRequestAreas([]);
-    } catch (error) {
-      setRequestMessage(readError(error, "Unable to submit access request."));
-    }
-  };
 
   return (
     <main className="login-page text-[var(--color-text)]">
@@ -1050,37 +1003,8 @@ function LoginScreen({
           <button className="btn-primary mt-4 w-full justify-center" onClick={signIn} disabled={signingIn}>
             {signingIn ? <InlineLoader label="Signing in" /> : <KeyRound size={17} />} {signingIn ? "Signing In" : "Sign In"}
           </button>
-          <button className="login-access-toggle" type="button" onClick={() => setRequestOpen((current) => !current)}>
-            {requestOpen ? "Hide access request" : "Need access? Request from admin"}
-          </button>
           {authMessage ? <p className="mt-3 text-sm font-bold text-[var(--color-primary)]">{authMessage}</p> : null}
           {requestMessage ? <p className="mt-3 rounded-lg bg-white/55 p-2 text-xs font-bold text-[var(--color-primary)]">{requestMessage}</p> : null}
-          {requestOpen ? (
-            <div className="login-access-panel">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Input label="Name" value={requestName} onChange={setRequestName} />
-                <Input label="Post" value={requestPost} onChange={setRequestPost} placeholder="Area Coordinator" />
-                <Input label="Phone number" value={requestPhone} onChange={setRequestPhone} />
-                <Input label="Notes" value={requestNotes} onChange={setRequestNotes} placeholder="Why access is needed" />
-              </div>
-              <div className="mt-3">
-                <p className="field-label">Area access requested</p>
-                <div className="login-area-grid mt-2">
-                  {areaOptions.map((area) => (
-                    <label key={area.id}>
-                      <input type="checkbox" checked={requestAreas.includes(area.id)} onChange={(event) => toggleAreaRequest(area.id, event.target.checked)} />
-                      <span>{area.name}<small>{area.zoneName}</small></span>
-                    </label>
-                  ))}
-                  {!areaOptions.length ? <p className="text-xs font-bold text-[var(--color-text-muted)]">Area list is unavailable. Check Supabase server settings.</p> : null}
-                </div>
-              </div>
-              <button className="btn-secondary mt-3 w-full justify-center" type="button" onClick={submitAccessRequest} disabled={requestSubmitting}>
-                {requestSubmitting ? <InlineLoader label="Submitting access request" /> : null}
-                {requestSubmitting ? "Submitting Request" : "Submit Access Request"}
-              </button>
-            </div>
-          ) : null}
         </section>
       </div>
     </main>
@@ -1628,6 +1552,9 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
       <Panel title="Live Tasks Area Configuration" action={<Badge>{state.liveTasks.length} tasks</Badge>}>
         <LiveTasksConfigTable
           state={state}
+          currentProfile={currentProfile}
+          updateState={updateState}
+          showToast={showToast}
           openTask={setSelectedTaskId}
         />
       </Panel>
@@ -1715,9 +1642,15 @@ function MasterTasksTab({ state, currentProfile, updateState, showToast }: { sta
 
 function LiveTasksConfigTable({
   state,
+  currentProfile,
+  updateState,
+  showToast,
   openTask
 }: {
   state: EventPrepState;
+  currentProfile: Profile;
+  updateState: (updater: (current: EventPrepState) => EventPrepState) => void;
+  showToast: ShowToast;
   openTask: (taskId: string) => void;
 }) {
   const latestUpdates = latestUpdateMap(state.taskUpdates);
@@ -1760,6 +1693,23 @@ function LiveTasksConfigTable({
 
   const toggleArea = (areaId: string) => setCollapsedAreas((current) => (current.includes(areaId) ? current.filter((item) => item !== areaId) : [...current, areaId]));
   const toggleGroup = (groupKey: string) => setCollapsedGroups((current) => (current.includes(groupKey) ? current.filter((item) => item !== groupKey) : [...current, groupKey]));
+  const deleteTask = (task: LiveTask) => {
+    const details = taskDetails(state, task);
+    if (!window.confirm(`Delete "${details.taskDetails}"? This final confirmation will remove the task and its task updates, evidence links, verification logs, and related notifications.`)) return;
+    updateState((current) => {
+      const updateIds = current.taskUpdates.filter((update) => update.liveTaskId === task.id).map((update) => update.id);
+      return withActivity({
+        ...current,
+        liveTasks: current.liveTasks.filter((item) => item.id !== task.id),
+        taskUpdates: current.taskUpdates.filter((update) => update.liveTaskId !== task.id),
+        taskFiles: current.taskFiles.filter((file) => file.liveTaskId !== task.id && !updateIds.includes(file.taskUpdateId)),
+        verificationLogs: current.verificationLogs.filter((log) => log.liveTaskId !== task.id && !updateIds.includes(log.taskUpdateId)),
+        notifications: current.notifications.filter((notification) => notification.relatedTaskId !== task.id),
+        requests: current.requests.map((request) => request.relatedLiveTaskId === task.id ? { ...request, relatedLiveTaskId: undefined } : request)
+      }, currentProfile, "Master Tasks", `Deleted task ${details.taskDetails}`, "live_task", task.id, { deleted: true });
+    });
+    showToast("Task deleted", `${details.taskDetails} was removed from the live task list.`, "warning");
+  };
 
   return (
     <div className="space-y-4">
@@ -1834,9 +1784,10 @@ function LiveTasksConfigTable({
                                   <span>Due</span>
                                   <span>Progress</span>
                                   <span>Prep Day</span>
+                                  <span>Action</span>
                                 </div>
                                 {workstreamTasks.map((task) => (
-                                  <TaskSummaryRow key={task.id} state={state} task={task} update={latestUpdates.get(task.id)} openTask={openTask} />
+                                  <TaskSummaryRow key={task.id} state={state} task={task} update={latestUpdates.get(task.id)} openTask={openTask} onDelete={deleteTask} />
                                 ))}
                               </div>
                             </div>
@@ -1928,14 +1879,20 @@ function MasterTaskMobileCard({ state, task, update, openTask }: { state: EventP
   );
 }
 
-function TaskSummaryRow({ state, task, update, openTask }: { state: EventPrepState; task: LiveTask; update?: TaskUpdate; openTask: (taskId: string) => void }) {
+function TaskSummaryRow({ state, task, update, openTask, onDelete }: { state: EventPrepState; task: LiveTask; update?: TaskUpdate; openTask: (taskId: string) => void; onDelete: (task: LiveTask) => void }) {
   const details = taskDetails(state, task);
   const status = taskDisplayStatus(update);
   const progress = taskProgress(task, update);
   const isOverdue = Boolean(task.dueDate && task.dueDate < todayIso() && update?.verificationStatus !== "Verified Completed");
+  const openFromKeyboard = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      openTask(task.id);
+    }
+  };
 
   return (
-    <button className={`task-summary-row ${isOverdue ? "is-overdue" : ""}`} onClick={() => openTask(task.id)} title="Open task detail drawer">
+    <div className={`task-summary-row ${isOverdue ? "is-overdue" : ""}`} role="button" tabIndex={0} onClick={() => openTask(task.id)} onKeyDown={openFromKeyboard} title="Open task detail drawer">
       <span className="task-summary-title-cell">
         <span className="task-summary-title">{details.taskDetails}</span>
         <span className="task-summary-meta">{details.expectedOutput || details.responsibleTeam || task.taskType}</span>
@@ -1951,7 +1908,21 @@ function TaskSummaryRow({ state, task, update, openTask }: { state: EventPrepSta
         <strong>{progress}%</strong>
       </span>
       <span className="task-summary-muted">{task.prepDay}</span>
-    </button>
+      <span className="task-summary-actions">
+        <button
+          className="task-delete-btn"
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete(task);
+          }}
+          aria-label={`Delete ${details.taskDetails}`}
+          title="Delete task"
+        >
+          <Trash2 size={15} />
+        </button>
+      </span>
+    </div>
   );
 }
 
@@ -2639,7 +2610,8 @@ function VerificationTab({ state, currentProfile, updateState, showToast }: { st
   const assignedAreaIds = getAllowedAreas(state, currentProfile).map((area) => area.id);
   const queue = state.liveTasks.filter((task) => {
     const update = latest.get(task.id);
-    if (!update || !["Needs Verification", "Partially Verified"].includes(update.verificationStatus)) return false;
+    if (!update || !["Needs Verification", "Partially Verified", "Verified Completed"].includes(update.verificationStatus)) return false;
+    if (update.verificationStatus === "Verified Completed" && !state.verificationLogs.some((log) => log.taskUpdateId === update.id && log.action === "verified")) return false;
     if (["admin", "super_admin"].includes(currentProfile.role)) return true;
     return task.assignedVerifierIds.includes(currentProfile.id) && assignedAreaIds.includes(task.areaId);
   });
@@ -2680,6 +2652,10 @@ function VerificationTab({ state, currentProfile, updateState, showToast }: { st
           const details = taskDetails(state, task);
           const update = latest.get(task.id);
           const canAct = update ? canActOnVerification(task, update, currentProfile, state.verificationLogs) : false;
+          const verifiedBy = state.verificationLogs
+            .filter((log) => log.taskUpdateId === update?.id && log.action === "verified")
+            .map((log) => state.profiles.find((profile) => profile.id === log.verifierId)?.fullName || log.verifierId)
+            .join(", ");
           return (
             <article key={task.id} className="rounded-lg border border-[var(--color-border)] bg-white p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -2694,6 +2670,7 @@ function VerificationTab({ state, currentProfile, updateState, showToast }: { st
                   <p className="mt-1 text-sm text-[var(--color-text-muted)]">{update?.remarks || "No remarks"}</p>
                   {task.taskType === "Quantity-Based Task" ? <p className="mt-1 text-sm font-bold">Quantity: {update?.completedQuantity || 0}/{task.requiredQuantity || 0}</p> : null}
                   <p className="mt-1 text-xs text-[var(--color-text-muted)]">Verifiers: {task.assignedVerifierIds.map((profileId) => state.profiles.find((profile) => profile.id === profileId)?.fullName || profileId).join(", ") || "None"}</p>
+                  {verifiedBy ? <p className="mt-1 text-xs font-black text-[var(--color-secondary)]">Verified by: {verifiedBy}</p> : null}
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <button className="btn-primary" disabled={!canAct} onClick={() => act(task, "verified")}>Verify</button>
@@ -2723,7 +2700,11 @@ function RequestsTab({ state, currentProfile, updateState, showToast }: { state:
     : currentProfile.role === "verifier"
       ? state.requests.filter((request) => assignedReviewRequestIds.has(request.id))
       : state.requests.filter((request) => areas.some((area) => area.id === request.areaId) || request.requestedBy === currentProfile.id);
-  const verifierOptions = state.profiles.filter((profile) => profile.role === "verifier" && profile.status === "active");
+  const verifierOptions = (requestAreaId: string) => state.profiles.filter((profile) => (
+    profile.role === "verifier" &&
+    profile.status === "active" &&
+    state.areaAccess.some((access) => access.profileId === profile.id && access.areaId === requestAreaId && access.role === "verifier")
+  ));
 
   const createRequest = () => {
     if (!title.trim() || !areaId) {
@@ -2767,28 +2748,35 @@ function RequestsTab({ state, currentProfile, updateState, showToast }: { state:
 
   const sendForVerification = (request: AreaRequest) => {
     const reviewerId = reviewerByRequest[request.id];
-    if (!reviewerId) {
-      showToast("Choose a verifier", "Select a verifier before sending the request.", "warning");
+    const targetVerifierIds = reviewerId ? [reviewerId] : verifierOptions(request.areaId).map((profile) => profile.id);
+    if (!targetVerifierIds.length) {
+      showToast("No area verifier", "Assign an active verifier to this area before sending the request.", "warning");
       return;
     }
     updateState((current) => {
-      const review: RequestReview = {
-        id: id("request-review"),
-        requestId: request.id,
-        reviewerId,
-        comment: "",
-        recommendation: "",
-        completed: false,
-        createdAt: new Date().toISOString()
-      };
+      const existingOpenReviewerIds = new Set(current.requestReviews.filter((review) => review.requestId === request.id && !review.completed).map((review) => review.reviewerId));
+      const reviews: RequestReview[] = targetVerifierIds
+        .filter((targetId) => !existingOpenReviewerIds.has(targetId))
+        .map((targetId) => ({
+          id: id("request-review"),
+          requestId: request.id,
+          reviewerId: targetId,
+          comment: "",
+          recommendation: "",
+          completed: false,
+          createdAt: new Date().toISOString()
+        }));
       return withActivity({
         ...current,
         requests: current.requests.map((item) => (item.id === request.id ? { ...item, status: "Sent for Verification" } : item)),
-        requestReviews: [review, ...current.requestReviews],
-        notifications: [createInAppNotification(reviewerId, "Request status changed", `Review request: ${request.title}`, "Admin sent this request to you for verification.", { areaId: request.areaId, relatedRequestId: request.id }), ...current.notifications]
-      }, currentProfile, "Requests", "Sent request for verifier review", "request", request.id, { reviewerAssigned: true });
+        requestReviews: [...reviews, ...current.requestReviews],
+        notifications: [
+          ...targetVerifierIds.map((targetId) => createInAppNotification(targetId, "Request status changed", `Review request: ${request.title}`, "Admin sent this request to your area verifier queue.", { areaId: request.areaId, relatedRequestId: request.id })),
+          ...current.notifications
+        ]
+      }, currentProfile, "Requests", "Sent request for area verifier review", "request", request.id, { reviewerIds: targetVerifierIds });
     });
-    showToast("Sent for verification", "The assigned verifier will see it in their queue.", "info");
+    showToast("Sent for verification", reviewerId ? "The selected verifier will see it in their queue." : "All active verifiers assigned to this area will see it in their queue.", "info");
   };
 
   const completeReview = (request: AreaRequest) => {
@@ -2835,8 +2823,8 @@ function RequestsTab({ state, currentProfile, updateState, showToast }: { state:
                 </select>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <select className="field" value={reviewerByRequest[request.id] || ""} onChange={(event) => setReviewerByRequest((current) => ({ ...current, [request.id]: event.target.value }))}>
-                    <option value="">Send to verifier</option>
-                    {verifierOptions.map((profile) => <option key={profile.id} value={profile.id}>{profile.fullName}</option>)}
+                    <option value="">Send to all area verifiers</option>
+                    {verifierOptions(request.areaId).map((profile) => <option key={profile.id} value={profile.id}>{profile.fullName}</option>)}
                   </select>
                   <button className="btn-compact" onClick={() => sendForVerification(request)}>Send</button>
                 </div>
@@ -2863,8 +2851,9 @@ function UsersAccessTab({ state, currentProfile, updateState, showToast }: { sta
   const [accessMessage, setAccessMessage] = useState("");
   const [savingAccessId, setSavingAccessId] = useState("");
   const shownProfiles = isAdmin
-    ? state.profiles
+    ? state.profiles.filter((profile) => profile.status !== "disabled")
     : state.profiles.filter((profile) => {
+      if (profile.status === "disabled") return false;
       const access = state.areaAccess.filter((item) => item.profileId === profile.id);
       return access.some((item) => managedAreas.some((area) => area.id === item.areaId)) || profile.createdBy === currentProfile.id;
     });
@@ -2979,6 +2968,26 @@ function UsersAccessTab({ state, currentProfile, updateState, showToast }: { sta
       setSavingAccessId("");
     }
   };
+  const deleteUser = (profile: Profile) => {
+    if (profile.id === currentProfile.id) {
+      showToast("Own access protected", "You cannot delete your own signed-in user.", "warning");
+      return;
+    }
+    if (!window.confirm(`Delete ${profile.fullName}? This final confirmation disables the user, removes their area access, and removes them from task assignment lists while keeping historical audit records intact.`)) return;
+    updateState((current) => withActivity({
+      ...current,
+      profiles: current.profiles.map((item) => (item.id === profile.id ? { ...item, status: "disabled" } : item)),
+      areaAccess: current.areaAccess.filter((access) => access.profileId !== profile.id),
+      liveTasks: current.liveTasks.map((task) => ({
+        ...task,
+        assignedProfileIds: task.assignedProfileIds.filter((profileId) => profileId !== profile.id),
+        assignedVerifierIds: task.assignedVerifierIds.filter((profileId) => profileId !== profile.id)
+      })),
+      requestReviews: current.requestReviews.map((review) => review.reviewerId === profile.id ? { ...review, completed: true, recommendation: review.recommendation || "Reviewer removed" } : review),
+      notifications: current.notifications.filter((notification) => notification.userId !== profile.id)
+    }, currentProfile, "Access changes", `Deleted user access for ${profile.fullName}`, "profile", profile.id, { deleted: true }));
+    showToast("User deleted", `${profile.fullName} was disabled and removed from active access.`, "warning");
+  };
 
   return (
     <div className="space-y-4">
@@ -3025,6 +3034,7 @@ function UsersAccessTab({ state, currentProfile, updateState, showToast }: { sta
             <div key="actions" className="flex flex-col gap-2">
               {profile.status === "pending_approval" && canApprove(profile) ? <button className="btn-compact" onClick={() => approve(profile)}>Approve</button> : null}
               {currentProfile.role === "super_admin" ? <button className="btn-compact" onClick={() => resetPassword(profile)}>Reset Password</button> : null}
+              {currentProfile.role === "super_admin" && profile.id !== currentProfile.id ? <button className="btn-compact btn-danger" onClick={() => deleteUser(profile)}><Trash2 size={14} /> Delete</button> : null}
               {profile.status !== "pending_approval" && currentProfile.role !== "super_admin" ? "-" : null}
             </div>
           ])}
@@ -5784,6 +5794,7 @@ function isFormFieldVisible(state: EventPrepState, taskType: TaskTypeName, field
 }
 
 function canActOnVerification(task: LiveTask, update: TaskUpdate, profile: Profile, logs: VerificationLog[]) {
+  if (update.verificationStatus === "Verified Completed") return false;
   if (["super_admin", "admin"].includes(profile.role)) return true;
   if (!task.assignedVerifierIds.includes(profile.id)) return false;
   const verifiedIds = logs

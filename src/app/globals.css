@@ -1174,6 +1174,18 @@ table {
     transform: translateY(-1px);
   }
 
+  .btn-danger {
+    border-color: rgba(122, 31, 43, 0.28) !important;
+    background: rgba(122, 31, 43, 0.08) !important;
+    color: var(--color-important) !important;
+  }
+
+  .btn-danger:hover {
+    border-color: rgba(122, 31, 43, 0.5) !important;
+    background: rgba(122, 31, 43, 0.14) !important;
+    box-shadow: 0 8px 18px rgba(122, 31, 43, 0.14);
+  }
+
   .icon-btn {
     display: inline-flex;
     height: 2.75rem;
@@ -3235,7 +3247,8 @@ table {
       minmax(5.75rem, 0.5fr)
       minmax(6.25rem, 0.5fr)
       minmax(8rem, 0.78fr)
-      minmax(4.6rem, 0.36fr);
+      minmax(4.6rem, 0.36fr)
+      minmax(4.2rem, 0.28fr);
     gap: 0;
     align-items: center;
   }
@@ -4406,6 +4419,32 @@ table {
     font-weight: 800;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .task-summary-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .task-delete-btn {
+    display: inline-flex;
+    height: 2.25rem;
+    width: 2.25rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.72rem;
+    border: 1px solid rgba(122, 31, 43, 0.22);
+    background: rgba(122, 31, 43, 0.08);
+    color: var(--color-important);
+    transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  }
+
+  .task-delete-btn:hover {
+    border-color: rgba(122, 31, 43, 0.42);
+    background: rgba(122, 31, 43, 0.14);
+    box-shadow: 0 8px 18px rgba(122, 31, 43, 0.14);
+    transform: translateY(-1px);
   }
 
   .report-bar-list strong {
