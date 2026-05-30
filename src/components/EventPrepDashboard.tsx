@@ -124,6 +124,9 @@ type DashboardChartSettings = {
   attention: AttentionChartKind;
 };
 type ChartRow = { label: string; value: number; helper: string; iconKey?: string };
+type InsightChartType = "donut" | "bar" | "line";
+type InsightBreakdownRow = { label: string; value: number; helper?: string; color?: string };
+type InsightAction = { label: string; onClick: () => void; primary?: boolean; disabled?: boolean };
 type ToastTone = "success" | "info" | "warning" | "error";
 type ToastMessage = { id: string; title: string; message?: string; tone: ToastTone };
 type ShowToast = (title: string, message?: string, tone?: ToastTone) => void;
@@ -420,7 +423,7 @@ export default function EventPrepDashboard() {
             </div>
             <button className="btn-primary" onClick={() => setPresentationMode(false)}>Exit Presentation</button>
           </div>
-          {activeTab === "Dashboard" ? <DashboardTab state={state} currentProfile={currentProfile} presentationMode /> : null}
+          {activeTab === "Dashboard" ? <DashboardTab state={state} currentProfile={currentProfile} presentationMode openWorkspace={openWorkspace} allowedTabs={tabs} /> : null}
           {isDailyReportsTab ? <DailyReportsTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} openWorkspace={openWorkspace} openNotifications={() => showToast("Notifications", "Exit presentation mode to review and mark notifications.", "info")} /> : null}
         </div>
         <ToastStack toasts={toasts} dismissToast={dismissToast} />
@@ -581,7 +584,7 @@ export default function EventPrepDashboard() {
           </header>
 
           <div className="animate-fade-in w-full p-3 sm:p-4 lg:p-5 2xl:p-6">
-            {activeTab === "Dashboard" ? <DashboardTab state={state} currentProfile={currentProfile} chartSettings={dashboardCharts} /> : null}
+            {activeTab === "Dashboard" ? <DashboardTab state={state} currentProfile={currentProfile} chartSettings={dashboardCharts} openWorkspace={openWorkspace} allowedTabs={tabs} /> : null}
             {activeTab === "Daily Reports" ? <DailyReportsTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} openWorkspace={openWorkspace} openNotifications={openNotificationsPanel} /> : null}
             {activeTab === "Master Tasks" ? <MasterTasksTab state={state} currentProfile={currentProfile} updateState={updateState} showToast={showToast} /> : null}
             {activeTab === "Zones / Areas" ? <ZonesAreasTab state={state} updateState={updateState} showToast={showToast} /> : null}
@@ -609,7 +612,21 @@ export default function EventPrepDashboard() {
   );
 }
 
-function DashboardTab({ state, currentProfile, presentationMode = false, chartSettings = DEFAULT_DASHBOARD_CHARTS }: { state: EventPrepState; currentProfile: Profile; presentationMode?: boolean; chartSettings?: DashboardChartSettings }) {
+function DashboardTab({
+  state,
+  currentProfile,
+  presentationMode = false,
+  chartSettings = DEFAULT_DASHBOARD_CHARTS,
+  openWorkspace,
+  allowedTabs = []
+}: {
+  state: EventPrepState;
+  currentProfile: Profile;
+  presentationMode?: boolean;
+  chartSettings?: DashboardChartSettings;
+  openWorkspace?: (tab: AnyTab, title: string, message: string) => void;
+  allowedTabs?: AnyTab[];
+}) {
   const allowedAreaIds = dashboardAllowedAreaIds(state, currentProfile);
   const allowedTaskIds = useMemo(() => scopedTaskIdsForProfile(state, currentProfile), [state, currentProfile.id, currentProfile.role]);
   const visibleTasks = useMemo(() => visibleTasksForProfile(state, currentProfile), [state, currentProfile.id, currentProfile.role]);
@@ -679,6 +696,13 @@ function DashboardTab({ state, currentProfile, presentationMode = false, chartSe
     { label: "Verified Tasks", value: String(scopedVerified), helper: "Counts as complete", tone: "good" as const },
     { label: "In Progress", value: String(scopedTasks.filter((task) => latest.get(task.id)?.status === "In Progress").length), helper: "Currently active", tone: "warning" as const }
   ];
+  const quickStatusBreakdown: InsightBreakdownRow[] = [
+    { label: "Verified", value: scopedVerified, color: "#2E7D5B" },
+    { label: "In Progress", value: scopedTasks.filter((task) => latest.get(task.id)?.status === "In Progress").length, color: "#C9A227" },
+    { label: "Pending", value: Math.max(0, scopedTasks.length - scopedVerified - scopedTasks.filter((task) => latest.get(task.id)?.status === "In Progress").length), color: "#F3E7C3" },
+    { label: "Issue / Overdue", value: metrics.issueFound + metrics.overdueTasks, color: "#7A1F2B" }
+  ];
+  const insightActionsFor = (label: string) => dashboardInsightActions(label, allowedTabs, openWorkspace);
   const recentActivity = state.activityLogs.slice(0, 5);
   const upcomingDeadlines = scopedTasks
     .filter((task) => task.dueDate && latest.get(task.id)?.verificationStatus !== "Verified Completed")
@@ -691,7 +715,7 @@ function DashboardTab({ state, currentProfile, presentationMode = false, chartSe
   );
   const attentionPanel = (
     <Panel title="Attention Required">
-      <DashboardAttentionVisual rows={attention} type={chartSettings.attention} />
+      <DashboardAttentionVisual rows={attention} type={chartSettings.attention} actionsFor={insightActionsFor} />
     </Panel>
   );
   const areaPanel = (
@@ -713,7 +737,18 @@ function DashboardTab({ state, currentProfile, presentationMode = false, chartSe
     <Panel title="Quick Status">
       <div className="quick-status-grid">
         {quickStatusRows.map((item) => (
-          <InsightTrigger key={item.label} title={`${item.label} Insight`} metricLabel={item.label} metricValue={item.value} breakdown={[{ label: item.label, value: Number(item.value) || 0, color: item.tone === "warning" ? "#C9A227" : "#2E7D5B" }]} lastUpdated="Live dashboard data">
+          <InsightTrigger
+            key={item.label}
+            title={`${item.label} Insight`}
+            subtitle="Filtered to your current access scope"
+            metricLabel={item.label}
+            metricValue={item.value}
+            helper={item.helper}
+            chartType="donut"
+            breakdown={quickStatusBreakdown}
+            actions={insightActionsFor(item.label)}
+            lastUpdated="Live dashboard data"
+          >
             <div className={`quick-status-item tone-${item.tone}`}>
               <span className="quick-status-icon"><CheckCircle2 size={18} /></span>
               <div>
@@ -896,13 +931,31 @@ function DashboardChartVisual({ rows, type }: { rows: ChartRow[]; type: Dashboar
   return <div className="chart-progress-list">{visibleRows.map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} helper={row.helper} iconKey={row.iconKey} />)}</div>;
 }
 
-function DashboardAttentionVisual({ rows, type }: { rows: ReturnType<typeof buildAttention>; type: AttentionChartKind }) {
+function DashboardAttentionVisual({
+  rows,
+  type,
+  actionsFor
+}: {
+  rows: ReturnType<typeof buildAttention>;
+  type: AttentionChartKind;
+  actionsFor?: (label: string) => InsightAction[];
+}) {
   if (!rows.length) return <EmptyState title="No attention items" body="Nothing needs attention in this view." />;
   if (type === "Compact list") {
     return (
       <div className="report-attention-list">
         {rows.map((item) => (
-          <InsightTrigger key={item.label} title={`${item.label} Insight`} metricLabel={item.label} metricValue={String(item.count)} breakdown={[{ label: item.label, value: item.count, color: item.count ? "#C9A227" : "#2E7D5B" }]} lastUpdated="Live dashboard data">
+          <InsightTrigger
+            key={item.label}
+            title={`${item.label} Insight`}
+            subtitle="Filtered to your current access scope"
+            metricLabel={item.label}
+            metricValue={String(item.count)}
+            chartType="bar"
+            breakdown={attentionInsightBreakdown(item.label, item.count)}
+            actions={actionsFor?.(item.label) || []}
+            lastUpdated="Live dashboard data"
+          >
             <div><span>{item.label}</span><strong>{item.count}</strong></div>
           </InsightTrigger>
         ))}
@@ -912,7 +965,17 @@ function DashboardAttentionVisual({ rows, type }: { rows: ReturnType<typeof buil
   return (
     <div className="attention-card-grid">
       {rows.map((item) => (
-        <InsightTrigger key={item.label} title={`${item.label} Insight`} metricLabel={item.label} metricValue={String(item.count)} breakdown={[{ label: item.label, value: item.count, color: item.count ? "#C9A227" : "#2E7D5B" }]} lastUpdated="Live dashboard data">
+        <InsightTrigger
+          key={item.label}
+          title={`${item.label} Insight`}
+          subtitle="Filtered to your current access scope"
+          metricLabel={item.label}
+          metricValue={String(item.count)}
+          chartType="bar"
+          breakdown={attentionInsightBreakdown(item.label, item.count)}
+          actions={actionsFor?.(item.label) || []}
+          lastUpdated="Live dashboard data"
+        >
           <div className={`attention-mini-card ${attentionToneClass(item.label)}`}>
             <span className="attention-mini-icon"><Bell size={16} /></span>
             <div>
@@ -924,6 +987,54 @@ function DashboardAttentionVisual({ rows, type }: { rows: ReturnType<typeof buil
       ))}
     </div>
   );
+}
+
+function attentionInsightBreakdown(label: string, count: number): InsightBreakdownRow[] {
+  const normalized = label.toLowerCase();
+  const color = normalized.includes("late") || normalized.includes("issue") || normalized.includes("rejected") || normalized.includes("overdue")
+    ? "#7A1F2B"
+    : normalized.includes("pending") || normalized.includes("missing") || normalized.includes("verification")
+      ? "#C9A227"
+      : "#2E7D5B";
+  return [
+    { label, value: count, color },
+    { label: "Resolved / clear", value: count ? 0 : 1, color: "#2E7D5B" }
+  ];
+}
+
+function dashboardInsightActions(label: string, allowedTabs: AnyTab[], openWorkspace?: (tab: AnyTab, title: string, message: string) => void): InsightAction[] {
+  if (!openWorkspace) return [];
+  const normalized = label.toLowerCase();
+  const targets: Array<{ tab: AnyTab; label: string; title: string; message: string; primary?: boolean }> = [];
+  const addTarget = (target: { tab: AnyTab; label: string; title: string; message: string; primary?: boolean }) => {
+    if (!allowedTabs.includes(target.tab) || targets.some((item) => item.tab === target.tab && item.label === target.label)) return;
+    targets.push(target);
+  };
+
+  if (normalized.includes("daily") || normalized.includes("missing") || normalized.includes("partial") || normalized.includes("late") || normalized.includes("escalated")) {
+    const tab = allowedTabs.includes("Daily Reports") ? "Daily Reports" : allowedTabs.includes("Daily Report") ? "Daily Report" : null;
+    if (tab) addTarget({ tab, label: "Open Daily Reports", title: "Daily Reports opened", message: "Showing daily report items within your access scope.", primary: true });
+  }
+  if (normalized.includes("verification") || normalized.includes("verified") || normalized.includes("correction") || normalized.includes("rejected")) {
+    addTarget({ tab: "Verification", label: "Open Verification", title: "Verification opened", message: "Showing verification items you are allowed to review.", primary: true });
+  }
+  if (normalized.includes("request")) {
+    addTarget({ tab: "Requests", label: "Open Requests", title: "Requests opened", message: "Showing requests within your access scope.", primary: true });
+  }
+  if (normalized.includes("task") || normalized.includes("progress") || normalized.includes("overdue") || normalized.includes("issue") || normalized.includes("total") || normalized.includes("in progress")) {
+    addTarget({ tab: "Master Tasks", label: "View Tasks", title: "Master Tasks opened", message: "Showing task records filtered by your role and scope.", primary: !targets.length });
+    addTarget({ tab: "My Area", label: "View My Area", title: "My Area opened", message: "Showing your assigned area and workstream task scope.", primary: !targets.length });
+  }
+  if (!targets.length) {
+    addTarget({ tab: "Dashboard", label: "Open Dashboard", title: "Dashboard opened", message: "Showing your dashboard metrics and scope." });
+    addTarget({ tab: "Reports", label: "Open Reports", title: "Reports opened", message: "Showing reports available to your role." });
+  }
+
+  return targets.map((target) => ({
+    label: target.label,
+    primary: target.primary,
+    onClick: () => openWorkspace(target.tab, target.title, target.message)
+  }));
 }
 
 function ChartSettingsModal({ settings, onChange, onClose, showToast }: { settings: DashboardChartSettings; onChange: (settings: DashboardChartSettings) => void; onClose: () => void; showToast: ShowToast }) {
@@ -1833,6 +1944,14 @@ function taskDisplayStatus(update?: TaskUpdate) {
   return update?.verificationStatus === "Verified Completed" ? "Verified Completed" : update?.status || "Pending";
 }
 
+function taskInsightBreakdown(progress: number, status: string, overdue: boolean): InsightBreakdownRow[] {
+  const color = overdue || status === "Issue Found" || status === "Rejected / Needs Correction" ? "#7A1F2B" : status === "In Progress" ? "#C9A227" : "#2E7D5B";
+  return [
+    { label: status, value: Math.max(0, Math.min(100, progress)), color },
+    { label: "Remaining", value: Math.max(0, 100 - progress), color: "#F3E7C3" }
+  ];
+}
+
 function MasterTaskTableRow({ state, task, update, openTask }: { state: EventPrepState; task: LiveTask; update?: TaskUpdate; openTask: (taskId: string) => void }) {
   const details = taskDetails(state, task);
   const progress = taskProgress(task, update);
@@ -1906,7 +2025,20 @@ function TaskSummaryRow({ state, task, update, openTask, onDelete }: { state: Ev
   return (
     <div className={`task-summary-row ${isOverdue ? "is-overdue" : ""}`} role="button" tabIndex={0} onClick={() => openTask(task.id)} onKeyDown={openFromKeyboard} title="Open task detail drawer">
       <span className="task-summary-title-cell">
-        <span className="task-summary-title">{details.taskDetails}</span>
+        <InsightTrigger
+          inline
+          title={`${details.taskDetails} Insight`}
+          subtitle={`${areaName(state, task.areaId)} / ${details.workstream || "General"}`}
+          metricLabel="Progress"
+          metricValue={`${progress}%`}
+          helper={`Status: ${status}. Priority: ${task.priority}. Due: ${task.dueDate || "No due date"}.`}
+          chartType="donut"
+          breakdown={taskInsightBreakdown(progress, status, isOverdue)}
+          actions={[{ label: "Open Task", primary: true, onClick: () => openTask(task.id) }]}
+          lastUpdated="Live task data"
+        >
+          <span className="task-summary-title">{details.taskDetails}</span>
+        </InsightTrigger>
         <span className="task-summary-meta">{details.expectedOutput || details.responsibleTeam || task.taskType}</span>
       </span>
       <span><span className="daily-soft-badge">{areaName(state, task.areaId)}</span></span>
@@ -4798,10 +4930,6 @@ function MetricCard({ title, value, helper, tone }: { title: string; value: stri
     </InsightTrigger>
   );
 }
-
-type InsightChartType = "donut" | "bar" | "line";
-type InsightBreakdownRow = { label: string; value: number; helper?: string; color?: string };
-type InsightAction = { label: string; onClick: () => void; primary?: boolean; disabled?: boolean };
 
 function InsightTrigger({
   title,
