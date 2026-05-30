@@ -841,16 +841,18 @@ function DashboardTab({
         <MetricCard title="Pending Requests" value={String(pendingRequestsCount)} helper="Requests needing review" tone="warning" />
       </div>
 
-      <div className="dashboard-structured-grid">
-        <div className="dashboard-zone-card">{zonePanel}</div>
-        <div className="dashboard-attention-card">{attentionPanel}</div>
-        <div>{areaPanel}</div>
-        <div>{dayPanel}</div>
-        <div className="dashboard-workstream-card">{workstreamPanel}</div>
-        <div>{quickStatusPanel}</div>
-        <div>{recentActivityPanel}</div>
-        <div>{upcomingDeadlinesPanel}</div>
-      </div>
+      <DashboardMasonry
+        items={[
+          { key: "zone-type-progress", weight: 1.85, content: zonePanel },
+          { key: "attention-required", weight: 1.65, content: attentionPanel },
+          { key: "area-wise-progress", weight: 1.1, content: areaPanel },
+          { key: "day-wise-progress", weight: 0.85, content: dayPanel },
+          { key: "workstream-progress", weight: 1.8, content: workstreamPanel },
+          { key: "quick-status", weight: 1.25, content: quickStatusPanel },
+          { key: "recent-activity", weight: 1.05, content: recentActivityPanel },
+          { key: "upcoming-deadlines", weight: 1.05, content: upcomingDeadlinesPanel }
+        ]}
+      />
     </div>
   );
 }
@@ -862,7 +864,7 @@ function DashboardMasonry({ items }: { items: Array<{ key: string; weight: numbe
   useEffect(() => {
     const calculateColumns = () => {
       const width = containerRef.current?.clientWidth || 0;
-      const next = Math.max(1, Math.min(5, Math.floor((width + 16) / 300)));
+      const next = Math.max(1, Math.min(4, Math.floor((width + 16) / 340)));
       setColumnCount(next);
     };
     calculateColumns();
