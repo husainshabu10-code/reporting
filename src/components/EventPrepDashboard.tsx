@@ -6114,9 +6114,9 @@ function buildUserAlerts(state: EventPrepState, profile: Profile): InAppNotifica
   const readGeneratedIds = new Set(state.notifications.filter((notification) => notification.userId === profile.id && notification.isRead).map((notification) => notification.id));
   const notifications: InAppNotification[] = [];
   const push = (type: InAppNotification["type"], title: string, message: string, extra: Partial<InAppNotification> = {}) => {
-    const generatedKey = extra.relatedTaskId || extra.relatedRequestId || extra.relatedDailyReportId || slug(message);
+    const generatedKey = extra.relatedTaskId || extra.relatedRequestId || extra.relatedDailyReportId || extra.areaId || slug(title);
     notifications.push({
-      id: `generated-${type}-${slug(title)}-${generatedKey}`,
+      id: `generated-${profile.id}-${type}-${slug(title)}-${generatedKey}`,
       userId: profile.id,
       type,
       title,
