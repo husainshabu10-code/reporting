@@ -312,12 +312,20 @@ table {
     overflow: visible !important;
   }
 
+  body * {
+    visibility: hidden !important;
+  }
+
   .no-print,
   .app-sidebar,
   .top-action-btn,
   .icon-btn,
   .toast-card,
-  .reports-control-panel {
+  .reports-control-panel,
+  .report-builder-topbar,
+  .report-preview-workspace,
+  .report-page-thumbnails,
+  .report-preview-toolbar {
     display: none !important;
   }
 
@@ -330,8 +338,24 @@ table {
     width: 100% !important;
   }
 
+  .report-print-root {
+    display: block !important;
+    position: absolute !important;
+    inset: 0 auto auto 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    visibility: visible !important;
+  }
+
+  .report-print-root * {
+    visibility: visible !important;
+  }
+
   .report-preview-shell {
     border: 0 !important;
+    min-height: auto !important;
     box-shadow: none !important;
     padding: 0 !important;
   }
@@ -4165,6 +4189,10 @@ table {
     min-height: 72rem;
     padding: clamp(1rem, 2.4vw, 2rem);
     box-shadow: var(--shadow-card-strong);
+  }
+
+  .report-print-root {
+    display: none;
   }
 
   .report-template-header {

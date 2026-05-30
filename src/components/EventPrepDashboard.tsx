@@ -3465,6 +3465,9 @@ function ReportsTab({ state, currentProfile, updateState, showToast }: { state: 
             </div>
           </div>
         </div>
+        <div className="report-print-root" aria-hidden="true">
+          <ReportPreview state={state} data={previewData} reportType={reportType} reportDate={reportDate} currentProfile={currentProfile} generatedAt={generatedAt} />
+        </div>
         <div className="no-print mt-4">
           <Panel title="Export History" action={<Badge>{exportHistory.length} export(s)</Badge>}>
             <ResponsiveTable
