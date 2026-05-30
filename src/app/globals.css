@@ -460,13 +460,63 @@ table {
     width: 0.34rem;
   }
 
-  .sidebar-brand-logo {
+  .logo-brand {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    max-width: 100%;
+    line-height: 1;
+    vertical-align: middle;
+  }
+
+  .logo-brand img,
+  .logo-brand svg {
     display: block;
-    width: clamp(15rem, 78vw, 20rem);
-    max-width: none;
-    height: auto;
-    transform: scale(1.22);
-    transform-origin: left center;
+    flex-shrink: 0;
+  }
+
+  .logo-brand-emblem {
+    width: 2.7rem;
+    height: 2.7rem;
+    object-fit: contain;
+    object-position: center;
+  }
+
+  .logo-brand-text {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    color: var(--color-primary);
+    font-size: 1.08rem;
+    font-weight: 950;
+    letter-spacing: 0;
+    line-height: 1.04;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .logo-brand-white .logo-brand-text {
+    color: #fff;
+  }
+
+  .logo-brand-green .logo-brand-text {
+    color: var(--color-primary);
+  }
+
+  .sidebar-brand-logo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .sidebar-brand-logo .logo-brand-emblem {
+    width: clamp(2.65rem, 4vw, 3.1rem);
+    height: clamp(2.65rem, 4vw, 3.1rem);
+  }
+
+  .sidebar-brand-logo .logo-brand-text {
+    font-size: clamp(1rem, 1.32vw, 1.2rem);
   }
 
   .login-brand-logo {
@@ -3393,8 +3443,19 @@ table {
   }
 
   .report-builder-logo {
-    width: min(15rem, 58vw);
-    height: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+    width: auto;
+  }
+
+  .report-builder-logo .logo-brand-emblem {
+    width: 2.35rem;
+    height: 2.35rem;
+  }
+
+  .report-builder-logo .logo-brand-text {
+    font-size: 0.95rem;
   }
 
   .report-export-menu {
