@@ -416,6 +416,7 @@ table {
     height: clamp(4.8rem, 17vw, 7.4rem);
     width: clamp(4.8rem, 17vw, 7.4rem);
     object-fit: contain;
+    object-position: center;
     filter: drop-shadow(0 12px 28px rgba(201, 162, 39, 0.2));
     animation: loading-logo-pulse 2.25s ease-in-out infinite;
   }
@@ -489,10 +490,10 @@ table {
   }
 
   .logo-brand {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: flex-start;
-    gap: 0.75rem;
+    gap: clamp(0.625rem, 1vw, 0.75rem);
     max-width: 100%;
     line-height: 1;
     vertical-align: middle;
@@ -509,11 +510,14 @@ table {
     height: 2.7rem;
     object-fit: contain;
     object-position: center;
+    align-self: center;
   }
 
   .logo-brand-text {
     display: flex;
     flex-direction: column;
+    align-self: center;
+    align-items: flex-start;
     justify-content: center;
     color: var(--color-primary);
     font-size: 1.08rem;
@@ -533,9 +537,9 @@ table {
   }
 
   .sidebar-brand-logo {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: clamp(0.625rem, 1vw, 0.75rem);
   }
 
   .sidebar-brand-logo .logo-brand-emblem {
@@ -552,6 +556,8 @@ table {
     width: min(13rem, 70vw);
     height: auto;
     margin: 0 auto 1rem;
+    object-fit: contain;
+    object-position: center;
   }
 
   .login-page {
@@ -3585,7 +3591,7 @@ table {
   }
 
   .report-builder-logo {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 0.7rem;
     width: auto;
