@@ -1787,6 +1787,81 @@ table {
     align-items: start;
   }
 
+  .dashboard-structured-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: clamp(0.85rem, 1.15vw, 1rem);
+    align-items: start;
+  }
+
+  .dashboard-structured-grid > * {
+    min-width: 0;
+    grid-column: span 3;
+  }
+
+  .dashboard-zone-card {
+    grid-column: span 7;
+  }
+
+  .dashboard-attention-card {
+    grid-column: span 5;
+  }
+
+  .dashboard-workstream-card {
+    grid-column: span 4;
+  }
+
+  .dashboard-compact-list {
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .dashboard-compact-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 0.7rem;
+    border-radius: var(--radius-card-sm);
+    border: 1px solid rgba(232, 221, 197, 0.82);
+    background: rgba(255, 255, 255, 0.82);
+    padding: 0.78rem;
+    box-shadow: var(--shadow-card-soft);
+  }
+
+  .dashboard-compact-row.deadline-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .dashboard-compact-row p {
+    overflow: hidden;
+    color: var(--color-primary);
+    font-size: 0.86rem;
+    font-weight: 850;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dashboard-compact-row small {
+    display: block;
+    margin-top: 0.18rem;
+    color: var(--color-text-muted);
+    font-size: 0.74rem;
+    font-weight: 700;
+  }
+
+  .dashboard-compact-icon {
+    display: inline-flex;
+    height: 2.15rem;
+    width: 2.15rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.72rem;
+    background: rgba(46, 125, 91, 0.12);
+    color: var(--color-primary);
+    box-shadow: var(--shadow-icon);
+  }
+
   .dashboard-balanced-grid {
     display: grid;
     gap: 1rem;
@@ -4734,6 +4809,38 @@ table {
     .task-filter-bar {
       grid-template-columns: minmax(14rem, 1.4fr) repeat(4, minmax(8.5rem, 0.8fr));
       align-items: end;
+    }
+  }
+
+  @media (max-width: 1279px) {
+    .dashboard-structured-grid > *,
+    .dashboard-zone-card,
+    .dashboard-attention-card,
+    .dashboard-workstream-card {
+      grid-column: span 6;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .dashboard-structured-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .dashboard-structured-grid > *,
+    .dashboard-zone-card,
+    .dashboard-attention-card,
+    .dashboard-workstream-card {
+      grid-column: 1 / -1;
+    }
+
+    .dashboard-compact-row,
+    .dashboard-compact-row.deadline-row {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .dashboard-compact-row .status-badge {
+      justify-self: start;
+      grid-column: 2;
     }
   }
 

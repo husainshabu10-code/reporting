@@ -671,77 +671,96 @@ function DashboardTab({ state, currentProfile, presentationMode = false, chartSe
     { label: "Verified Tasks", value: String(scopedVerified), helper: "Counts as complete", tone: "good" as const },
     { label: "In Progress", value: String(scopedTasks.filter((task) => latest.get(task.id)?.status === "In Progress").length), helper: "Currently active", tone: "warning" as const }
   ];
-  const dashboardSections = [
-    {
-      key: "zone-type",
-      weight: Math.max(2.4, zoneRows.length * 0.85 + 1.2),
-      content: (
-        <Panel title="Zone Type Progress" action={<Badge>Verified completed only</Badge>}>
-          <DashboardChartVisual rows={zoneRows.map((row) => ({ label: row.label, value: row.percent, helper: `${row.verified}/${row.total} tasks`, iconKey: zoneProgressIconKey(row.label) }))} type={chartSettings.zoneType} />
-        </Panel>
-      )
-    },
-    {
-      key: "attention",
-      weight: Math.max(2.8, attention.length * 0.62 + 1.4),
-      content: (
-        <Panel title="Attention Required">
-          <DashboardAttentionVisual rows={attention} type={chartSettings.attention} />
-        </Panel>
-      )
-    },
-    {
-      key: "area",
-      weight: Math.max(1.8, areaProgressRows.length * 0.58 + 1.1),
-      content: (
-        <Panel title="Area-Wise Progress">
-          <DashboardChartVisual rows={areaProgressRows} type={chartSettings.area} />
-        </Panel>
-      )
-    },
-    {
-      key: "day",
-      weight: Math.max(1.4, dayRows.length * 0.42 + 0.9),
-      content: (
-        <Panel title="Day-Wise Progress">
-          <DashboardChartVisual rows={dayRows} type={chartSettings.day} />
-        </Panel>
-      )
-    },
-    {
-      key: "workstream",
-      weight: Math.max(2.2, workstreamRows.length * 0.52 + 1.15),
-      content: (
-        <Panel title="Workstream Progress">
-          <DashboardChartVisual rows={workstreamRows} type={chartSettings.workstream} />
-        </Panel>
-      )
-    },
-    {
-      key: "quick-status",
-      weight: 2.5,
-      content: (
-        <Panel title="Quick Status">
-          <div className="quick-status-grid">
-            {quickStatusRows.map((item) => (
-              <div key={item.label} className={`quick-status-item tone-${item.tone}`}>
-                <span className="quick-status-icon"><CheckCircle2 size={18} /></span>
-                <div>
-                  <p>{item.label}</p>
-                  <strong>{item.value}</strong>
-                  <small>{item.helper}</small>
-                </div>
+  const recentActivity = state.activityLogs.slice(0, 5);
+  const upcomingDeadlines = scopedTasks
+    .filter((task) => task.dueDate && latest.get(task.id)?.verificationStatus !== "Verified Completed")
+    .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""))
+    .slice(0, 5);
+  const zonePanel = (
+    <Panel title="Zone Type Progress" action={<Badge>Verified completed only</Badge>}>
+      <DashboardChartVisual rows={zoneRows.map((row) => ({ label: row.label, value: row.percent, helper: `${row.verified}/${row.total} tasks`, iconKey: zoneProgressIconKey(row.label) }))} type={chartSettings.zoneType} />
+    </Panel>
+  );
+  const attentionPanel = (
+    <Panel title="Attention Required">
+      <DashboardAttentionVisual rows={attention} type={chartSettings.attention} />
+    </Panel>
+  );
+  const areaPanel = (
+    <Panel title="Area-Wise Progress">
+      <DashboardChartVisual rows={areaProgressRows} type={chartSettings.area} />
+    </Panel>
+  );
+  const dayPanel = (
+    <Panel title="Day-Wise Progress">
+      <DashboardChartVisual rows={dayRows} type={chartSettings.day} />
+    </Panel>
+  );
+  const workstreamPanel = (
+    <Panel title="Workstream Progress">
+      <DashboardChartVisual rows={workstreamRows} type={chartSettings.workstream} />
+    </Panel>
+  );
+  const quickStatusPanel = (
+    <Panel title="Quick Status">
+      <div className="quick-status-grid">
+        {quickStatusRows.map((item) => (
+          <InsightTrigger key={item.label} title={`${item.label} Insight`} metricLabel={item.label} metricValue={item.value} breakdown={[{ label: item.label, value: Number(item.value) || 0, color: item.tone === "warning" ? "#C9A227" : "#2E7D5B" }]} lastUpdated="Live dashboard data">
+            <div className={`quick-status-item tone-${item.tone}`}>
+              <span className="quick-status-icon"><CheckCircle2 size={18} /></span>
+              <div>
+                <p>{item.label}</p>
+                <strong>{item.value}</strong>
+                <small>{item.helper}</small>
               </div>
-            ))}
-          </div>
-          <div className="mt-3 flex items-center justify-between border-t border-[var(--color-border)] pt-3 text-xs font-bold text-[var(--color-text-muted)]">
-            <span>Last updated: {new Date().toLocaleDateString()}</span>
-            <span className="text-[var(--color-secondary)]">Auto refresh: On</span>
-          </div>
-        </Panel>
-      )
-    }
-  ];
+            </div>
+          </InsightTrigger>
+        ))}
+      </div>
+      <div className="mt-3 flex items-center justify-between border-t border-[var(--color-border)] pt-3 text-xs font-bold text-[var(--color-text-muted)]">
+        <span>Last updated: {new Date().toLocaleDateString()}</span>
+        <span className="text-[var(--color-secondary)]">Auto refresh: On</span>
+      </div>
+    </Panel>
+  );
+  const recentActivityPanel = (
+    <Panel title="Recent Activity">
+      {recentActivity.length ? (
+        <div className="dashboard-compact-list">
+          {recentActivity.map((log) => (
+            <div key={log.id} className="dashboard-compact-row">
+              <span className="dashboard-compact-icon"><Activity size={15} /></span>
+              <div>
+                <p>{log.action}</p>
+                <small>{log.category} · {new Date(log.createdAt).toLocaleString()}</small>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : <EmptyState title="No activity yet" body="Activity logs will appear here when Supabase has records for this view." />}
+    </Panel>
+  );
+  const upcomingDeadlinesPanel = (
+    <Panel title="Upcoming Deadlines">
+      {upcomingDeadlines.length ? (
+        <div className="dashboard-compact-list">
+          {upcomingDeadlines.map((task) => {
+            const details = taskDetails(state, task);
+            return (
+              <div key={task.id} className="dashboard-compact-row deadline-row">
+                <span className="dashboard-compact-icon"><CalendarClock size={15} /></span>
+                <div>
+                  <p>{details.taskDetails}</p>
+                  <small>{areaName(state, task.areaId)} · Due {task.dueDate}</small>
+                </div>
+                <StatusBadge value={task.priority} />
+              </div>
+            );
+          })}
+        </div>
+      ) : <EmptyState title="No upcoming deadlines" body="No open task deadlines are available in the current dashboard scope." />}
+    </Panel>
+  );
 
   return (
     <div className="premium-dashboard space-y-5">
@@ -779,7 +798,16 @@ function DashboardTab({ state, currentProfile, presentationMode = false, chartSe
         <MetricCard title="Pending Requests" value={String(pendingRequestsCount)} helper="Requests needing review" tone="warning" />
       </div>
 
-      <DashboardMasonry items={dashboardSections} />
+      <div className="dashboard-structured-grid">
+        <div className="dashboard-zone-card">{zonePanel}</div>
+        <div className="dashboard-attention-card">{attentionPanel}</div>
+        <div>{areaPanel}</div>
+        <div>{dayPanel}</div>
+        <div className="dashboard-workstream-card">{workstreamPanel}</div>
+        <div>{quickStatusPanel}</div>
+        <div>{recentActivityPanel}</div>
+        <div>{upcomingDeadlinesPanel}</div>
+      </div>
     </div>
   );
 }
