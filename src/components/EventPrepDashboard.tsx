@@ -5525,7 +5525,7 @@ function openPrintableReport(title: string, bodyHtml: string) {
   if (!popup) throw new Error("Popup blocked. Allow popups to open the printable report.");
   popup.document.write(`<!doctype html><html><head><title>${escapeHtml(title)}</title><style>
     :root{--green:#0B4F3A;--gold:#C9A227;--light:#F3E7C3;--border:#E8DDC5;--text:#1F2933;--muted:#6B7280}
-    body{margin:0;background:#FAF7EF;color:var(--text);font-family:Arial,Helvetica,sans-serif}
+    body{margin:0;background:#FAF7EF;color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums}
     main{max-width:1100px;margin:0 auto;padding:28px}
     h1,h2,h3{color:var(--green);margin:0 0 12px}
     .brand{color:var(--gold);font-weight:900;letter-spacing:.12em;text-transform:uppercase;font-size:12px}

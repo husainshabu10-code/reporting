@@ -2621,7 +2621,7 @@ function chartSvg(dataset: ChartDataset, chartKind: ChartKind, showDataLabels = 
     return `<g><circle cx="${x}" cy="${y}" r="7" fill="${cssColor(chartColor(row, index))}"><title>${escapeHtml(`${row.label}: ${row.value}${dataset.suffix || ""} (${row.percent}%)`)}</title></circle>${valueLabel}</g>`;
   }).join("")}${legend}`;
   const body = chartKind === "Pie" || chartKind === "Donut" ? pie : chartKind === "Line" ? line : bars;
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#FAF7EF"/><rect x="20" y="20" width="${width - 40}" height="${height - 40}" rx="16" fill="#FFFFFF" stroke="#E8DDC5"/><text x="40" y="58" font-family="Arial" font-size="24" font-weight="700" fill="#0B4F3A">${escapeHtml(dataset.title)}</text>${body}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" fill="#FAF7EF"/><rect x="20" y="20" width="${width - 40}" height="${height - 40}" rx="16" fill="#FFFFFF" stroke="#E8DDC5"/><text x="40" y="58" font-family="Inter, system-ui, sans-serif" font-size="24" font-weight="700" fill="#0B4F3A">${escapeHtml(dataset.title)}</text>${body}</svg>`;
 }
 
 function downloadChartVisual(dataset: ChartDataset, chartKind: ChartKind, format: "png" | "pdf", showDataLabels = false) {
@@ -2629,7 +2629,7 @@ function downloadChartVisual(dataset: ChartDataset, chartKind: ChartKind, format
   if (format === "pdf") {
     const win = window.open("", "_blank");
     if (!win) return;
-    win.document.write(`<!doctype html><html><head><title>${escapeHtml(dataset.title)}</title><style>@page{size:A4 portrait;margin:18mm}body{background:#FAF7EF;font-family:Arial,sans-serif}svg{max-width:100%;height:auto}</style></head><body>${svg}<script>window.print()</script></body></html>`);
+    win.document.write(`<!doctype html><html><head><title>${escapeHtml(dataset.title)}</title><style>@page{size:A4 portrait;margin:18mm}body{background:#FAF7EF;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-variant-numeric:tabular-nums}svg{max-width:100%;height:auto}</style></head><body>${svg}<script>window.print()</script></body></html>`);
     win.document.close();
     return;
   }
@@ -3489,7 +3489,7 @@ function downloadExcelReport(rows: TrackerTask[], charts: ChartDataset[], format
     }).join("")
     : "";
   const taskTable = `<h2>Task table</h2><table><thead><tr>${keys.map((key) => `<th>${escapeHtml(key)}</th>`).join("")}</tr></thead><tbody>${tableRows.map((row) => `<tr>${keys.map((key) => `<td>${escapeHtml(String(row[key] ?? ""))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
-  const html = `<html><head><meta charset="utf-8" /><style>body{font-family:Arial,sans-serif;color:#1F2933}h1,h2{color:#0B4F3A}table{border-collapse:collapse;margin-bottom:18px}th{background:#F3E7C3;color:#0B4F3A}td,th{border:1px solid #E8DDC5;padding:6px;vertical-align:top}</style></head><body><h1>ASHARA MUBARAKAH IT / Event Preparation Report</h1>${chartTables}${taskTable}</body></html>`;
+  const html = `<html><head><meta charset="utf-8" /><style>body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#1F2933;font-variant-numeric:tabular-nums}h1,h2{color:#0B4F3A}table{border-collapse:collapse;margin-bottom:18px}th{background:#F3E7C3;color:#0B4F3A}td,th{border:1px solid #E8DDC5;padding:6px;vertical-align:top}</style></head><body><h1>ASHARA MUBARAKAH IT / Event Preparation Report</h1>${chartTables}${taskTable}</body></html>`;
   downloadBlob(html, filename, "application/vnd.ms-excel");
 }
 
@@ -3500,7 +3500,7 @@ function openPdfReport(rows: TrackerTask[], charts: ChartDataset[], format: Repo
   const tableHtml = `<section class="card"><h2>Task table</h2><table><thead><tr>${keys.map((key) => `<th>${escapeHtml(key)}</th>`).join("")}</tr></thead><tbody>${tableRows.map((row) => `<tr>${keys.map((key) => `<td>${escapeHtml(String(row[key] ?? ""))}</td>`).join("")}</tr>`).join("")}</tbody></table></section>`;
   const win = window.open("", "_blank");
   if (!win) return;
-  win.document.write(`<!doctype html><html><head><title>ASHARA MUBARAKAH IT Report</title><style>@page{size:A4 portrait;margin:18mm}body{font-family:Arial,sans-serif;background:#FAF7EF;color:#1F2933}h1,h2{color:#0B4F3A}.card{background:#fff;border:1px solid #E8DDC5;border-radius:8px;padding:14px;margin:0 0 14px}.bar{position:relative;margin:10px 0;padding-bottom:8px;border-bottom:1px solid #E8DDC5}.bar span{display:inline-block;width:70%}.bar strong{float:right;color:#0B4F3A}.bar i{display:block;height:7px;background:#2E7D5B;border-radius:99px;margin-top:6px}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#F3E7C3;color:#0B4F3A}td,th{border:1px solid #E8DDC5;padding:5px;vertical-align:top}</style></head><body><h1>ASHARA MUBARAKAH IT / Event Preparation Report</h1><p>${new Date().toLocaleString()}</p>${format !== "Tables only" ? chartHtml : ""}${format !== "Charts only" ? tableHtml : ""}<script>window.print()</script></body></html>`);
+  win.document.write(`<!doctype html><html><head><title>ASHARA MUBARAKAH IT Report</title><style>@page{size:A4 portrait;margin:18mm}body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7EF;color:#1F2933;font-variant-numeric:tabular-nums}h1,h2{color:#0B4F3A}.card{background:#fff;border:1px solid #E8DDC5;border-radius:8px;padding:14px;margin:0 0 14px}.bar{position:relative;margin:10px 0;padding-bottom:8px;border-bottom:1px solid #E8DDC5}.bar span{display:inline-block;width:70%}.bar strong{float:right;color:#0B4F3A}.bar i{display:block;height:7px;background:#2E7D5B;border-radius:99px;margin-top:6px}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#F3E7C3;color:#0B4F3A}td,th{border:1px solid #E8DDC5;padding:5px;vertical-align:top}</style></head><body><h1>ASHARA MUBARAKAH IT / Event Preparation Report</h1><p>${new Date().toLocaleString()}</p>${format !== "Tables only" ? chartHtml : ""}${format !== "Charts only" ? tableHtml : ""}<script>window.print()</script></body></html>`);
   win.document.close();
 }
 
@@ -3509,7 +3509,7 @@ function openTablePdf(title: string, rows: Array<Record<string, string | number>
   const tableHtml = `<table><thead><tr>${keys.map((key) => `<th>${escapeHtml(key)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${keys.map((key) => `<td>${escapeHtml(String(row[key] ?? ""))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
   const win = window.open("", "_blank");
   if (!win) return;
-  win.document.write(`<!doctype html><html><head><title>${escapeHtml(title)}</title><style>@page{size:A4 portrait;margin:18mm}body{font-family:Arial,sans-serif;background:#FAF7EF;color:#1F2933}h1{color:#0B4F3A}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#F3E7C3;color:#0B4F3A}td,th{border:1px solid #E8DDC5;padding:5px;vertical-align:top}</style></head><body><h1>${escapeHtml(title)}</h1>${tableHtml}<script>window.print()</script></body></html>`);
+  win.document.write(`<!doctype html><html><head><title>${escapeHtml(title)}</title><style>@page{size:A4 portrait;margin:18mm}body{font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7EF;color:#1F2933;font-variant-numeric:tabular-nums}h1{color:#0B4F3A}table{width:100%;border-collapse:collapse;font-size:10px}th{background:#F3E7C3;color:#0B4F3A}td,th{border:1px solid #E8DDC5;padding:5px;vertical-align:top}</style></head><body><h1>${escapeHtml(title)}</h1>${tableHtml}<script>window.print()</script></body></html>`);
   win.document.close();
 }
 
