@@ -1825,16 +1825,19 @@ function LiveTasksConfigTable({
     const details = taskDetails(state, task);
     if (!window.confirm(`Delete "${details.taskDetails}"? This final confirmation will remove the task and its task updates, evidence links, verification logs, and related notifications.`)) return;
     updateState((current) => {
-      const updateIds = current.taskUpdates.filter((update) => update.liveTaskId === task.id).map((update) => update.id);
-      return withActivity({
+      const removedUpdates = current.taskUpdates.filter((update) => update.liveTaskId === task.id);
+      const removedUpdateIds = new Set(removedUpdates.map((update) => update.id));
+      const affectedReportIds = affectedDailyReportIdsForTask(current, task, removedUpdates);
+      const nextState = reconcileDailyReportsForTaskScope({
         ...current,
         liveTasks: current.liveTasks.filter((item) => item.id !== task.id),
         taskUpdates: current.taskUpdates.filter((update) => update.liveTaskId !== task.id),
-        taskFiles: current.taskFiles.filter((file) => file.liveTaskId !== task.id && !updateIds.includes(file.taskUpdateId)),
-        verificationLogs: current.verificationLogs.filter((log) => log.liveTaskId !== task.id && !updateIds.includes(log.taskUpdateId)),
+        taskFiles: current.taskFiles.filter((file) => file.liveTaskId !== task.id && !removedUpdateIds.has(file.taskUpdateId)),
+        verificationLogs: current.verificationLogs.filter((log) => log.liveTaskId !== task.id && !removedUpdateIds.has(log.taskUpdateId)),
         notifications: current.notifications.filter((notification) => notification.relatedTaskId !== task.id),
         requests: current.requests.map((request) => request.relatedLiveTaskId === task.id ? { ...request, relatedLiveTaskId: undefined } : request)
-      }, currentProfile, "Master Tasks", `Deleted task ${details.taskDetails}`, "live_task", task.id, { deleted: true });
+      }, affectedReportIds);
+      return withActivity(nextState, currentProfile, "Master Tasks", `Deleted task ${details.taskDetails}`, "live_task", task.id, { deleted: true });
     });
     showToast("Task deleted", `${details.taskDetails} was removed from the live task list.`, "warning");
   };
@@ -2886,15 +2889,22 @@ function RequestsTab({ state, currentProfile, updateState, showToast }: { state:
   };
 
   const changeStatus = (request: AreaRequest, status: RequestStatus) => {
-    updateState((current) => withActivity({
-      ...current,
-      requests: current.requests.map((item) => (item.id === request.id ? { ...item, status } : item)),
-      notifications: [createInAppNotification(request.requestedBy, "Request status changed", `Request ${status}`, request.title, { areaId: request.areaId, relatedRequestId: request.id }), ...current.notifications],
-      liveTasks:
-        status === "Approved" && request.requestType === "Not Applicable / Task Removal Request" && request.relatedLiveTaskId
+    updateState((current) => {
+      const removedTask = request.relatedLiveTaskId ? current.liveTasks.find((task) => task.id === request.relatedLiveTaskId) : undefined;
+      const shouldRemoveTaskFromScope = status === "Approved" && request.requestType === "Not Applicable / Task Removal Request" && Boolean(removedTask);
+      const nextState = {
+        ...current,
+        requests: current.requests.map((item) => (item.id === request.id ? { ...item, status } : item)),
+        notifications: [createInAppNotification(request.requestedBy, "Request status changed", `Request ${status}`, request.title, { areaId: request.areaId, relatedRequestId: request.id }), ...current.notifications],
+        liveTasks: shouldRemoveTaskFromScope
           ? current.liveTasks.map((task) => (task.id === request.relatedLiveTaskId ? { ...task, notApplicable: true, active: false } : task))
           : current.liveTasks
-    }, currentProfile, "Requests", `Changed request status to ${status}`, "request", request.id, { status }));
+      };
+      const reconciledState = shouldRemoveTaskFromScope && removedTask
+        ? reconcileDailyReportsForTaskScope(nextState, affectedDailyReportIdsForTask(current, removedTask))
+        : nextState;
+      return withActivity(reconciledState, currentProfile, "Requests", `Changed request status to ${status}`, "request", request.id, { status });
+    });
     showToast("Request updated", `${request.title} is now ${status}.`, status === "Rejected" ? "warning" : "success");
   };
 
@@ -6562,6 +6572,50 @@ function getOrCreateReport(state: EventPrepState, areaId: string, prepDay: numbe
 
 function upsertReport(state: EventPrepState, report: DailyReport): EventPrepState {
   return { ...state, dailyReports: [report, ...state.dailyReports.filter((item) => item.id !== report.id)] };
+}
+
+function affectedDailyReportIdsForTask(state: EventPrepState, task: LiveTask, updates = state.taskUpdates.filter((update) => update.liveTaskId === task.id)) {
+  const affectedReportIds = new Set(updates.map((update) => update.dailyReportId));
+  state.dailyReports
+    .filter((report) => report.areaId === task.areaId && report.prepDay === task.prepDay)
+    .forEach((report) => affectedReportIds.add(report.id));
+  return affectedReportIds;
+}
+
+function reconcileDailyReportsForTaskScope(state: EventPrepState, affectedReportIds: Set<string>): EventPrepState {
+  if (!affectedReportIds.size) return state;
+  const now = new Date().toISOString();
+  const dailyReports = state.dailyReports.map((report) => {
+    if (!affectedReportIds.has(report.id) || report.status === "Closed" || report.status === "Escalated") return report;
+    const reportTasks = state.liveTasks.filter((task) => task.areaId === report.areaId && task.prepDay === report.prepDay && task.active && !task.notApplicable);
+    const reportTaskIds = new Set(reportTasks.map((task) => task.id));
+    const updates = state.taskUpdates.filter((update) => update.dailyReportId === report.id && reportTaskIds.has(update.liveTaskId));
+    const hasRemark = Boolean(report.generalRemark.trim());
+    const hasTaskActivity = updates.length > 0;
+    const hasRemainingMissingTasks = reportTasks.some((task) => !updates.some((update) => update.liveTaskId === task.id));
+    const submittedStatus: DailyReport["status"] = report.status === "Late Submitted" ? "Late Submitted" : "Submitted";
+    const wasSubmittedLike = ["Submitted", "Late Submitted", "Partially Updated"].includes(report.status);
+    const nextStatus: DailyReport["status"] = !hasTaskActivity && !hasRemark
+      ? "Not Started"
+      : hasRemainingMissingTasks
+        ? hasTaskActivity ? "Partially Updated" : "Draft Saved"
+        : report.submittedAt || wasSubmittedLike
+          ? submittedStatus
+          : "Draft Saved";
+    const isSubmittedLike = ["Submitted", "Late Submitted", "Partially Updated"].includes(nextStatus);
+    const nextSubmittedAt = ["Submitted", "Late Submitted"].includes(nextStatus) ? report.submittedAt || now : isSubmittedLike ? report.submittedAt : undefined;
+    if (nextStatus === report.status && report.submittedAt === nextSubmittedAt) {
+      return report;
+    }
+    return {
+      ...report,
+      status: nextStatus,
+      submittedBy: isSubmittedLike ? report.submittedBy : undefined,
+      submittedAt: nextSubmittedAt,
+      updatedAt: now
+    };
+  });
+  return { ...state, dailyReports };
 }
 
 function createTaskUpdate(task: LiveTask, report: DailyReport, profileId: string, latest?: TaskUpdate): TaskUpdate {
