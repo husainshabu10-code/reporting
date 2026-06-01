@@ -312,8 +312,14 @@ async function saveToSupabase(db: SupabaseClient, state: EventPrepState, profile
     updated_at: new Date().toISOString()
   });
   if (settingsError) throw settingsError;
+  await upsertRows(db, "requests", state.requests.map(requestToDb));
   await deleteMissingRows(db, "areas", state.areas.map((area) => area.id));
+  await deleteMissingRows(db, "area_access", state.areaAccess.map((access) => access.id));
   await deleteMissingRows(db, "live_tasks", state.liveTasks.map((task) => task.id));
+  await deleteMissingRows(db, "task_updates", state.taskUpdates.map((update) => update.id));
+  await deleteMissingRows(db, "task_files", state.taskFiles.map((file) => file.id));
+  await deleteMissingRows(db, "verification_logs", state.verificationLogs.map((log) => log.id));
+  await deleteMissingRows(db, "in_app_notifications", state.notifications.map((notification) => notification.id));
   await upsertRows(db, "profiles", state.profiles.map(profileToDb));
   await upsertRows(db, "zone_types", state.zoneTypes.map(zoneTypeToDb));
   await upsertRows(db, "areas", state.areas.map(areaToDb));
