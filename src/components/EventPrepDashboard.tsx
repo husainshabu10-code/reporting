@@ -3249,6 +3249,11 @@ function AccessEditor({
   const [viewerPdf, setViewerPdf] = useState(currentViewerAccess.canExportPdf);
   const [viewerExcel, setViewerExcel] = useState(currentViewerAccess.canExportExcel);
   const [scopeByArea, setScopeByArea] = useState<Record<string, AreaAccess["data"]>>(() => Object.fromEntries(currentAccess.map((access) => [access.areaId, access.data || defaultAreaAccessScope(access.role)])));
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(true);
+  const [areasOpen, setAreasOpen] = useState(false);
+  const [scopeOpen, setScopeOpen] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
   useEffect(() => {
     setRole(profile.role);
     setStatus(profile.status);
@@ -3274,158 +3279,239 @@ function AccessEditor({
     canExportPdf: viewerPdf,
     canExportExcel: viewerExcel
   };
+  const accessWorkstreamKey: "workstreams" | "verificationWorkstreams" = role === "verifier" ? "verificationWorkstreams" : "workstreams";
+  const selectedAreaNames = areaIds.map((selectedAreaId) => areas.find((area) => area.id === selectedAreaId)?.name || selectedAreaId);
+  const selectedWorkstreamTotal = nextAccessScopes.reduce((sum, access) => {
+    const workstreams = access.data?.[accessWorkstreamKey];
+    return sum + (Array.isArray(workstreams) ? workstreams.length : 0);
+  }, 0);
+  const accessSummary = allAreasRole ? "All areas" : areaIds.length ? `${areaIds.length} area(s)` : "No area access";
+  const workstreamSummary = allAreasRole ? "All workstreams" : selectedWorkstreamTotal ? `${selectedWorkstreamTotal} workstream selection(s)` : "No workstreams selected";
+  const statusLabel = status.replace("_", " ");
   return (
-    <article className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h3 className="font-black text-[var(--color-primary)]">{profile.fullName}</h3>
-          <p className="text-sm text-[var(--color-text-muted)]">{profile.email}</p>
+    <article className={`user-access-card motion-card animate-fade-in ${editorOpen ? "is-open" : "is-collapsed"}`}>
+      <button type="button" className="user-access-card-header" onClick={() => setEditorOpen((open) => !open)} aria-expanded={editorOpen}>
+        <div className="user-access-heading">
+          <span className="user-access-avatar" aria-hidden="true">{profileInitials(profile)}</span>
+          <span className="min-w-0">
+            <span className="user-access-name">{profile.fullName}</span>
+            <span className="user-access-email">{profile.email}</span>
+          </span>
         </div>
-        <div className="grid gap-3 md:grid-cols-[12rem_12rem_auto] md:items-end">
-          <Select label="Role" value={role} onChange={(value) => setRole(value as UserRole)} options={["super_admin", "admin", "area_admin", "verifier", "report_user", "viewer"].map((value) => ({ label: roleLabel(value as UserRole), value }))} />
-          <Select label="Status" value={status} onChange={(value) => setStatus(value as Profile["status"])} options={[{ label: "Active", value: "active" }, { label: "Pending Approval", value: "pending_approval" }, { label: "Disabled", value: "disabled" }]} />
-          <button className="btn-primary" disabled={saving} onClick={() => onSave(profile, role, status, areaIds, role === "viewer" ? nextViewerAccess : undefined, nextAccessScopes)}>
-            {saving ? <Spinner /> : null}
-            {saving ? "Saving..." : "Save Access"}
-          </button>
+        <div className="user-access-header-meta">
+          <span className="user-access-pill">{roleLabel(role)}</span>
+          <span className={`user-access-status-pill status-${status}`}>{statusLabel}</span>
+          <span className="user-access-pill">{accessSummary}</span>
+          <span className="user-access-pill">{workstreamSummary}</span>
+          <span className={`task-collapse-icon ${editorOpen ? "" : "is-collapsed"}`} aria-hidden="true"><ChevronDown size={16} /></span>
         </div>
-      </div>
-      <div className="mt-3">
-        <p className="field-label">Area access</p>
-        {allAreasRole ? (
-          <p className="mt-2 rounded-lg bg-white p-3 text-sm font-bold text-[var(--color-primary)]">This role can access all areas.</p>
-        ) : (
-          <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {areas.map((area) => (
-              <label key={area.id} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white p-2 text-sm font-bold text-[var(--color-primary)]">
-                <input
-                  type="checkbox"
-                  checked={areaIds.includes(area.id)}
-                  onChange={(event) => {
-                    setAreaIds((current) => event.target.checked ? [...current, area.id] : current.filter((idValue) => idValue !== area.id));
-                    if (event.target.checked) setScopeByArea((current) => ({ ...current, [area.id]: current[area.id] || defaultAreaAccessScope(role) }));
-                  }}
-                />
-                {area.name}
-              </label>
-            ))}
-          </div>
-        )}
-      </div>
-      {!allAreasRole && areaIds.length ? (
-        <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-white p-3">
-          <div className="flex items-center gap-2 text-sm font-black text-[var(--color-primary)]">
-            <ShieldCheck size={16} />
-            Access Scope
-          </div>
-          <p className="mt-1 text-xs font-bold text-[var(--color-text-muted)]">
-            Select the exact workstreams this user can see. Leave legacy imported access unchanged only when you intentionally want area-wide visibility.
-          </p>
-          <div className="mt-3 grid gap-3">
-            {areaIds.map((selectedAreaId) => {
-              const area = areas.find((item) => item.id === selectedAreaId);
-              const scope = scopeByArea[selectedAreaId] || defaultAreaAccessScope(role) || {};
-              const keyName: "workstreams" | "verificationWorkstreams" = role === "verifier" ? "verificationWorkstreams" : "workstreams";
-              const selectedWorkstreams = scope[keyName] || [];
-              return (
-                <div key={selectedAreaId} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <strong className="text-sm text-[var(--color-primary)]">{area?.name || selectedAreaId}</strong>
-                    <Badge>{selectedWorkstreams.length ? `${selectedWorkstreams.length} workstream(s)` : "No workstreams selected"}</Badge>
-                  </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {workstreamOptions.map((workstream) => (
-                      <label key={`${selectedAreaId}-${workstream}`} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white p-2 text-xs font-bold text-[var(--color-primary)]">
+      </button>
+      <div className={`task-area-collapse-panel ${editorOpen ? "" : "is-collapsed"}`}>
+        <div className="task-area-collapse-inner">
+          <div className="user-access-card-body">
+            <AccessAccordionSection
+              title="User details"
+              helper="Change role, status, then save the user's access."
+              summary={`${roleLabel(role)} / ${statusLabel}`}
+              icon={Users}
+              open={detailsOpen}
+              onToggle={() => setDetailsOpen((open) => !open)}
+            >
+              <div className="user-access-controls-grid">
+                <Select label="Role" value={role} onChange={(value) => setRole(value as UserRole)} options={["super_admin", "admin", "area_admin", "verifier", "report_user", "viewer"].map((value) => ({ label: roleLabel(value as UserRole), value }))} />
+                <Select label="Status" value={status} onChange={(value) => setStatus(value as Profile["status"])} options={[{ label: "Active", value: "active" }, { label: "Pending Approval", value: "pending_approval" }, { label: "Disabled", value: "disabled" }]} />
+                <button className="btn-primary" disabled={saving} onClick={() => onSave(profile, role, status, areaIds, role === "viewer" ? nextViewerAccess : undefined, nextAccessScopes)}>
+                  {saving ? <Spinner /> : null}
+                  {saving ? "Saving..." : "Save Access"}
+                </button>
+              </div>
+            </AccessAccordionSection>
+
+            <AccessAccordionSection
+              title="Area-wise access"
+              helper={allAreasRole ? "This role can access every area." : "Choose the areas included in this user's scope."}
+              summary={selectedAreaNames.length ? selectedAreaNames.slice(0, 2).join(", ") + (selectedAreaNames.length > 2 ? ` +${selectedAreaNames.length - 2}` : "") : accessSummary}
+              icon={MapPinPlus}
+              open={areasOpen}
+              onToggle={() => setAreasOpen((open) => !open)}
+            >
+              {allAreasRole ? (
+                <p className="user-access-note">This role can access all areas.</p>
+              ) : (
+                <div className="user-access-check-grid area-grid">
+                  {areas.map((area) => (
+                    <label key={area.id} className="user-access-check-option">
+                      <input
+                        type="checkbox"
+                        checked={areaIds.includes(area.id)}
+                        onChange={(event) => {
+                          setAreaIds((current) => event.target.checked ? [...current, area.id] : current.filter((idValue) => idValue !== area.id));
+                          if (event.target.checked) setScopeByArea((current) => ({ ...current, [area.id]: current[area.id] || defaultAreaAccessScope(role) }));
+                        }}
+                      />
+                      {area.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </AccessAccordionSection>
+
+            {!allAreasRole && areaIds.length ? (
+              <AccessAccordionSection
+                title={role === "verifier" ? "Verification scope" : "Access scope"}
+                helper="Select exact workstreams and allowed actions per area."
+                summary={workstreamSummary}
+                icon={ShieldCheck}
+                open={scopeOpen}
+                onToggle={() => setScopeOpen((open) => !open)}
+              >
+                <p className="user-access-section-note">
+                  Select the exact workstreams this user can see. Leave legacy imported access unchanged only when you intentionally want area-wide visibility.
+                </p>
+                <div className="user-access-scope-stack">
+                  {areaIds.map((selectedAreaId) => {
+                    const area = areas.find((item) => item.id === selectedAreaId);
+                    const scope = scopeByArea[selectedAreaId] || defaultAreaAccessScope(role) || {};
+                    const keyName: "workstreams" | "verificationWorkstreams" = role === "verifier" ? "verificationWorkstreams" : "workstreams";
+                    const selectedWorkstreams = scope[keyName] || [];
+                    return (
+                      <div key={selectedAreaId} className="user-access-area-scope-card">
+                        <div className="user-access-area-scope-head">
+                          <strong>{area?.name || selectedAreaId}</strong>
+                          <Badge>{selectedWorkstreams.length ? `${selectedWorkstreams.length} workstream(s)` : "No workstreams selected"}</Badge>
+                        </div>
+                        <div className="user-access-check-grid workstream-grid">
+                          {workstreamOptions.map((workstream) => (
+                            <label key={`${selectedAreaId}-${workstream}`} className="user-access-check-option is-compact">
+                              <input
+                                type="checkbox"
+                                checked={selectedWorkstreams.includes(workstream)}
+                                onChange={(event) => {
+                                  const next = event.target.checked ? unique([...selectedWorkstreams, workstream]) : selectedWorkstreams.filter((value) => value !== workstream);
+                                  setScopeByArea((current) => ({
+                                    ...current,
+                                    [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), [keyName]: next }
+                                  }));
+                                }}
+                              />
+                              {workstream}
+                            </label>
+                          ))}
+                        </div>
+                        {role === "report_user" ? (
+                          <div className="user-access-permission-grid">
+                            <ScopeToggle label="View tasks" checked={scope.canViewTasks !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canViewTasks: checked } }))} />
+                            <ScopeToggle label="Update tasks" checked={scope.canUpdateTasks !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canUpdateTasks: checked } }))} />
+                            <ScopeToggle label="Submit reports" checked={scope.canSubmitReports !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canSubmitReports: checked } }))} />
+                            <ScopeToggle label="Raise requests" checked={scope.canRaiseRequests !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canRaiseRequests: checked } }))} />
+                          </div>
+                        ) : null}
+                        {role === "verifier" ? (
+                          <div className="user-access-permission-grid">
+                            <ScopeToggle label="Verify" checked={scope.canVerify !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canVerify: checked } }))} />
+                            <ScopeToggle label="Request correction" checked={scope.canRequestCorrection !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canRequestCorrection: checked } }))} />
+                            <ScopeToggle label="Reject" checked={scope.canReject !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canReject: checked } }))} />
+                            <ScopeToggle label="View evidence" checked={scope.canViewEvidence !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canViewEvidence: checked } }))} />
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </AccessAccordionSection>
+            ) : null}
+
+            {role === "viewer" ? (
+              <AccessAccordionSection
+                title="Viewer permissions"
+                helper="Read-only visibility and export permissions for viewer accounts."
+                summary={`${viewerDashboard ? "Dashboard on" : "Dashboard off"} / ${viewerReportTypes.length} report type(s)`}
+                icon={Eye}
+                open={viewerOpen}
+                onToggle={() => setViewerOpen((open) => !open)}
+              >
+                <div className="user-access-permission-grid">
+                  <ScopeToggle label="Can see dashboard" checked={viewerDashboard} onChange={setViewerDashboard} />
+                  <ScopeToggle label="Can export PDF" checked={viewerPdf} onChange={setViewerPdf} />
+                  <ScopeToggle label="Can export Excel" checked={viewerExcel} onChange={setViewerExcel} />
+                </div>
+                <div className="mt-3">
+                  <p className="field-label">Visible zone types</p>
+                  <div className="user-access-check-grid zone-grid">
+                    {zoneTypes.map((zone) => (
+                      <label key={zone.id} className="user-access-check-option">
                         <input
                           type="checkbox"
-                          checked={selectedWorkstreams.includes(workstream)}
-                          onChange={(event) => {
-                            const next = event.target.checked ? unique([...selectedWorkstreams, workstream]) : selectedWorkstreams.filter((value) => value !== workstream);
-                            setScopeByArea((current) => ({
-                              ...current,
-                              [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), [keyName]: next }
-                            }));
-                          }}
+                          checked={viewerZoneIds.includes(zone.id)}
+                          onChange={(event) => setViewerZoneIds((current) => event.target.checked ? [...current, zone.id] : current.filter((idValue) => idValue !== zone.id))}
                         />
-                        {workstream}
+                        {zone.name}
                       </label>
                     ))}
                   </div>
-                  {role === "report_user" ? (
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                      <ScopeToggle label="View tasks" checked={scope.canViewTasks !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canViewTasks: checked } }))} />
-                      <ScopeToggle label="Update tasks" checked={scope.canUpdateTasks !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canUpdateTasks: checked } }))} />
-                      <ScopeToggle label="Submit reports" checked={scope.canSubmitReports !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canSubmitReports: checked } }))} />
-                      <ScopeToggle label="Raise requests" checked={scope.canRaiseRequests !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canRaiseRequests: checked } }))} />
-                    </div>
-                  ) : null}
-                  {role === "verifier" ? (
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                      <ScopeToggle label="Verify" checked={scope.canVerify !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canVerify: checked } }))} />
-                      <ScopeToggle label="Request correction" checked={scope.canRequestCorrection !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canRequestCorrection: checked } }))} />
-                      <ScopeToggle label="Reject" checked={scope.canReject !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canReject: checked } }))} />
-                      <ScopeToggle label="View evidence" checked={scope.canViewEvidence !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canViewEvidence: checked } }))} />
-                    </div>
-                  ) : null}
                 </div>
-              );
-            })}
+                <div className="mt-3">
+                  <p className="field-label">Allowed report types</p>
+                  <div className="user-access-check-grid report-grid">
+                    {["Daily Area Report PDF", "Overall Progress Report PDF"].map((reportType) => (
+                      <label key={reportType} className="user-access-check-option">
+                        <input
+                          type="checkbox"
+                          checked={viewerReportTypes.includes(reportType)}
+                          onChange={(event) => setViewerReportTypes((current) => event.target.checked ? [...current, reportType] : current.filter((value) => value !== reportType))}
+                        />
+                        {reportType}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </AccessAccordionSection>
+            ) : null}
           </div>
         </div>
-      ) : null}
-      {role === "viewer" ? (
-        <div className="mt-3 rounded-lg border border-[var(--color-border)] bg-white p-3">
-          <div className="flex items-center gap-2 text-sm font-black text-[var(--color-primary)]">
-            <Eye size={16} />
-            Viewer permissions
-          </div>
-          <div className="mt-3 grid gap-3 lg:grid-cols-2">
-            <label className="flex items-center gap-2 text-sm font-bold text-[var(--color-primary)]">
-              <input type="checkbox" checked={viewerDashboard} onChange={(event) => setViewerDashboard(event.target.checked)} />
-              Can see dashboard
-            </label>
-            <label className="flex items-center gap-2 text-sm font-bold text-[var(--color-primary)]">
-              <input type="checkbox" checked={viewerPdf} onChange={(event) => setViewerPdf(event.target.checked)} />
-              Can export PDF
-            </label>
-            <label className="flex items-center gap-2 text-sm font-bold text-[var(--color-primary)]">
-              <input type="checkbox" checked={viewerExcel} onChange={(event) => setViewerExcel(event.target.checked)} />
-              Can export Excel
-            </label>
-          </div>
-          <div className="mt-3">
-            <p className="field-label">Visible zone types</p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3">
-              {zoneTypes.map((zone) => (
-                <label key={zone.id} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-2 text-sm font-bold text-[var(--color-primary)]">
-                  <input
-                    type="checkbox"
-                    checked={viewerZoneIds.includes(zone.id)}
-                    onChange={(event) => setViewerZoneIds((current) => event.target.checked ? [...current, zone.id] : current.filter((idValue) => idValue !== zone.id))}
-                  />
-                  {zone.name}
-                </label>
-              ))}
-            </div>
-          </div>
-          <div className="mt-3">
-            <p className="field-label">Allowed report types</p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              {["Daily Area Report PDF", "Overall Progress Report PDF"].map((reportType) => (
-                <label key={reportType} className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-2 text-sm font-bold text-[var(--color-primary)]">
-                  <input
-                    type="checkbox"
-                    checked={viewerReportTypes.includes(reportType)}
-                    onChange={(event) => setViewerReportTypes((current) => event.target.checked ? [...current, reportType] : current.filter((value) => value !== reportType))}
-                  />
-                  {reportType}
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : null}
+      </div>
     </article>
+  );
+}
+
+function AccessAccordionSection({
+  title,
+  helper,
+  summary,
+  icon: Icon,
+  open,
+  onToggle,
+  children
+}: {
+  title: string;
+  helper: string;
+  summary: string;
+  icon: SectionIcon;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <section className={`user-access-section ${open ? "is-open" : "is-collapsed"}`}>
+      <button type="button" className="user-access-section-header" onClick={onToggle} aria-expanded={open}>
+        <span className="user-access-section-title">
+          <span className="user-access-section-icon" aria-hidden="true"><Icon size={16} /></span>
+          <span>
+            <strong>{title}</strong>
+            <small>{helper}</small>
+          </span>
+        </span>
+        <span className="user-access-section-meta">
+          <span>{summary}</span>
+          <span className={`task-collapse-icon ${open ? "" : "is-collapsed"}`} aria-hidden="true"><ChevronDown size={15} /></span>
+        </span>
+      </button>
+      <div className={`task-collapse-panel ${open ? "" : "is-collapsed"}`}>
+        <div className="task-collapse-inner">
+          <div className="user-access-section-body">{children}</div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -3448,7 +3534,7 @@ function MyAreaTab({ state, currentProfile }: { state: EventPrepState; currentPr
 
 function ScopeToggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
   return (
-    <label className="flex items-center gap-2 rounded-lg border border-[var(--color-border)] bg-white p-2 text-xs font-bold text-[var(--color-primary)]">
+    <label className="scope-toggle-option">
       <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
       {label}
     </label>
