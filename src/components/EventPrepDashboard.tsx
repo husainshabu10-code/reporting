@@ -1361,7 +1361,7 @@ function NotificationCenter({ state, currentProfile, updateState, showToast }: {
       ...current,
       notifications: current.notifications.some((notification) => notification.id === target.id)
         ? current.notifications.map((notification) => (notification.id === target.id ? { ...notification, isRead: true } : notification))
-        : [{ ...target, isRead: true, createdAt: new Date().toISOString() }, ...current.notifications]
+        : [{ ...target, isRead: true, createdAt: target.createdAt || new Date().toISOString() }, ...current.notifications]
     }));
     showToast("Notification marked read", "This alert is now cleared from your unread list.");
   };
@@ -1373,7 +1373,7 @@ function NotificationCenter({ state, currentProfile, updateState, showToast }: {
       const targetIds = new Set(targets.map((notification) => notification.id));
       const inserted = targets
         .filter((notification) => !existingIds.has(notification.id))
-        .map((notification) => ({ ...notification, isRead: true, createdAt: new Date().toISOString() }));
+        .map((notification) => ({ ...notification, isRead: true, createdAt: notification.createdAt || new Date().toISOString() }));
       return {
         ...current,
         notifications: [
@@ -1399,28 +1399,29 @@ function NotificationCenter({ state, currentProfile, updateState, showToast }: {
       <div className="grid max-h-[28rem] gap-2 overflow-y-auto p-3">
         {!count ? <EmptyState title="No unread notifications" body="You are clear for now." /> : null}
         {generated.map((notification) => (
-          <div key={notification.id} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] p-3">
-            <div className="flex items-center gap-2">
-              <Bell size={15} className="text-[var(--color-accent)]" />
-              <p className="text-xs font-black uppercase text-[var(--color-primary)]">{notification.type}</p>
-            </div>
-            <p className="mt-2 font-black text-[var(--color-primary)]">{notification.title}</p>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">{notification.message}</p>
-            <button className="btn-compact mt-3" onClick={() => markRead(notification)}>Mark Read</button>
-          </div>
+          <NotificationCard key={notification.id} notification={notification} tone="generated" onMarkRead={markRead} />
         ))}
         {stored.map((notification) => (
-          <div key={notification.id} className="rounded-lg border border-[var(--color-border)] bg-white p-3">
-            <div className="flex items-center gap-2">
-              <Bell size={15} className="text-[var(--color-accent)]" />
-              <p className="text-xs font-black uppercase text-[var(--color-primary)]">{notification.type}</p>
-            </div>
-            <p className="mt-2 font-black text-[var(--color-primary)]">{notification.title}</p>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">{notification.message}</p>
-            <button className="btn-compact mt-3" onClick={() => markRead(notification)}>Mark Read</button>
-          </div>
+          <NotificationCard key={notification.id} notification={notification} tone="stored" onMarkRead={markRead} />
         ))}
       </div>
+    </div>
+  );
+}
+
+function NotificationCard({ notification, tone, onMarkRead }: { notification: InAppNotification; tone: "generated" | "stored"; onMarkRead: (notification: InAppNotification) => void }) {
+  return (
+    <div className={`notification-item-card ${tone === "generated" ? "is-generated" : "is-stored"}`}>
+      <div className="notification-item-head">
+        <span>
+          <Bell size={15} className="text-[var(--color-accent)]" />
+          <p>{notification.type}</p>
+        </span>
+        <time dateTime={notification.createdAt}>{formatNotificationDateTime(notification.createdAt)}</time>
+      </div>
+      <p className="notification-item-title">{notification.title}</p>
+      <p className="notification-item-message">{notification.message}</p>
+      <button className="btn-compact mt-3" onClick={() => onMarkRead(notification)}>Mark Read</button>
     </div>
   );
 }
@@ -4962,7 +4963,7 @@ function ActivityLogTab({ state, currentProfile, updateState, showToast }: { sta
         {!filteredLogs.length ? <EmptyState title="No activity found" body="Adjust or clear the filters to see more activity." /> : null}
       </Panel>
       <Panel title="In-App Notifications">
-        <ResponsiveTable headers={["User", "Type", "Title", "Read"]} rows={state.notifications.map((notification) => [state.profiles.find((profile) => profile.id === notification.userId)?.fullName || "User", notification.type, notification.title, notification.isRead ? "Yes" : "No"])} />
+        <ResponsiveTable headers={["Time", "User", "Type", "Title", "Read"]} rows={state.notifications.map((notification) => [formatNotificationDateTime(notification.createdAt), state.profiles.find((profile) => profile.id === notification.userId)?.fullName || "User", notification.type, notification.title, notification.isRead ? "Yes" : "No"])} />
       </Panel>
     </div>
   );
@@ -6319,31 +6320,31 @@ function buildUserAlerts(state: EventPrepState, profile: Profile): InAppNotifica
       title,
       message,
       isRead: false,
-      createdAt: new Date().toISOString(),
+      createdAt: extra.createdAt || new Date().toISOString(),
       ...extra
     });
   };
 
   if (["super_admin", "admin"].includes(profile.role)) {
     buildAttention(state).forEach((item) => {
-      if (item.count > 0) push(item.type, item.label, `${item.count} item(s) need attention.`);
+      if (item.count > 0) push(item.type, item.label, `${item.count} item(s) need attention.`, { createdAt: attentionAlertTimestamp(state, item.label, today) });
     });
     return notifications.filter((notification) => !readGeneratedIds.has(notification.id));
   }
 
   if (profile.role === "verifier") {
-    const queueCount = state.liveTasks.filter((task) => {
+    const queueTasks = state.liveTasks.filter((task) => {
       const update = latest.get(task.id);
       return update && ["Needs Verification", "Partially Verified"].includes(update.verificationStatus) && hasTaskScopeAccess(state, profile, task, "verify") && allowedAreaIds.includes(task.areaId);
-    }).length;
-    if (queueCount) push("Task needs verification", "Verification Queue", `${queueCount} task(s) are waiting for your verification.`);
+    });
+    if (queueTasks.length) push("Task needs verification", "Verification Queue", `${queueTasks.length} task(s) are waiting for your verification.`, { createdAt: latestTaskUpdateTimestamp(queueTasks, latest) });
   }
 
   if (profile.role === "report_user" || profile.role === "area_admin") {
     allowedAreas.forEach((area) => {
       const report = state.dailyReports.find((item) => item.areaId === area.id && item.reportDate === today);
-      if (!report) push("Daily report reminder", "Today's report pending", `${area.name} has no submitted report for today.`, { areaId: area.id });
-      if (report?.status === "Draft Saved") push("Partially updated report", "Draft saved but not submitted", `${area.name} has a draft report waiting for submission.`, { areaId: area.id, relatedDailyReportId: report.id });
+      if (!report) push("Daily report reminder", "Today's report pending", `${area.name} has no submitted report for today.`, { areaId: area.id, createdAt: combineDateAndTime(today, area.reminderTime || area.dailyDeadline) });
+      if (report?.status === "Draft Saved") push("Partially updated report", "Draft saved but not submitted", `${area.name} has a draft report waiting for submission.`, { areaId: area.id, relatedDailyReportId: report.id, createdAt: report.updatedAt || combineDateAndTime(today, area.reminderTime || area.dailyDeadline) });
     });
   }
 
@@ -6351,15 +6352,72 @@ function buildUserAlerts(state: EventPrepState, profile: Profile): InAppNotifica
   assignedTasks.forEach((task) => {
     const update = latest.get(task.id);
     const details = taskDetails(state, task);
-    if (update?.verificationStatus === "Rejected / Needs Correction") push("Task needs correction", "Task needs correction", details.taskDetails || "A task needs correction.", { areaId: task.areaId, relatedTaskId: task.id });
-    if (task.dueDate < today && update?.verificationStatus !== "Verified Completed") push("Overdue task", "Overdue assigned task", details.taskDetails || "An assigned task is overdue.", { areaId: task.areaId, relatedTaskId: task.id });
+    if (update?.verificationStatus === "Rejected / Needs Correction") push("Task needs correction", "Task needs correction", details.taskDetails || "A task needs correction.", { areaId: task.areaId, relatedTaskId: task.id, createdAt: update.updatedAt });
+    if (task.dueDate < today && update?.verificationStatus !== "Verified Completed") push("Overdue task", "Overdue assigned task", details.taskDetails || "An assigned task is overdue.", { areaId: task.areaId, relatedTaskId: task.id, createdAt: combineDateAndTime(task.dueDate, "23:59") });
   });
 
   state.requests
     .filter((request) => request.requestedBy === profile.id && request.status === "Need More Info")
-    .forEach((request) => push("Request status changed", "Request needs more info", request.title, { areaId: request.areaId, relatedRequestId: request.id }));
+    .forEach((request) => push("Request status changed", "Request needs more info", request.title, { areaId: request.areaId, relatedRequestId: request.id, createdAt: request.createdAt }));
 
   return notifications.filter((notification) => !readGeneratedIds.has(notification.id));
+}
+
+function latestTaskUpdateTimestamp(tasks: LiveTask[], latest: Map<string, TaskUpdate>) {
+  const timestamps = tasks
+    .map((task) => latest.get(task.id)?.updatedAt)
+    .filter(Boolean)
+    .sort((a, b) => String(b).localeCompare(String(a)));
+  return timestamps[0] || new Date().toISOString();
+}
+
+function attentionAlertTimestamp(state: EventPrepState, label: string, today: string) {
+  const latest = latestUpdateMap(state.taskUpdates);
+  const normalized = label.toLowerCase();
+  if (normalized.includes("missing")) {
+    const pendingAreas = state.areas.filter((area) => area.active && !state.dailyReports.some((report) => report.areaId === area.id && report.reportDate === today));
+    return combineDateAndTime(today, pendingAreas[0]?.reminderTime || pendingAreas[0]?.dailyDeadline || "00:00");
+  }
+  if (normalized.includes("partial")) return latestDailyReportTimestamp(state.dailyReports.filter((report) => ["Draft Saved", "Partially Updated"].includes(report.status)));
+  if (normalized.includes("late")) return latestDailyReportTimestamp(state.dailyReports.filter((report) => report.status === "Late Submitted"));
+  if (normalized.includes("escalated")) return latestDailyReportTimestamp(state.dailyReports.filter((report) => report.status === "Escalated"));
+  if (normalized.includes("issue")) return latestTaskUpdateTimestamp(state.liveTasks.filter((task) => latest.get(task.id)?.status === "Issue Found"), latest);
+  if (normalized.includes("verification")) return latestTaskUpdateTimestamp(state.liveTasks.filter((task) => latest.get(task.id)?.verificationStatus === "Needs Verification"), latest);
+  if (normalized.includes("correction") || normalized.includes("rejected")) return latestTaskUpdateTimestamp(state.liveTasks.filter((task) => latest.get(task.id)?.verificationStatus === "Rejected / Needs Correction"), latest);
+  if (normalized.includes("request")) return state.requests.filter((request) => request.status === "Under Review").sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]?.createdAt || new Date().toISOString();
+  if (normalized.includes("overdue")) {
+    const overdueTask = state.liveTasks
+      .filter((task) => task.dueDate < today && latest.get(task.id)?.verificationStatus !== "Verified Completed")
+      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
+    return overdueTask ? combineDateAndTime(overdueTask.dueDate, "23:59") : new Date().toISOString();
+  }
+  return new Date().toISOString();
+}
+
+function latestDailyReportTimestamp(reports: DailyReport[]) {
+  return reports
+    .map((report) => report.submittedAt || report.updatedAt)
+    .filter(Boolean)
+    .sort((a, b) => String(b).localeCompare(String(a)))[0] || new Date().toISOString();
+}
+
+function combineDateAndTime(date: string, time?: string) {
+  const normalizedTime = (time || "00:00").trim();
+  const timeWithSeconds = /^\d{2}:\d{2}$/.test(normalizedTime) ? `${normalizedTime}:00` : normalizedTime;
+  const parsed = new Date(`${date}T${timeWithSeconds}`);
+  return Number.isNaN(parsed.getTime()) ? new Date(`${date}T00:00:00`).toISOString() : parsed.toISOString();
+}
+
+function formatNotificationDateTime(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "Date/time unavailable";
+  return parsed.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
 }
 
 function createInAppNotification(
