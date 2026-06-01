@@ -50,17 +50,30 @@ async function createUser(db: ServerDb, actor: Profile & { authUserId?: string }
   const email = body.email.trim().toLowerCase();
   const existingProfile = await getProfileByEmail(db, email);
   const temporaryPassword = body.password?.trim() || generateTemporaryPassword();
-  const { data, error } = await db.auth.admin.createUser({
-    email,
-    password: temporaryPassword,
-    email_confirm: true,
-    user_metadata: { full_name: body.fullName.trim() }
-  });
-  if (error || !data.user) throw new Error(error?.message || "Unable to create Supabase auth user.");
+  const existingAuthUser = await getAuthUserByEmail(db, email);
+  let authUserId = existingAuthUser?.id;
+  if (authUserId) {
+    const { error } = await db.auth.admin.updateUserById(authUserId, {
+      password: temporaryPassword,
+      email_confirm: true,
+      user_metadata: { full_name: body.fullName.trim() }
+    });
+    if (error) throw new Error(error.message);
+  } else {
+    const { data, error } = await db.auth.admin.createUser({
+      email,
+      password: temporaryPassword,
+      email_confirm: true,
+      user_metadata: { full_name: body.fullName.trim() }
+    });
+    if (error || !data.user) throw new Error(error?.message || "Unable to create Supabase auth user.");
+    authUserId = data.user.id;
+  }
+  if (!authUserId) throw new Error("Unable to resolve Supabase auth user.");
 
   const role = isAreaAdmin ? "report_user" : body.role;
   const profile: Profile = {
-    id: existingProfile?.id || data.user.id,
+    id: existingProfile?.id || authUserId,
     email,
     fullName: body.fullName.trim(),
     role,
@@ -243,11 +256,15 @@ function defaultAreaAccessScope(role: UserRole): AreaAccess["data"] {
 
 async function resolveAuthUserId(db: ServerDb, profile: Profile) {
   if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(profile.id)) return profile.id;
-  const { data, error } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
-  if (error) throw new Error(error.message);
-  const match = data.users.find((user) => user.email?.toLowerCase() === profile.email.toLowerCase());
+  const match = await getAuthUserByEmail(db, profile.email);
   if (!match) throw new Error("No Supabase Auth user exists for this profile login ID.");
   return match.id;
+}
+
+async function getAuthUserByEmail(db: ServerDb, email: string) {
+  const { data, error } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (error) throw new Error(error.message);
+  return data.users.find((user) => user.email?.toLowerCase() === email.toLowerCase()) || null;
 }
 
 async function createInAppNotification(db: ServerDb, userId: string, areaId: string | undefined, type: string, title: string, message: string) {
