@@ -269,6 +269,8 @@ export type Reminder = {
   active: boolean;
 };
 
+export type ActivityMetadataValue = string | number | boolean | string[];
+
 export type ActivityLog = {
   id: string;
   category: string;
@@ -276,7 +278,7 @@ export type ActivityLog = {
   action: string;
   entityType: string;
   entityId?: string;
-  metadata: Record<string, string | number | boolean>;
+  metadata: Record<string, ActivityMetadataValue>;
   createdAt: string;
 };
 
