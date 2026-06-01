@@ -691,16 +691,19 @@ function DashboardTab({
     return { label: workstream, value: percent(verified, tasks.length), helper: `${tasks.length} live tasks` };
   });
   const pendingRequestsCount = metrics.pendingRequests;
+  const scopedInProgress = scopedTasks.filter((task) => latest.get(task.id)?.status === "In Progress").length;
+  const scopedIssueFound = scopedTasks.filter((task) => latest.get(task.id)?.status === "Issue Found").length;
+  const scopedOverdue = scopedTasks.filter((task) => task.dueDate && task.dueDate < todayIso() && latest.get(task.id)?.verificationStatus !== "Verified Completed").length;
   const quickStatusRows = [
     { label: "Total Tasks", value: String(scopedTasks.length), helper: "Filtered scope", tone: "good" as const },
     { label: "Verified Tasks", value: String(scopedVerified), helper: "Counts as complete", tone: "good" as const },
-    { label: "In Progress", value: String(scopedTasks.filter((task) => latest.get(task.id)?.status === "In Progress").length), helper: "Currently active", tone: "warning" as const }
+    { label: "In Progress", value: String(scopedInProgress), helper: "Currently active", tone: "warning" as const }
   ];
   const quickStatusBreakdown: InsightBreakdownRow[] = [
     { label: "Verified", value: scopedVerified, color: "#2E7D5B" },
-    { label: "In Progress", value: scopedTasks.filter((task) => latest.get(task.id)?.status === "In Progress").length, color: "#C9A227" },
-    { label: "Pending", value: Math.max(0, scopedTasks.length - scopedVerified - scopedTasks.filter((task) => latest.get(task.id)?.status === "In Progress").length), color: "#F3E7C3" },
-    { label: "Issue / Overdue", value: metrics.issueFound + metrics.overdueTasks, color: "#7A1F2B" }
+    { label: "In Progress", value: scopedInProgress, color: "#C9A227" },
+    { label: "Pending", value: Math.max(0, scopedTasks.length - scopedVerified - scopedInProgress), color: "#F3E7C3" },
+    { label: "Issue / Overdue", value: scopedIssueFound + scopedOverdue, color: "#7A1F2B" }
   ];
   const insightActionsFor = (label: string) => dashboardInsightActions(label, allowedTabs, openWorkspace);
   const recentActivity = state.activityLogs.slice(0, 5);
