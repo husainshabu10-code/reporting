@@ -3815,17 +3815,6 @@ function collectDocumentCss() {
   return chunks.join("\n");
 }
 
-function escapeHtml(value: string) {
-  const entities: Record<string, string> = {
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    "\"": "&quot;",
-    "'": "&#39;"
-  };
-  return value.replace(/[&<>"']/g, (char) => entities[char] || char);
-}
-
 function ReportPreview({ state, data, reportType, reportDate, currentProfile, generatedAt }: { state: EventPrepState; data: ReportPreviewData; reportType: string; reportDate: string; currentProfile: Profile; generatedAt?: string }) {
   const isDaily = reportType === "Area-wise Daily Report";
   const isProject = reportType === "Printable Project Status Report";
