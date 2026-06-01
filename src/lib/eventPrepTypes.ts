@@ -96,6 +96,7 @@ export type AreaAccessScope = {
   canReject?: boolean;
   canViewEvidence?: boolean;
   canRaiseRequests?: boolean;
+  canReviewRequests?: boolean;
   canManageUsers?: boolean;
   canViewReports?: boolean;
   canViewDashboard?: boolean;

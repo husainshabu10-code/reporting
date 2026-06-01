@@ -57,6 +57,7 @@ import {
   ZONE_TYPES,
   type ActivityLog,
   type AreaAccess,
+  type AreaAccessScope,
   type AreaRequest,
   type CustomFieldResponse,
   type DashboardMetrics,
@@ -326,7 +327,7 @@ export default function EventPrepDashboard() {
   const isAreaAdmin = currentProfile?.role === "area_admin";
   const isVerifier = currentProfile?.role === "verifier";
   const isViewer = currentProfile?.role === "viewer";
-  const tabs: AnyTab[] = isAdmin ? ADMIN_TABS : isAreaAdmin ? AREA_ADMIN_TABS : isVerifier ? VERIFIER_TABS : isViewer ? viewerTabsFor(state || undefined, currentProfile) : USER_TABS;
+  const tabs: AnyTab[] = currentProfile ? roleTabsForProfile(state || undefined, currentProfile) : [];
   const notificationCount = state && currentProfile ? unreadNotificationsFor(state, currentProfile).length + buildUserAlerts(state, currentProfile).length : 0;
 
   useEffect(() => {
@@ -2363,7 +2364,7 @@ function ZonesAreasTab({ state, updateState, showToast }: { state: EventPrepStat
 }
 
 function DailyReportTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
-  const allowedAreas = getAllowedAreas(state, currentProfile);
+  const allowedAreas = getAllowedAreas(state, currentProfile).filter((area) => canSubmitReportsForProfile(state, currentProfile, area.id));
   const [areaId, setAreaId] = useState(allowedAreas[0]?.id || "");
   const [taskView, setTaskView] = useState<TaskView>("all");
   const [dayFilter, setDayFilter] = useState("All");
@@ -2400,7 +2401,7 @@ function DailyReportTab({ state, currentProfile, updateState, showToast }: { sta
   const workstreamOptions = unique(tasks.map((task) => taskDetails(state, task).workstream));
 
   useEffect(() => {
-    setAreaId((current: string) => current || allowedAreas[0]?.id || "");
+    setAreaId((current: string) => allowedAreas.some((areaItem) => areaItem.id === current) ? current : allowedAreas[0]?.id || "");
   }, [allowedAreas]);
 
   useEffect(() => {
@@ -2770,6 +2771,14 @@ function VerificationTab({ state, currentProfile, updateState, showToast }: { st
   const act = (task: LiveTask, action: VerificationLog["action"]) => {
     const update = latest.get(task.id);
     if (!update) return;
+    if (action === "verified" && !hasTaskScopeAccess(state, currentProfile, task, "verify")) {
+      showToast("Verification access disabled", "This user does not currently have verify access for this task scope.", "warning");
+      return;
+    }
+    if (action === "rejected" && !canRejectVerificationForTask(state, currentProfile, task)) {
+      showToast("Correction access disabled", "This user does not currently have reject or correction access for this task scope.", "warning");
+      return;
+    }
     if (!canActOnVerification(state, task, update, currentProfile, state.verificationLogs)) {
       window.alert("This verification is waiting for another assigned verifier.");
       showToast("Verification blocked", "This task is waiting for another assigned verifier.", "warning");
@@ -2803,6 +2812,8 @@ function VerificationTab({ state, currentProfile, updateState, showToast }: { st
           const details = taskDetails(state, task);
           const update = latest.get(task.id);
           const canAct = update ? canActOnVerification(state, task, update, currentProfile, state.verificationLogs) : false;
+          const canVerifyAction = canAct && hasTaskScopeAccess(state, currentProfile, task, "verify");
+          const canRejectAction = canAct && canRejectVerificationForTask(state, currentProfile, task);
           const verifiedBy = state.verificationLogs
             .filter((log) => log.taskUpdateId === update?.id && log.action === "verified")
             .map((log) => state.profiles.find((profile) => profile.id === log.verifierId)?.fullName || log.verifierId)
@@ -2824,8 +2835,8 @@ function VerificationTab({ state, currentProfile, updateState, showToast }: { st
                   {verifiedBy ? <p className="mt-1 text-xs font-black text-[var(--color-secondary)]">Verified by: {verifiedBy}</p> : null}
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
-                  <button className="btn-primary" disabled={!canAct} onClick={() => act(task, "verified")}>Verify</button>
-                  <button className="btn-secondary" disabled={!canAct} onClick={() => act(task, "rejected")}>Reject / Needs Correction</button>
+                  {canVerifyAction ? <button className="btn-primary" onClick={() => act(task, "verified")}>Verify</button> : null}
+                  {canRejectAction ? <button className="btn-secondary" onClick={() => act(task, "rejected")}>Reject / Needs Correction</button> : null}
                 </div>
               </div>
             </article>
@@ -2840,7 +2851,10 @@ function VerificationTab({ state, currentProfile, updateState, showToast }: { st
 function RequestsTab({ state, currentProfile, updateState, showToast }: { state: EventPrepState; currentProfile: Profile; updateState: (updater: (current: EventPrepState) => EventPrepState) => void; showToast: ShowToast }) {
   const isAdmin = ["super_admin", "admin"].includes(currentProfile.role);
   const areas = getAllowedAreas(state, currentProfile);
-  const [areaId, setAreaId] = useState(areas[0]?.id || state.areas[0]?.id || "");
+  const requestAreas = isAdmin ? state.areas : areas.filter((area) => canRaiseRequestsForProfile(state, currentProfile, area.id) || canReviewRequestsForProfile(state, currentProfile, area.id));
+  const createRequestAreas = isAdmin ? state.areas : areas.filter((area) => canRaiseRequestsForProfile(state, currentProfile, area.id));
+  const canCreateRequests = createRequestAreas.length > 0;
+  const [areaId, setAreaId] = useState(createRequestAreas[0]?.id || requestAreas[0]?.id || state.areas[0]?.id || "");
   const [requestType, setRequestType] = useState<(typeof REQUEST_TYPES)[number]>("Extra Equipment Request");
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
@@ -2850,7 +2864,7 @@ function RequestsTab({ state, currentProfile, updateState, showToast }: { state:
     ? state.requests
     : currentProfile.role === "verifier"
       ? state.requests.filter((request) => assignedReviewRequestIds.has(request.id))
-      : state.requests.filter((request) => areas.some((area) => area.id === request.areaId) || request.requestedBy === currentProfile.id);
+      : state.requests.filter((request) => requestAreas.some((area) => area.id === request.areaId));
   const verifierOptions = (requestAreaId: string, relatedTaskId?: string) => {
     const relatedTask = relatedTaskId ? state.liveTasks.find((task) => task.id === relatedTaskId) : undefined;
     const workstream = relatedTask ? taskDetails(state, relatedTask).workstream || "General" : undefined;
@@ -2861,7 +2875,15 @@ function RequestsTab({ state, currentProfile, updateState, showToast }: { state:
     ));
   };
 
+  useEffect(() => {
+    setAreaId((current) => createRequestAreas.some((area) => area.id === current) ? current : createRequestAreas[0]?.id || "");
+  }, [createRequestAreas]);
+
   const createRequest = () => {
+    if (!canCreateRequests || !canRaiseRequestsForProfile(state, currentProfile, areaId)) {
+      showToast("Request access disabled", "This user does not currently have request submission access.", "warning");
+      return;
+    }
     if (!title.trim() || !areaId) {
       showToast("Request needs a title", "Add a request title and area before submitting.", "warning");
       return;
@@ -2956,16 +2978,16 @@ function RequestsTab({ state, currentProfile, updateState, showToast }: { state:
 
   return (
     <div className="space-y-4">
-      <Panel title="Raise Request">
+      {canCreateRequests ? <Panel title="Raise Request">
         <div className="grid gap-3 lg:grid-cols-4">
           <Select label="Request Type" value={requestType} onChange={(value) => setRequestType(value as typeof requestType)} options={[...REQUEST_TYPES]} />
-          <Select label="Area" value={areaId} onChange={setAreaId} options={(isAdmin ? state.areas : areas).map((area) => ({ label: area.name, value: area.id }))} />
+          <Select label="Area" value={areaId} onChange={setAreaId} options={createRequestAreas.map((area) => ({ label: area.name, value: area.id }))} />
           <Input label="Request title" value={title} onChange={setTitle} />
           <Select label="Priority" value="Medium" onChange={() => undefined} options={[...PRIORITY_OPTIONS]} disabled />
         </div>
         <textarea className="field mt-3 min-h-20" value={details} onChange={(event) => setDetails(event.target.value)} placeholder="Request details" />
         <button className="btn-primary mt-3" onClick={createRequest}>Submit Request</button>
-      </Panel>
+      </Panel> : null}
       <Panel title="Requests">
         <ResponsiveTable
           headers={["Type", "Area", "Title", "Status", "Review", "Action"]}
@@ -3048,7 +3070,7 @@ function UsersAccessTab({ state, currentProfile, updateState, showToast }: { sta
       updateState((current) => ({
         ...withActivity(current, currentProfile, "Access changes", `Created ${roleLabel(profile.role)} credentials`, "profile", profile.id, { pendingApproval: profile.status === "pending_approval" }),
         profiles: [profile, ...current.profiles.filter((item) => item.id !== profile.id)],
-        areaAccess: areaId ? [{ ...scopedAreaAccessRow(profile.id, areaId, profile.role), data: profile.role === "verifier" ? { ...defaultAreaAccessScope(profile.role), verificationWorkstreams: newUserWorkstreams } : { ...defaultAreaAccessScope(profile.role), workstreams: newUserWorkstreams } }, ...current.areaAccess.filter((access) => !(access.profileId === profile.id && access.areaId === areaId && access.role === profile.role))] : current.areaAccess,
+        areaAccess: areaId ? [{ ...scopedAreaAccessRow(profile.id, areaId, profile.role), data: accessScopeForRole(profile.role, profile.role === "verifier" ? { verificationWorkstreams: newUserWorkstreams } : { workstreams: newUserWorkstreams }) }, ...current.areaAccess.filter((access) => !(access.profileId === profile.id && access.areaId === areaId && access.role === profile.role))] : current.areaAccess,
         notifications: [createInAppNotification(profile.id, "Access request approved/rejected", "User created / pending approval", "Your credentials were created. Use the temporary password and change it on first login.", { areaId }), ...current.notifications]
       }));
       setTemporaryPassword(result.temporaryPassword);
@@ -3258,7 +3280,7 @@ function AccessEditor({
   const [viewerReportTypes, setViewerReportTypes] = useState<string[]>(currentViewerAccess.reportTypes);
   const [viewerPdf, setViewerPdf] = useState(currentViewerAccess.canExportPdf);
   const [viewerExcel, setViewerExcel] = useState(currentViewerAccess.canExportExcel);
-  const [scopeByArea, setScopeByArea] = useState<Record<string, AreaAccess["data"]>>(() => Object.fromEntries(currentAccess.map((access) => [access.areaId, access.data || defaultAreaAccessScope(access.role)])));
+  const [scopeByArea, setScopeByArea] = useState<Record<string, AreaAccess["data"]>>(() => Object.fromEntries(currentAccess.map((access) => [access.areaId, accessScopeForRole(profile.role, access.data)])));
   const [editorOpen, setEditorOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(true);
   const [areasOpen, setAreasOpen] = useState(false);
@@ -3268,7 +3290,7 @@ function AccessEditor({
     setRole(profile.role);
     setStatus(profile.status);
     setAreaIds(currentAreaIds);
-    setScopeByArea(Object.fromEntries(currentAccess.map((access) => [access.areaId, access.data || defaultAreaAccessScope(access.role)])));
+    setScopeByArea(Object.fromEntries(currentAccess.map((access) => [access.areaId, accessScopeForRole(profile.role, access.data)])));
     const access = viewerAccessFor(profile, { areas, zoneTypes } as EventPrepState);
     setViewerDashboard(access.canSeeDashboard);
     setViewerZoneIds(access.zoneTypeIds);
@@ -3279,7 +3301,7 @@ function AccessEditor({
   const allAreasRole = ["super_admin", "admin"].includes(role);
   const nextAccessScopes = areaIds.map((nextAreaId) => ({
     ...scopedAreaAccessRow(profile.id, nextAreaId, role),
-    data: scopeByArea[nextAreaId] || defaultAreaAccessScope(role)
+    data: accessScopeForRole(role, scopeByArea[nextAreaId])
   }));
   const nextViewerAccess: Profile["viewerAccess"] = {
     canSeeDashboard: viewerDashboard,
@@ -3298,6 +3320,7 @@ function AccessEditor({
   const accessSummary = allAreasRole ? "All areas" : areaIds.length ? `${areaIds.length} area(s)` : "No area access";
   const workstreamSummary = allAreasRole ? "All workstreams" : selectedWorkstreamTotal ? `${selectedWorkstreamTotal} workstream selection(s)` : "No workstreams selected";
   const statusLabel = status.replace("_", " ");
+  const saveAccess = () => onSave(profile, role, status, areaIds, role === "viewer" ? nextViewerAccess : undefined, nextAccessScopes);
   return (
     <article className={`user-access-card motion-card animate-fade-in ${editorOpen ? "is-open" : "is-collapsed"}`}>
       <button type="button" className="user-access-card-header" onClick={() => setEditorOpen((open) => !open)} aria-expanded={editorOpen}>
@@ -3330,10 +3353,6 @@ function AccessEditor({
               <div className="user-access-controls-grid">
                 <Select label="Role" value={role} onChange={(value) => setRole(value as UserRole)} options={["super_admin", "admin", "area_admin", "verifier", "report_user", "viewer"].map((value) => ({ label: roleLabel(value as UserRole), value }))} />
                 <Select label="Status" value={status} onChange={(value) => setStatus(value as Profile["status"])} options={[{ label: "Active", value: "active" }, { label: "Pending Approval", value: "pending_approval" }, { label: "Disabled", value: "disabled" }]} />
-                <button className="btn-primary" disabled={saving} onClick={() => onSave(profile, role, status, areaIds, role === "viewer" ? nextViewerAccess : undefined, nextAccessScopes)}>
-                  {saving ? <Spinner /> : null}
-                  {saving ? "Saving..." : "Save Access"}
-                </button>
               </div>
             </AccessAccordionSection>
 
@@ -3356,7 +3375,7 @@ function AccessEditor({
                         checked={areaIds.includes(area.id)}
                         onChange={(event) => {
                           setAreaIds((current) => event.target.checked ? [...current, area.id] : current.filter((idValue) => idValue !== area.id));
-                          if (event.target.checked) setScopeByArea((current) => ({ ...current, [area.id]: current[area.id] || defaultAreaAccessScope(role) }));
+                          if (event.target.checked) setScopeByArea((current) => ({ ...current, [area.id]: accessScopeForRole(role, current[area.id]) }));
                         }}
                       />
                       {area.name}
@@ -3381,9 +3400,13 @@ function AccessEditor({
                 <div className="user-access-scope-stack">
                   {areaIds.map((selectedAreaId) => {
                     const area = areas.find((item) => item.id === selectedAreaId);
-                    const scope = scopeByArea[selectedAreaId] || defaultAreaAccessScope(role) || {};
+                    const scope = accessScopeForRole(role, scopeByArea[selectedAreaId]) || {};
                     const keyName: "workstreams" | "verificationWorkstreams" = role === "verifier" ? "verificationWorkstreams" : "workstreams";
                     const selectedWorkstreams = scope[keyName] || [];
+                    const updateSelectedScope = (patch: AreaAccess["data"]) => setScopeByArea((current) => ({
+                      ...current,
+                      [selectedAreaId]: accessScopeForRole(role, { ...accessScopeForRole(role, current[selectedAreaId]), ...patch })
+                    }));
                     return (
                       <div key={selectedAreaId} className="user-access-area-scope-card">
                         <div className="user-access-area-scope-head">
@@ -3398,10 +3421,7 @@ function AccessEditor({
                                 checked={selectedWorkstreams.includes(workstream)}
                                 onChange={(event) => {
                                   const next = event.target.checked ? unique([...selectedWorkstreams, workstream]) : selectedWorkstreams.filter((value) => value !== workstream);
-                                  setScopeByArea((current) => ({
-                                    ...current,
-                                    [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), [keyName]: next }
-                                  }));
+                                  updateSelectedScope({ [keyName]: next } as AreaAccess["data"]);
                                 }}
                               />
                               {workstream}
@@ -3410,18 +3430,27 @@ function AccessEditor({
                         </div>
                         {role === "report_user" ? (
                           <div className="user-access-permission-grid">
-                            <ScopeToggle label="View tasks" checked={scope.canViewTasks !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canViewTasks: checked } }))} />
-                            <ScopeToggle label="Update tasks" checked={scope.canUpdateTasks !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canUpdateTasks: checked } }))} />
-                            <ScopeToggle label="Submit reports" checked={scope.canSubmitReports !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canSubmitReports: checked } }))} />
-                            <ScopeToggle label="Raise requests" checked={scope.canRaiseRequests !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canRaiseRequests: checked } }))} />
+                            <ScopeToggle label="My Area / view tasks" checked={scope.canViewTasks !== false} onChange={(checked) => updateSelectedScope({ canViewTasks: checked })} />
+                            <ScopeToggle label="Update tasks" checked={scope.canUpdateTasks !== false} onChange={(checked) => updateSelectedScope({ canUpdateTasks: checked })} />
+                            <ScopeToggle label="Daily Report + Requests tabs" checked={scope.canSubmitReports !== false && scope.canRaiseRequests !== false} onChange={(checked) => updateSelectedScope({ canSubmitReports: checked, canRaiseRequests: checked })} />
+                          </div>
+                        ) : null}
+                        {role === "area_admin" ? (
+                          <div className="user-access-permission-grid">
+                            <ScopeToggle label="My Area / view tasks" checked={scope.canViewTasks !== false} onChange={(checked) => updateSelectedScope({ canViewTasks: checked })} />
+                            <ScopeToggle label="Update tasks" checked={scope.canUpdateTasks !== false} onChange={(checked) => updateSelectedScope({ canUpdateTasks: checked })} />
+                            <ScopeToggle label="Requests tab" checked={scope.canRaiseRequests !== false} onChange={(checked) => updateSelectedScope({ canRaiseRequests: checked })} />
+                            <ScopeToggle label="Manage area users" checked={scope.canManageUsers !== false} onChange={(checked) => updateSelectedScope({ canManageUsers: checked })} />
                           </div>
                         ) : null}
                         {role === "verifier" ? (
                           <div className="user-access-permission-grid">
-                            <ScopeToggle label="Verify" checked={scope.canVerify !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canVerify: checked } }))} />
-                            <ScopeToggle label="Request correction" checked={scope.canRequestCorrection !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canRequestCorrection: checked } }))} />
-                            <ScopeToggle label="Reject" checked={scope.canReject !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canReject: checked } }))} />
-                            <ScopeToggle label="View evidence" checked={scope.canViewEvidence !== false} onChange={(checked) => setScopeByArea((current) => ({ ...current, [selectedAreaId]: { ...(current[selectedAreaId] || defaultAreaAccessScope(role)), canViewEvidence: checked } }))} />
+                            <ScopeToggle label="Verification tab" checked={scope.canVerify !== false} onChange={(checked) => updateSelectedScope({ canVerify: checked })} />
+                            <ScopeToggle label="Request correction" checked={scope.canRequestCorrection !== false} onChange={(checked) => updateSelectedScope({ canRequestCorrection: checked })} />
+                            <ScopeToggle label="Reject" checked={scope.canReject !== false} onChange={(checked) => updateSelectedScope({ canReject: checked })} />
+                            <ScopeToggle label="View evidence" checked={scope.canViewEvidence !== false} onChange={(checked) => updateSelectedScope({ canViewEvidence: checked })} />
+                            <ScopeToggle label="Requests review tab" checked={scope.canReviewRequests !== false} onChange={(checked) => updateSelectedScope({ canReviewRequests: checked })} />
+                            <ScopeToggle label="Review user access tab" checked={scope.canManageUsers !== false} onChange={(checked) => updateSelectedScope({ canManageUsers: checked })} />
                           </div>
                         ) : null}
                       </div>
@@ -3477,6 +3506,16 @@ function AccessEditor({
                 </div>
               </AccessAccordionSection>
             ) : null}
+            <div className="user-access-save-footer">
+              <div>
+                <strong>Save access changes</strong>
+                <span>Applies role, area, workstream, and tab/action permissions for this user.</span>
+              </div>
+              <button className="btn-primary" disabled={saving} onClick={saveAccess}>
+                {saving ? <Spinner /> : null}
+                {saving ? "Saving..." : "Save Access"}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -6460,6 +6499,19 @@ function hasTaskScopeAccess(state: EventPrepState, profile: Profile, task: LiveT
   });
 }
 
+function canRejectVerificationForTask(state: EventPrepState, profile: Profile, task: LiveTask) {
+  if (["super_admin", "admin"].includes(profile.role)) return true;
+  if (task.assignedVerifierIds.includes(profile.id)) return true;
+  const workstream = taskDetails(state, task).workstream || "General";
+  return state.areaAccess
+    .filter((access) => access.profileId === profile.id && access.areaId === task.areaId && access.role === "verifier")
+    .some((access) => (
+      matchesAccessWorkstream(access, workstream, "verificationWorkstreams", "workstreams") &&
+      access.data?.canVerify !== false &&
+      (access.data?.canReject !== false || access.data?.canRequestCorrection !== false)
+    ));
+}
+
 function matchingScopedProfileIds(state: EventPrepState, areaId: string, workstream: string, role: UserRole, intent: "view" | "verify" = "view") {
   return state.areaAccess
     .filter((access) => access.areaId === areaId && access.role === role && matchesAccessWorkstream(access, workstream, intent === "verify" ? "verificationWorkstreams" : "workstreams", "workstreams"))
@@ -6484,12 +6536,87 @@ function scopedAreaAccessRow(profileId: string, areaId: string, role: UserRole):
   return { id: `access-${profileId}-${areaId}-${role}`, profileId, areaId, role, data: defaultAreaAccessScope(role) };
 }
 
-function defaultAreaAccessScope(role: UserRole): AreaAccess["data"] {
+function defaultAreaAccessScope(role: UserRole): AreaAccessScope {
   if (role === "report_user") return { workstreams: [], canViewTasks: true, canUpdateTasks: true, canSubmitReports: true, canRaiseRequests: true };
-  if (role === "verifier") return { verificationWorkstreams: [], canVerify: true, canRequestCorrection: true, canReject: true, canViewEvidence: true };
+  if (role === "verifier") return { verificationWorkstreams: [], canVerify: true, canRequestCorrection: true, canReject: true, canViewEvidence: true, canReviewRequests: true, canManageUsers: true };
   if (role === "viewer") return { workstreams: [], canViewTasks: true, canViewReports: true, canViewDashboard: true, readOnly: true };
   if (role === "area_admin") return { workstreams: [], canViewTasks: true, canUpdateTasks: true, canSubmitReports: true, canRaiseRequests: true, canManageUsers: true };
   return {};
+}
+
+function accessScopeForRole(role: UserRole, scope: AreaAccess["data"] = {}): AreaAccessScope {
+  const defaults = defaultAreaAccessScope(role) || {};
+  const base = { ...defaults, ...(scope || {}) };
+  const taskWorkstreams = Array.isArray(scope?.workstreams) ? scope.workstreams : Array.isArray(scope?.verificationWorkstreams) ? scope.verificationWorkstreams : Array.isArray(defaults.workstreams) ? defaults.workstreams : undefined;
+  const verificationWorkstreams = Array.isArray(scope?.verificationWorkstreams) ? scope.verificationWorkstreams : Array.isArray(scope?.workstreams) ? scope.workstreams : Array.isArray(defaults.verificationWorkstreams) ? defaults.verificationWorkstreams : undefined;
+  if (role === "verifier") return { ...base, verificationWorkstreams: verificationWorkstreams || [] };
+  if (role === "report_user" || role === "area_admin" || role === "viewer") return { ...base, workstreams: taskWorkstreams || [] };
+  return base;
+}
+
+function areaScopeAllows(state: EventPrepState, profile: Profile, areaId: string | undefined, key: keyof AreaAccessScope, defaultAllowed = true) {
+  if (["super_admin", "admin"].includes(profile.role)) return true;
+  const accessRows = state.areaAccess.filter((access) => access.profileId === profile.id && access.role === profile.role && (!areaId || access.areaId === areaId));
+  if (!accessRows.length) return defaultAllowed;
+  return accessRows.some((access) => {
+    const value = accessScopeForRole(profile.role, access.data)?.[key];
+    return value === undefined ? defaultAllowed : value !== false;
+  });
+}
+
+function accessScopeAllows(state: EventPrepState, profile: Profile, key: keyof AreaAccessScope, defaultAllowed = true) {
+  return areaScopeAllows(state, profile, undefined, key, defaultAllowed);
+}
+
+function canSubmitReportsForProfile(state: EventPrepState, profile: Profile, areaId?: string) {
+  if (["super_admin", "admin"].includes(profile.role)) return true;
+  if (profile.role === "report_user" || profile.role === "area_admin") return areaScopeAllows(state, profile, areaId, "canSubmitReports", true);
+  return areaScopeAllows(state, profile, areaId, "canSubmitReports", false);
+}
+
+function canRaiseRequestsForProfile(state: EventPrepState, profile: Profile, areaId?: string) {
+  if (["super_admin", "admin"].includes(profile.role)) return true;
+  if (profile.role === "report_user" || profile.role === "area_admin") return areaScopeAllows(state, profile, areaId, "canRaiseRequests", true);
+  return areaScopeAllows(state, profile, areaId, "canRaiseRequests", false);
+}
+
+function canReviewRequestsForProfile(state: EventPrepState, profile: Profile, areaId?: string) {
+  if (["super_admin", "admin"].includes(profile.role)) return true;
+  if (profile.role === "verifier") return areaScopeAllows(state, profile, areaId, "canReviewRequests", true);
+  return canRaiseRequestsForProfile(state, profile, areaId);
+}
+
+function roleTabsForProfile(state: EventPrepState | undefined, profile: Profile): AnyTab[] {
+  if (["super_admin", "admin"].includes(profile.role)) return ADMIN_TABS;
+  if (!state) {
+    if (profile.role === "area_admin") return AREA_ADMIN_TABS;
+    if (profile.role === "verifier") return VERIFIER_TABS;
+    if (profile.role === "viewer") return VIEWER_TABS;
+    return USER_TABS;
+  }
+  if (profile.role === "viewer") return viewerTabsFor(state, profile);
+  if (profile.role === "area_admin") {
+    return [
+      ...(accessScopeAllows(state, profile, "canViewTasks", true) ? ["My Area" as const] : []),
+      ...(accessScopeAllows(state, profile, "canManageUsers", true) ? ["Users & Access" as const] : []),
+      ...(canRaiseRequestsForProfile(state, profile) ? ["Requests" as const] : []),
+      "Profile / Access"
+    ];
+  }
+  if (profile.role === "verifier") {
+    return [
+      ...(accessScopeAllows(state, profile, "canVerify", true) ? ["Verification" as const] : []),
+      ...(canReviewRequestsForProfile(state, profile) ? ["Requests" as const] : []),
+      ...(accessScopeAllows(state, profile, "canManageUsers", true) ? ["Users & Access" as const] : []),
+      "Profile / Access"
+    ];
+  }
+  return [
+    ...(canSubmitReportsForProfile(state, profile) ? ["Daily Report" as const] : []),
+    ...(accessScopeAllows(state, profile, "canViewTasks", true) ? ["My Area" as const] : []),
+    ...(canRaiseRequestsForProfile(state, profile) ? ["Requests" as const] : []),
+    "Profile / Access"
+  ];
 }
 
 function accessSummaryText(state: EventPrepState, profile: Profile) {
