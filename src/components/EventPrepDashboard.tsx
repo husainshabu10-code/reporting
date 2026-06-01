@@ -2108,7 +2108,7 @@ function LiveTaskEditorModal({
   }, []);
 
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
+    const onKey = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") close();
     };
     window.addEventListener("keydown", onKey);
@@ -5079,7 +5079,7 @@ function InsightTrigger({
       if (popover?.contains(event.target as Node)) return;
       setOpen(false);
     };
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
     };
     window.addEventListener("pointerdown", handlePointerDown);
