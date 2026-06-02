@@ -28,6 +28,21 @@ import type {
 const STORAGE_KEY = "ashara-event-prep-phase-1";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const MAX_EVIDENCE_FILE_SIZE = 15 * 1024 * 1024;
+const ALLOWED_EVIDENCE_EXTENSIONS = new Set(["csv", "doc", "docx", "heic", "jpeg", "jpg", "pdf", "png", "txt", "webp", "xls", "xlsx"]);
+const ALLOWED_EVIDENCE_MIME_TYPES = new Set([
+  "application/msword",
+  "application/pdf",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "image/heic",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "text/csv",
+  "text/plain"
+]);
 
 let client: SupabaseClient | null = null;
 
@@ -160,10 +175,20 @@ export async function saveEventPrepState(state: EventPrepState, profile?: Profil
 export async function uploadTaskEvidence(file: File, liveTaskId: string) {
   const db = eventPrepSupabase();
   if (!db) return { storagePath: "" };
+  validateEvidenceFile(file);
   const storagePath = `${liveTaskId}/${Date.now()}-${safeFileName(file.name)}`;
   const { error } = await db.storage.from("task-evidence").upload(storagePath, file, { upsert: false });
   if (error) throw error;
   return { storagePath };
+}
+
+function validateEvidenceFile(file: File) {
+  if (file.size > MAX_EVIDENCE_FILE_SIZE) throw new Error("Evidence file is too large. Upload files up to 15 MB.");
+  const extension = file.name.split(".").pop()?.toLowerCase() || "";
+  const mimeType = file.type.toLowerCase();
+  if (!ALLOWED_EVIDENCE_EXTENSIONS.has(extension) || (mimeType && !ALLOWED_EVIDENCE_MIME_TYPES.has(mimeType))) {
+    throw new Error("Evidence file type is not allowed. Upload an image, PDF, document, spreadsheet, CSV, or text file.");
+  }
 }
 
 export function subscribeToEventPrepChanges(onChange: () => void) {

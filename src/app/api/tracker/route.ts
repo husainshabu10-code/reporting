@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { TrackerTask } from "@/lib/asharaTrackerData";
+import type { Profile } from "@/lib/eventPrepTypes";
 import type { SharedChartConfig, SharedTrackerActivity, SharedTrackerContact, SharedTrackerEquipment, SharedTrackerState } from "@/lib/sharedTrackerStore";
 
 export const dynamic = "force-dynamic";
@@ -26,9 +27,10 @@ type TrackerAction =
   | { action: "upsertActivity"; activity: SharedTrackerActivity[] }
   | { action: "saveChartConfig"; chartConfig: SharedChartConfig };
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const db = serverSupabase();
+    await requireTrackerAdmin(db, request);
     const state = await loadState(db);
     return NextResponse.json(state, { headers: noStoreHeaders() });
   } catch (error) {
@@ -39,6 +41,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const db = serverSupabase();
+    await requireTrackerAdmin(db, request);
     const body = await request.json() as TrackerAction;
     switch (body.action) {
       case "seed":
@@ -92,16 +95,64 @@ export async function POST(request: Request) {
 
 function serverSupabase() {
   const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("Server Supabase URL or service role key is missing.");
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+function authSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.SUPABASE_PUBLISHABLE_KEY ||
-    process.env.SUPABASE_ANON_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_PUBLISHABLE_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
     process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
     process.env.VITE_SUPABASE_ANON_KEY;
-  if (!url || !key) throw new Error("Supabase environment variables are missing on the server.");
+  if (!url || !key) throw secureError("Supabase auth environment variables are missing.", 500);
   return createClient(url, key, { auth: { persistSession: false } });
+}
+
+async function requireTrackerAdmin(db: TrackerDbClient, request: Request) {
+  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  if (!token) throw secureError("Missing signed-in Supabase session.", 401);
+  const { data, error } = await authSupabase().auth.getUser(token);
+  if (error || !data.user) throw secureError("Invalid session.", 401);
+  const profile = await getProfile(db, data.user.id, data.user.email || "");
+  if (!profile || profile.status !== "active") throw secureError("Tracker access denied.", 403);
+  if (!["super_admin", "admin"].includes(profile.role)) throw secureError("Tracker access is admin-only.", 403);
+}
+
+async function getProfile(db: TrackerDbClient, id: string, email?: string) {
+  let { data, error } = await db.from("profiles").select("*").eq("id", id).maybeSingle();
+  if (error) throw new Error(formatSupabaseError(error, "Unable to load profile."));
+  if (!data && email) {
+    const fallback = await db.from("profiles").select("*").eq("email", email.toLowerCase()).maybeSingle();
+    data = fallback.data;
+    error = fallback.error;
+    if (error) throw new Error(formatSupabaseError(error, "Unable to load profile."));
+  }
+  return data ? profileFromRow(data as Record<string, unknown>) : null;
+}
+
+function profileFromRow(row: Record<string, unknown>): Profile {
+  if (row.data && typeof row.data === "object" && "id" in row.data) {
+    const profile = row.data as Profile;
+    return {
+      ...profile,
+      status: row.status as Profile["status"],
+      mustChangePassword: Boolean(row.must_change_password ?? profile.mustChangePassword)
+    };
+  }
+  return {
+    id: String(row.id || ""),
+    email: String(row.email || ""),
+    fullName: String(row.full_name || ""),
+    role: row.role as Profile["role"],
+    status: row.status as Profile["status"],
+    mustChangePassword: Boolean(row.must_change_password),
+    createdBy: row.created_by ? String(row.created_by) : undefined
+  };
 }
 
 async function loadState(db: TrackerDbClient): Promise<SharedTrackerState<SharedTrackerContact, SharedTrackerActivity>> {
@@ -247,7 +298,12 @@ async function loadSinglePayload<T>(db: TrackerDbClient, table: string, id: stri
 
 function errorResponse(error: unknown) {
   const message = error instanceof Error ? error.message : "Tracker database request failed.";
-  return NextResponse.json({ error: message }, { status: 500, headers: noStoreHeaders() });
+  const status = typeof (error as { status?: unknown })?.status === "number" ? (error as { status: number }).status : 500;
+  return NextResponse.json({ error: message }, { status, headers: noStoreHeaders() });
+}
+
+function secureError(message: string, status: number) {
+  return Object.assign(new Error(message), { status });
 }
 
 function noStoreHeaders() {

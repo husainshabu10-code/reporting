@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { AreaRequest, InAppNotification } from "@/lib/eventPrepTypes";
 
 export const dynamic = "force-dynamic";
+const PUBLIC_ACCESS_REQUESTS_ENABLED = process.env.ENABLE_PUBLIC_ACCESS_REQUESTS === "true";
 
 type AccessRequestBody = {
   name?: string;
@@ -15,6 +16,7 @@ type AccessRequestBody = {
 
 export async function GET() {
   try {
+    if (!PUBLIC_ACCESS_REQUESTS_ENABLED) return publicAccessDisabledResponse();
     const db = serverSupabase();
     const [{ data: areas, error: areaError }, { data: zones, error: zoneError }] = await Promise.all([
       db.from("areas").select("id,name,zone_type_id,active").eq("active", true).order("name"),
@@ -38,6 +40,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    if (!PUBLIC_ACCESS_REQUESTS_ENABLED) return publicAccessDisabledResponse();
     const db = serverSupabase();
     const body = await request.json() as AccessRequestBody;
     const name = clean(body.name);
@@ -184,4 +187,11 @@ function slug(value: string) {
 
 function noStoreHeaders() {
   return { "Cache-Control": "no-store, max-age=0" };
+}
+
+function publicAccessDisabledResponse() {
+  return NextResponse.json(
+    { error: "Public access requests are disabled. Ask an admin to create or update user access." },
+    { status: 404, headers: noStoreHeaders() }
+  );
 }

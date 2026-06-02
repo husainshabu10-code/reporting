@@ -3750,7 +3750,13 @@ function clamp(value: number, min: number, max: number) {
 }
 
 function escapeCsv(value: string) {
-  return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+  const safeValue = neutralizeSpreadsheetFormula(value);
+  return /[",\n\r]/.test(safeValue) ? `"${safeValue.replace(/"/g, '""')}"` : safeValue;
+}
+
+function neutralizeSpreadsheetFormula(value: string) {
+  const trimmedStart = value.trimStart();
+  return /^[=+\-@]/.test(trimmedStart) ? `'${value}` : value;
 }
 
 function slug(value: string) {

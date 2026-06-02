@@ -412,6 +412,44 @@ as $$
     )
 $$;
 
+create or replace function public.can_submit_reports_for_area(target_area_id text)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select public.is_admin()
+    or exists (
+      select 1
+      from public.area_access aa
+      cross join lateral (select coalesce(aa.data->'data', aa.data, '{}'::jsonb) as scope) scope_data
+      where aa.profile_id = public.current_profile_id()
+        and aa.area_id = target_area_id
+        and aa.role in ('report_user','area_admin')
+        and coalesce((scope_data.scope->>'canSubmitReports')::boolean, true)
+    )
+$$;
+
+create or replace function public.can_raise_requests_for_area(target_area_id text)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select public.is_admin()
+    or exists (
+      select 1
+      from public.area_access aa
+      cross join lateral (select coalesce(aa.data->'data', aa.data, '{}'::jsonb) as scope) scope_data
+      where aa.profile_id = public.current_profile_id()
+        and aa.area_id = target_area_id
+        and aa.role in ('report_user','area_admin')
+        and coalesce((scope_data.scope->>'canRaiseRequests')::boolean, true)
+    )
+$$;
+
 create or replace function public.has_live_task_access(target_task_id text, target_intent text default 'view')
 returns boolean
 language sql
@@ -657,8 +695,8 @@ create policy "Area users read live tasks" on public.live_tasks for select using
 create policy "Admins manage live tasks" on public.live_tasks for all using (public.is_admin()) with check (public.is_admin());
 
 create policy "Area users read reports" on public.daily_reports for select using (public.has_area_access(area_id));
-create policy "Area users write reports" on public.daily_reports for insert with check (public.has_area_access(area_id));
-create policy "Area users update reports" on public.daily_reports for update using (public.has_area_access(area_id)) with check (public.has_area_access(area_id));
+create policy "Area users write reports" on public.daily_reports for insert with check (public.can_submit_reports_for_area(area_id));
+create policy "Area users update reports" on public.daily_reports for update using (public.can_submit_reports_for_area(area_id)) with check (public.can_submit_reports_for_area(area_id));
 create policy "Admins delete reports" on public.daily_reports for delete using (public.is_admin());
 
 create policy "Area users read task updates" on public.task_updates for select using (
@@ -687,15 +725,15 @@ create policy "Area users update task updates" on public.task_updates for update
 );
 
 create policy "Area users read files" on public.task_files for select using (
-  exists (select 1 from public.live_tasks lt where lt.id = live_task_id and public.has_area_access(lt.area_id))
+  public.has_live_task_access(live_task_id, 'view') or public.has_live_task_access(live_task_id, 'verify')
 );
 create policy "Area users add files" on public.task_files for insert with check (
-  exists (select 1 from public.live_tasks lt where lt.id = live_task_id and public.has_area_access(lt.area_id))
+  public.has_live_task_access(live_task_id, 'update')
 );
 create policy "Admins manage files" on public.task_files for all using (public.is_admin()) with check (public.is_admin());
 
 create policy "Area users read task verifiers" on public.task_verifiers for select using (
-  exists (select 1 from public.live_tasks lt where lt.id = live_task_id and public.has_area_access(lt.area_id))
+  public.has_live_task_access(live_task_id, 'view') or public.has_live_task_access(live_task_id, 'verify')
 );
 create policy "Admins manage task verifiers" on public.task_verifiers for all using (public.is_admin()) with check (public.is_admin());
 
@@ -703,11 +741,11 @@ create policy "Assigned verifiers and admins read verification logs" on public.v
   public.is_admin() or verifier_id = public.current_profile_id()
 );
 create policy "Assigned verifiers create verification logs" on public.verification_logs for insert with check (
-  public.is_admin() or verifier_id = public.current_profile_id()
+  public.is_admin() or (verifier_id = public.current_profile_id() and public.has_live_task_access(live_task_id, 'verify'))
 );
 
-create policy "Area users read requests" on public.requests for select using (public.has_area_access(area_id) or requested_by = public.current_profile_id());
-create policy "Area users create requests" on public.requests for insert with check (requested_by = public.current_profile_id() and public.has_area_access(area_id));
+create policy "Area users read requests" on public.requests for select using (public.can_raise_requests_for_area(area_id) or requested_by = public.current_profile_id());
+create policy "Area users create requests" on public.requests for insert with check (requested_by = public.current_profile_id() and public.can_raise_requests_for_area(area_id));
 create policy "Admins manage requests" on public.requests for all using (public.is_admin()) with check (public.is_admin());
 create policy "Reviewers read assigned requests" on public.requests for select using (
   exists (
@@ -732,7 +770,7 @@ create policy "Reviewers update assigned requests" on public.requests for update
 
 create policy "Admins manage request reviews" on public.request_reviews for all using (public.is_admin()) with check (public.is_admin());
 create policy "Reviewer reads own request reviews" on public.request_reviews for select using (reviewer_id = public.current_profile_id() or public.is_admin());
-create policy "Reviewers create own request reviews" on public.request_reviews for insert with check (reviewer_id = public.current_profile_id());
+create policy "Reviewers create own request reviews" on public.request_reviews for insert with check (public.is_admin());
 create policy "Reviewers update own request reviews" on public.request_reviews for update using (reviewer_id = public.current_profile_id()) with check (reviewer_id = public.current_profile_id());
 
 create policy "Authenticated read form fields" on public.form_fields for select using (auth.role() = 'authenticated');
@@ -753,7 +791,7 @@ create policy "Area users read task evidence" on storage.objects for select usin
   and exists (
     select 1 from public.live_tasks lt
     where lt.id = split_part(name, '/', 1)
-      and public.has_area_access(lt.area_id)
+      and (public.has_live_task_access(lt.id, 'view') or public.has_live_task_access(lt.id, 'verify'))
   )
 );
 create policy "Authenticated upload task evidence" on storage.objects for insert with check (
@@ -762,7 +800,7 @@ create policy "Authenticated upload task evidence" on storage.objects for insert
   and exists (
     select 1 from public.live_tasks lt
     where lt.id = split_part(name, '/', 1)
-      and public.has_area_access(lt.area_id)
+      and public.has_live_task_access(lt.id, 'update')
   )
 );
 create policy "Admins manage task evidence" on storage.objects for all using (

@@ -44,17 +44,26 @@ async function saveState(db: ServerDb, state: EventPrepState, actor: Profile) {
   const isAdmin = ["super_admin", "admin"].includes(actor.role);
 
   if (!isAdmin) {
-    const allowedAreaIds = new Set(state.areaAccess.filter((access) => access.profileId === actor.id).map((access) => access.areaId));
-    const allowedTaskIds = scopedTaskIdsForProfile(state, actor, actor.role === "verifier" ? "verify" : "update");
-    const reviewRequestIds = new Set(state.requestReviews.filter((review) => review.reviewerId === actor.id).map((review) => review.requestId));
-    const writableNotifications = state.notifications.filter((notification) => notification.userId === actor.id || (notification.areaId && allowedAreaIds.has(notification.areaId)));
+    const authoritativeScope = await loadAuthoritativeSyncScope(db, actor);
+    const scopeState: EventPrepState = {
+      ...state,
+      areaAccess: authoritativeScope.areaAccess,
+      liveTasks: authoritativeScope.liveTasks,
+      taskTemplates: authoritativeScope.taskTemplates,
+      requestReviews: authoritativeScope.requestReviews
+    };
+    const reportAreaIds = new Set(authoritativeScope.areaAccess.filter((access) => canSubmitReportsInScope(access, actor)).map((access) => access.areaId));
+    const requestAreaIds = new Set(authoritativeScope.areaAccess.filter((access) => canRaiseRequestsInScope(access, actor)).map((access) => access.areaId));
+    const allowedTaskIds = scopedTaskIdsForProfile(scopeState, actor, actor.role === "verifier" ? "verify" : "update");
+    const reviewRequestIds = new Set(authoritativeScope.requestReviews.filter((review) => review.reviewerId === actor.id).map((review) => review.requestId));
+    const writableNotifications = state.notifications.filter((notification) => notification.userId === actor.id);
 
-    await upsertRows(db, "daily_reports", state.dailyReports.filter((report) => allowedAreaIds.has(report.areaId)).map(reportToDb));
+    await upsertRows(db, "daily_reports", state.dailyReports.filter((report) => reportAreaIds.has(report.areaId)).map(reportToDb));
     await upsertRows(db, "task_updates", state.taskUpdates.filter((update) => allowedTaskIds.has(update.liveTaskId) && (update.updatedBy === actor.id || actor.role === "verifier")).map(updateToDb));
     await upsertRows(db, "task_files", state.taskFiles.filter((file) => allowedTaskIds.has(file.liveTaskId)).map(fileToDb));
-    await upsertRows(db, "verification_logs", state.verificationLogs.filter((log) => log.verifierId === actor.id).map(verificationLogToDb));
-    await upsertRows(db, "requests", state.requests.filter((request) => request.requestedBy === actor.id || reviewRequestIds.has(request.id)).map(requestToDb));
-    await upsertRows(db, "request_reviews", state.requestReviews.filter((review) => review.reviewerId === actor.id).map(requestReviewToDb));
+    await upsertRows(db, "verification_logs", state.verificationLogs.filter((log) => log.verifierId === actor.id && allowedTaskIds.has(log.liveTaskId)).map(verificationLogToDb));
+    await upsertRows(db, "requests", state.requests.filter((request) => (request.requestedBy === actor.id && requestAreaIds.has(request.areaId)) || reviewRequestIds.has(request.id)).map(requestToDb));
+    await upsertRows(db, "request_reviews", state.requestReviews.filter((review) => review.reviewerId === actor.id && reviewRequestIds.has(review.requestId)).map(requestReviewToDb));
     await upsertRows(db, "in_app_notifications", writableNotifications.map(notificationToDb));
     return;
   }
@@ -93,6 +102,35 @@ async function saveState(db: ServerDb, state: EventPrepState, actor: Profile) {
   await upsertRows(db, "report_exports", state.reportExports.map(reportExportToDb));
   await upsertRows(db, "global_options", state.globalOptions.map(globalOptionToDb));
   await upsertRows(db, "form_fields", state.formFields.map(formFieldToDb));
+}
+
+async function loadAuthoritativeSyncScope(db: ServerDb, actor: Profile) {
+  const [areaAccessResult, liveTasksResult, taskTemplatesResult, requestReviewsResult] = await Promise.all([
+    db.from("area_access").select("*").eq("profile_id", actor.id),
+    db.from("live_tasks").select("*"),
+    db.from("task_templates").select("*"),
+    db.from("request_reviews").select("*").eq("reviewer_id", actor.id)
+  ]);
+  if (areaAccessResult.error) throw new Error(`area_access: ${areaAccessResult.error.message}`);
+  if (liveTasksResult.error) throw new Error(`live_tasks: ${liveTasksResult.error.message}`);
+  if (taskTemplatesResult.error) throw new Error(`task_templates: ${taskTemplatesResult.error.message}`);
+  if (requestReviewsResult.error) throw new Error(`request_reviews: ${requestReviewsResult.error.message}`);
+  return {
+    areaAccess: ((areaAccessResult.data || []) as Array<Record<string, unknown>>).map(areaAccessFromRow),
+    liveTasks: ((liveTasksResult.data || []) as Array<Record<string, unknown>>).map(liveTaskFromRow),
+    taskTemplates: ((taskTemplatesResult.data || []) as Array<Record<string, unknown>>).map(taskTemplateFromRow),
+    requestReviews: ((requestReviewsResult.data || []) as Array<Record<string, unknown>>).map(requestReviewFromRow)
+  };
+}
+
+function canSubmitReportsInScope(access: AreaAccess, actor: Profile) {
+  if (access.profileId !== actor.id) return false;
+  return (access.role === "report_user" || access.role === "area_admin") && access.data?.canSubmitReports !== false;
+}
+
+function canRaiseRequestsInScope(access: AreaAccess, actor: Profile) {
+  if (access.profileId !== actor.id) return false;
+  return (access.role === "report_user" || access.role === "area_admin") && access.data?.canRaiseRequests !== false;
 }
 
 function scopedTaskIdsForProfile(state: EventPrepState, profile: Profile, intent: "view" | "update" | "verify" = "view") {
@@ -194,6 +232,84 @@ function profileFromRow(row: Record<string, unknown>): Profile {
 
 function profileToDb(item: Profile) {
   return { id: item.id, email: item.email, full_name: item.fullName, role: item.role, status: item.status, must_change_password: item.mustChangePassword, created_by: item.createdBy || null, data: item, updated_at: new Date().toISOString() };
+}
+
+function areaAccessFromRow(row: Record<string, unknown>): AreaAccess {
+  const data = row.data && typeof row.data === "object" ? row.data as Partial<AreaAccess> : {};
+  return {
+    id: String(row.id || data.id || ""),
+    profileId: String(row.profile_id || data.profileId || ""),
+    areaId: String(row.area_id || data.areaId || ""),
+    role: (row.role || data.role) as Profile["role"],
+    data: data.data
+  };
+}
+
+function taskTemplateFromRow(row: Record<string, unknown>): TaskTemplate {
+  const data = row.data && typeof row.data === "object" ? row.data as Partial<TaskTemplate> : {};
+  return {
+    id: String(row.id || data.id || ""),
+    source: data.source,
+    day: Number(row.prep_day ?? data.day ?? 1),
+    priorityLevel: (row.priority_level || data.priorityLevel || "Medium") as TaskTemplate["priorityLevel"],
+    mainObjective: String(row.main_objective || data.mainObjective || ""),
+    workstream: String(row.workstream || data.workstream || "General"),
+    taskDetails: String(row.task_details || data.taskDetails || ""),
+    responsibleTeam: String(row.responsible_team || data.responsibleTeam || ""),
+    followUpQuestions: String(row.follow_up_questions || data.followUpQuestions || ""),
+    requiredEquipment: String(row.required_equipment || data.requiredEquipment || ""),
+    expectedOutput: String(row.expected_output || data.expectedOutput || ""),
+    testingRequired: String(row.testing_required || data.testingRequired || ""),
+    hiddenReference: data.hiddenReference || (row.hidden_reference as TaskTemplate["hiddenReference"]) || {},
+    importedAt: String(data.importedAt || row.created_at || row.updated_at || new Date().toISOString())
+  };
+}
+
+function liveTaskFromRow(row: Record<string, unknown>): LiveTask {
+  const data = row.data && typeof row.data === "object" ? row.data as Partial<LiveTask> : {};
+  return {
+    id: String(row.id || data.id || ""),
+    templateId: String(row.template_id || data.templateId || ""),
+    areaId: String(row.area_id || data.areaId || ""),
+    taskDetails: data.taskDetails,
+    mainObjective: data.mainObjective,
+    workstream: data.workstream,
+    responsibleTeam: data.responsibleTeam,
+    followUpQuestions: data.followUpQuestions,
+    requiredEquipment: data.requiredEquipment,
+    expectedOutput: data.expectedOutput,
+    testingRequired: data.testingRequired,
+    taskType: (row.task_type || data.taskType || "Simple Task") as LiveTask["taskType"],
+    prepDay: Number(row.prep_day ?? data.prepDay ?? 1),
+    startDate: String(row.start_date || data.startDate || ""),
+    dueDate: String(row.due_date || data.dueDate || ""),
+    actualCompletionDate: data.actualCompletionDate || (row.actual_completion_date ? String(row.actual_completion_date) : undefined),
+    priority: (row.priority || data.priority || "Medium") as LiveTask["priority"],
+    requiredQuantity: row.required_quantity === null || row.required_quantity === undefined ? data.requiredQuantity : Number(row.required_quantity),
+    unit: String(row.unit || data.unit || ""),
+    assignedProfileIds: Array.isArray(row.assigned_profile_ids) ? row.assigned_profile_ids.map(String) : data.assignedProfileIds || [],
+    assignedVerifierIds: Array.isArray(row.assigned_verifier_ids) ? row.assigned_verifier_ids.map(String) : data.assignedVerifierIds || [],
+    verificationRequired: Boolean(row.verification_required ?? data.verificationRequired),
+    verificationRule: (row.verification_rule || data.verificationRule || "one_verifier") as LiveTask["verificationRule"],
+    evidenceNote: data.evidenceNote || (row.evidence_note ? String(row.evidence_note) : undefined),
+    active: Boolean(row.active ?? data.active ?? true),
+    notApplicable: Boolean(row.not_applicable ?? data.notApplicable),
+    delayReason: data.delayReason || (row.delay_reason ? String(row.delay_reason) : undefined),
+    revisedDueDate: data.revisedDueDate || (row.revised_due_date ? String(row.revised_due_date) : undefined)
+  };
+}
+
+function requestReviewFromRow(row: Record<string, unknown>): RequestReview {
+  const data = row.data && typeof row.data === "object" ? row.data as Partial<RequestReview> : {};
+  return {
+    id: String(row.id || data.id || ""),
+    requestId: String(row.request_id || data.requestId || ""),
+    reviewerId: String(row.reviewer_id || data.reviewerId || ""),
+    comment: String(row.comment || data.comment || ""),
+    recommendation: String(row.recommendation || data.recommendation || ""),
+    completed: Boolean(row.completed ?? data.completed),
+    createdAt: String(row.created_at || data.createdAt || row.updated_at || new Date().toISOString())
+  };
 }
 
 function zoneTypeToDb(item: ZoneType) {

@@ -6076,8 +6076,13 @@ function exportLiveTasksCsv(state: EventPrepState) {
 }
 
 function csvCell(value: string | number) {
-  const text = String(value ?? "");
+  const text = neutralizeSpreadsheetFormula(String(value ?? ""));
   return `"${text.replace(/"/g, "\"\"")}"`;
+}
+
+function neutralizeSpreadsheetFormula(value: string) {
+  const trimmedStart = value.trimStart();
+  return /^[=+\-@]/.test(trimmedStart) ? `'${value}` : value;
 }
 
 function openPrintableReport(title: string, bodyHtml: string) {
@@ -6850,14 +6855,27 @@ function createTaskUpdate(task: LiveTask, report: DailyReport, profileId: string
   };
 }
 
-async function parsePreparationPlan(file: File): Promise<TaskTemplate[]> {
+const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_IMPORT_EXTENSIONS = new Set(["csv", "xls", "xlsx"]);
+
+function validatePreparationImportFile(file: File) {
   const extension = file.name.split(".").pop()?.toLowerCase();
+  if (!file.size) throw new Error("Import file is empty. Upload a CSV, XLS, or XLSX file with task rows.");
+  if (file.size > MAX_IMPORT_FILE_SIZE) throw new Error("Import file is too large. Upload CSV, XLS, or XLSX files up to 5 MB.");
+  if (!extension || !ALLOWED_IMPORT_EXTENSIONS.has(extension)) throw new Error("Import file type is not allowed. Upload CSV, XLS, or XLSX only.");
+  return extension;
+}
+
+async function parsePreparationPlan(file: File): Promise<TaskTemplate[]> {
+  const extension = validatePreparationImportFile(file);
   if (extension === "csv") return rowsToTemplates(parseCsv(await file.text()));
   const XLSX = await import("xlsx");
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
+  if (!workbook.SheetNames.length) throw new Error("Import workbook has no readable sheets.");
   const sheetName = workbook.SheetNames.find((name) => name.toLowerCase() === "day plan") || workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
+  if (!sheet) throw new Error("Import workbook sheet could not be read.");
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
   return rowsToTemplates(rows);
 }

@@ -108,7 +108,7 @@ async function resetPassword(db: ServerDb, actor: Profile & { authUserId?: strin
   const authUserId = await resolveAuthUserId(db, target);
   const { error } = await db.auth.admin.updateUserById(authUserId, { password: temporaryPassword });
   if (error) throw new Error(error.message);
-  const profile = { ...target, mustChangePassword: false };
+  const profile = { ...target, mustChangePassword: true };
   await upsertProfile(db, profile);
   await createInAppNotification(db, profile.id, undefined, "Access request approved/rejected", "Password reset", "Super Admin reset your password.");
   return { profile, temporaryPassword };

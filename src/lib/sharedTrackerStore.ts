@@ -46,6 +46,9 @@ type PayloadRow<T> = {
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const CHART_CONFIG_ID = "global-dashboard-config";
+const MAX_EQUIPMENT_PHOTO_SIZE = 8 * 1024 * 1024;
+const ALLOWED_EQUIPMENT_PHOTO_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
+const ALLOWED_EQUIPMENT_PHOTO_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 let client: SupabaseClient | null = null;
 
 export function isSharedDatabaseConfigured() {
@@ -68,11 +71,7 @@ export function currentSharedUser() {
 
 export async function loadSharedTrackerState<Contact extends SharedTrackerContact, ActivityEntry extends SharedTrackerActivity>(): Promise<SharedTrackerState<Contact, ActivityEntry> | null> {
   if (typeof window !== "undefined") {
-    try {
-      return await trackerApiRequest<SharedTrackerState<Contact, ActivityEntry>>();
-    } catch {
-      // Fall through to direct Supabase client if public realtime variables are available.
-    }
+    return await trackerApiRequest<SharedTrackerState<Contact, ActivityEntry>>();
   }
   const db = supabase();
   if (!db) return null;
@@ -186,6 +185,7 @@ export async function deleteSharedEquipment(equipmentId: string) {
 export async function uploadEquipmentPhoto(file: File, path: string) {
   const db = supabase();
   if (!db) throw new Error("Shared database is not configured.");
+  validateEquipmentPhoto(file, path);
   const { error } = await db.storage.from("equipment-photos").upload(path, file, {
     cacheControl: "3600",
     upsert: true
@@ -193,6 +193,19 @@ export async function uploadEquipmentPhoto(file: File, path: string) {
   if (error) throw error;
   const { data } = db.storage.from("equipment-photos").getPublicUrl(path);
   return data.publicUrl;
+}
+
+function validateEquipmentPhoto(file: File, path: string) {
+  if (!path.startsWith("equipment/") || path.includes("..") || path.includes("\\")) {
+    throw new Error("Equipment photo path is not allowed.");
+  }
+  if (!file.size) throw new Error("Equipment photo is empty.");
+  if (file.size > MAX_EQUIPMENT_PHOTO_SIZE) throw new Error("Equipment photo is too large. Upload images up to 8 MB.");
+  const extension = file.name.split(".").pop()?.toLowerCase() || "";
+  const mimeType = file.type.toLowerCase();
+  if (!ALLOWED_EQUIPMENT_PHOTO_EXTENSIONS.has(extension) || (mimeType && !ALLOWED_EQUIPMENT_PHOTO_MIME_TYPES.has(mimeType))) {
+    throw new Error("Equipment photo type is not allowed. Upload JPG, PNG, or WebP images only.");
+  }
 }
 
 export async function upsertSharedCities(cities: string[]) {
@@ -299,9 +312,10 @@ async function loadSinglePayload<T>(db: SupabaseClient, table: string, id: strin
 }
 
 async function trackerApiRequest<T>(body?: unknown): Promise<T> {
+  const headers = await trackerApiHeaders(Boolean(body));
   const response = await fetch("/api/tracker", {
     method: body ? "POST" : "GET",
-    headers: body ? { "Content-Type": "application/json" } : undefined,
+    headers: Object.keys(headers).length ? headers : undefined,
     body: body ? JSON.stringify(body) : undefined,
     cache: "no-store"
   });
@@ -310,15 +324,22 @@ async function trackerApiRequest<T>(body?: unknown): Promise<T> {
   return data as T;
 }
 
+async function trackerApiHeaders(hasBody: boolean) {
+  const headers: Record<string, string> = hasBody ? { "Content-Type": "application/json" } : {};
+  const db = supabase();
+  let token: string | undefined;
+  if (db) {
+    const { data } = await db.auth.getSession();
+    token = data.session?.access_token;
+  }
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
 async function trackerApiMutation(body: unknown) {
   if (typeof window === "undefined") return false;
-  try {
-    await trackerApiRequest<{ ok: boolean }>(body);
-    return true;
-  } catch (error) {
-    if (supabase()) return false;
-    throw error;
-  }
+  await trackerApiRequest<{ ok: boolean }>(body);
+  return true;
 }
 
 function slugId(value: string) {
