@@ -423,7 +423,7 @@ as $$
     select
       lt.id,
       lt.area_id,
-      lower(coalesce(nullif(lt.data->>'workstream', ''), 'General')) as workstream,
+      lower(regexp_replace(trim(coalesce(nullif(lt.data->>'workstream', ''), 'General')), '[[:space:]]+', ' ', 'g')) as workstream,
       lt.assigned_profile_ids,
       lt.assigned_verifier_ids
     from public.live_tasks lt
@@ -434,6 +434,7 @@ as $$
       select 1
       from task_scope lt
       where (target_intent <> 'verify' and public.current_profile_id() = any(lt.assigned_profile_ids))
+         or (target_intent <> 'update' and public.current_profile_id() = any(lt.assigned_verifier_ids))
          or (target_intent = 'verify' and public.current_profile_id() = any(lt.assigned_verifier_ids))
     )
     or exists (
@@ -443,20 +444,48 @@ as $$
       cross join lateral (select coalesce(aa.data->'data', aa.data, '{}'::jsonb) as scope) scope_data
       cross join lateral (
         select case
-          when target_intent = 'verify' then coalesce(scope_data.scope->'verificationWorkstreams', scope_data.scope->'workstreams')
+          when target_intent = 'verify' or aa.role = 'verifier' then coalesce(scope_data.scope->'verificationWorkstreams', scope_data.scope->'workstreams')
           else scope_data.scope->'workstreams'
         end as workstreams
       ) scope_workstreams
       where (
-        (target_intent = 'verify' and aa.role = 'verifier')
-        or (target_intent <> 'verify' and aa.role in ('area_admin','report_user','viewer','verifier'))
+        (
+          aa.role = 'area_admin'
+          and (
+            (
+              target_intent <> 'verify'
+              and coalesce((scope_data.scope->>'canViewTasks')::boolean, true)
+              and (target_intent <> 'update' or coalesce((scope_data.scope->>'canUpdateTasks')::boolean, true))
+            )
+            or (
+              target_intent = 'verify'
+              and coalesce((scope_data.scope->>'canVerify')::boolean, false)
+            )
+          )
+        )
+        or (
+          aa.role = 'report_user'
+          and target_intent <> 'verify'
+          and coalesce((scope_data.scope->>'canViewTasks')::boolean, true)
+          and (target_intent <> 'update' or coalesce((scope_data.scope->>'canUpdateTasks')::boolean, true))
+        )
+        or (
+          aa.role = 'viewer'
+          and target_intent = 'view'
+          and coalesce((scope_data.scope->>'canViewTasks')::boolean, true)
+        )
+        or (
+          aa.role = 'verifier'
+          and target_intent <> 'update'
+          and coalesce((scope_data.scope->>'canVerify')::boolean, true)
+        )
       )
       and (
         scope_workstreams.workstreams is null
         or exists (
           select 1
           from jsonb_array_elements_text(scope_workstreams.workstreams) ws(value)
-          where lower(ws.value) = lt.workstream
+          where lower(regexp_replace(trim(ws.value), '[[:space:]]+', ' ', 'g')) = lt.workstream
         )
       )
     )
@@ -637,11 +666,11 @@ create policy "Area users read task updates" on public.task_updates for select u
 );
 create policy "Area users write task updates" on public.task_updates for insert with check (
   updated_by = public.current_profile_id()
-  and public.has_live_task_access(live_task_id, 'view')
+  and public.has_live_task_access(live_task_id, 'update')
 );
 create policy "Area users update task updates" on public.task_updates for update using (
   public.is_admin()
-  or updated_by = public.current_profile_id()
+  or (updated_by = public.current_profile_id() and public.has_live_task_access(live_task_id, 'update'))
   or exists (
     select 1 from public.live_tasks lt
     where lt.id = live_task_id
@@ -649,7 +678,7 @@ create policy "Area users update task updates" on public.task_updates for update
   )
 ) with check (
   public.is_admin()
-  or updated_by = public.current_profile_id()
+  or (updated_by = public.current_profile_id() and public.has_live_task_access(live_task_id, 'update'))
   or exists (
     select 1 from public.live_tasks lt
     where lt.id = live_task_id

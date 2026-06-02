@@ -672,7 +672,7 @@ function DashboardTab({
     areas: allowedAreas,
     liveTasks: scopedTasks,
     dailyReports: state.dailyReports.filter((report) => allowedAreaIds.includes(report.areaId)),
-    requests: state.requests.filter((request) => allowedAreaIds.includes(request.areaId))
+    requests: state.requests.filter((request) => allowedAreaIds.includes(request.areaId) && (!request.relatedLiveTaskId || allowedTaskIds.has(request.relatedLiveTaskId)))
   }).filter((item) => presentationMode ? !["Pending Requests", "Rejected / Needs Correction Tasks"].includes(item.label) : true);
   const dayRows = dayOptions.map((day) => {
     const tasks = scopedTasks.filter((task) => String(task.prepDay) === day);
@@ -1215,7 +1215,7 @@ function DailyReportsTab({
     areas: state.areas.filter((area) => allowedAreaIds.includes(area.id)),
     liveTasks: state.liveTasks.filter((task) => allowedAreaIds.includes(task.areaId) && allowedTaskIds.has(task.id)),
     dailyReports: state.dailyReports.filter((report) => allowedAreaIds.includes(report.areaId)),
-    requests: state.requests.filter((request) => allowedAreaIds.includes(request.areaId))
+    requests: state.requests.filter((request) => allowedAreaIds.includes(request.areaId) && (!request.relatedLiveTaskId || allowedTaskIds.has(request.relatedLiveTaskId)))
   };
   const metrics = buildMetricsForAreas(state, allowedAreaIds, allowedTaskIds);
   const todayReports = scopedState.dailyReports.filter((report) => report.reportDate === today);
@@ -2581,7 +2581,7 @@ function TaskCard({
       const without = current.taskUpdates.filter((update) => update.id !== next.id);
       const nextReport = current.dailyReports.some((item) => item.id === report.id) ? current.dailyReports : [report, ...current.dailyReports];
       const verifierNotifications = next.verificationStatus === "Needs Verification"
-        ? task.assignedVerifierIds.map((verifierId) => createInAppNotification(verifierId, "Task needs verification", "Task needs verification", details.taskDetails || "A task is ready for verification.", { areaId: task.areaId, relatedTaskId: task.id, relatedDailyReportId: report.id }))
+        ? verificationPoolIds(current, task).map((verifierId) => createInAppNotification(verifierId, "Task needs verification", "Task needs verification", details.taskDetails || "A task is ready for verification.", { areaId: task.areaId, relatedTaskId: task.id, relatedDailyReportId: report.id }))
         : [];
       return withActivity({ ...current, dailyReports: nextReport, taskUpdates: [next, ...without], notifications: [...verifierNotifications, ...current.notifications] }, currentProfile, "Task updates", `Updated task: ${details.taskDetails}`, "task_update", next.id, { status: next.status });
     });
@@ -2861,18 +2861,29 @@ function RequestsTab({ state, currentProfile, updateState, showToast }: { state:
   const [details, setDetails] = useState("");
   const [reviewerByRequest, setReviewerByRequest] = useState<Record<string, string>>({});
   const assignedReviewRequestIds = new Set(state.requestReviews.filter((review) => review.reviewerId === currentProfile.id && !review.completed).map((review) => review.requestId));
-  const visibleRequests = isAdmin
-    ? state.requests
-    : currentProfile.role === "verifier"
-      ? state.requests.filter((request) => assignedReviewRequestIds.has(request.id))
-      : state.requests.filter((request) => requestAreas.some((area) => area.id === request.areaId));
+  const canSeeRequest = (request: AreaRequest) => {
+    if (isAdmin) return true;
+    if (currentProfile.role === "verifier") return assignedReviewRequestIds.has(request.id);
+    if (request.relatedLiveTaskId) {
+      const relatedTask = state.liveTasks.find((task) => task.id === request.relatedLiveTaskId);
+      return Boolean(relatedTask && hasTaskScopeAccess(state, currentProfile, relatedTask, "view"));
+    }
+    return requestAreas.some((area) => area.id === request.areaId);
+  };
+  const visibleRequests = state.requests.filter(canSeeRequest);
   const verifierOptions = (requestAreaId: string, relatedTaskId?: string) => {
     const relatedTask = relatedTaskId ? state.liveTasks.find((task) => task.id === relatedTaskId) : undefined;
     const workstream = relatedTask ? taskDetails(state, relatedTask).workstream || "General" : undefined;
     return state.profiles.filter((profile) => (
       profile.role === "verifier" &&
       profile.status === "active" &&
-      state.areaAccess.some((access) => access.profileId === profile.id && access.areaId === requestAreaId && access.role === "verifier" && (!workstream || matchesAccessWorkstream(access, workstream, "verificationWorkstreams", "workstreams")))
+      state.areaAccess.some((access) => (
+        access.profileId === profile.id &&
+        access.areaId === requestAreaId &&
+        access.role === "verifier" &&
+        accessScopeForRole("verifier", access.data).canReviewRequests !== false &&
+        (!workstream || matchesAccessWorkstream(access, workstream, "verificationWorkstreams", "workstreams"))
+      ))
     ));
   };
 
@@ -2959,7 +2970,7 @@ function RequestsTab({ state, currentProfile, updateState, showToast }: { state:
           ...targetVerifierIds.map((targetId) => createInAppNotification(targetId, "Request status changed", `Review request: ${request.title}`, "Admin sent this request to your area verifier queue.", { areaId: request.areaId, relatedRequestId: request.id })),
           ...current.notifications
         ]
-      }, currentProfile, "Requests", "Sent request for area verifier review", "request", request.id, { reviewerIds: targetVerifierIds });
+      }, currentProfile, "Requests", "Sent request for area verifier review", "request", request.id, { reviewerIds: targetVerifierIds.join(", ") });
     });
     showToast("Sent for verification", reviewerId ? "The selected verifier will see it in their queue." : "All active verifiers assigned to this area will see it in their queue.", "info");
   };
@@ -4369,7 +4380,11 @@ function buildReportPreviewData(state: EventPrepState, filters: {
   const dailyReports = state.dailyReports.filter((report) => areaIds.includes(report.areaId) && (!reportDate || report.reportDate === reportDate));
   const reportIds = new Set(dailyReports.map((report) => report.id));
   const updates = state.taskUpdates.filter((update) => taskIds.has(update.liveTaskId) && (!reportIds.size || reportIds.has(update.dailyReportId)));
-  const requests = state.requests.filter((request) => areaIds.includes(request.areaId) && (filters.requestStatus === "All" || request.status === filters.requestStatus));
+  const requests = state.requests.filter((request) => (
+    areaIds.includes(request.areaId) &&
+    (!request.relatedLiveTaskId || taskIds.has(request.relatedLiveTaskId)) &&
+    (filters.requestStatus === "All" || request.status === filters.requestStatus)
+  ));
   const verifiedTasks = tasks.filter((task) => latest.get(task.id)?.verificationStatus === "Verified Completed");
   const inProgressTasks = tasks.filter((task) => latest.get(task.id)?.status === "In Progress");
   const pendingTasks = tasks.filter((task) => !latest.get(task.id) || latest.get(task.id)?.status === "Pending");
@@ -6478,7 +6493,7 @@ function buildMetricsForAreas(state: EventPrepState, allowedAreaIds: string[], a
     areas: state.areas.filter((area) => allowedAreaIds.includes(area.id)),
     liveTasks: state.liveTasks.filter((task) => allowedAreaIds.includes(task.areaId) && (!allowedTaskIds || allowedTaskIds.has(task.id))),
     dailyReports: state.dailyReports.filter((report) => allowedAreaIds.includes(report.areaId)),
-    requests: state.requests.filter((request) => allowedAreaIds.includes(request.areaId))
+    requests: state.requests.filter((request) => allowedAreaIds.includes(request.areaId) && (!request.relatedLiveTaskId || !allowedTaskIds || allowedTaskIds.has(request.relatedLiveTaskId)))
   };
   return buildMetrics(scopedState);
 }
@@ -6545,13 +6560,13 @@ function visibleTasksForProfile(state: EventPrepState, profile: Profile, intent:
 function hasTaskScopeAccess(state: EventPrepState, profile: Profile, task: LiveTask, intent: "view" | "update" | "verify" = "view") {
   if (["super_admin", "admin"].includes(profile.role)) return true;
   if (task.assignedProfileIds.includes(profile.id) && intent !== "verify") return true;
-  if (task.assignedVerifierIds.includes(profile.id) && intent === "verify") return true;
+  if (task.assignedVerifierIds.includes(profile.id) && intent !== "update") return true;
   const workstream = taskDetails(state, task).workstream || "General";
   const accessRows = state.areaAccess.filter((access) => access.profileId === profile.id && access.areaId === task.areaId && access.role === profile.role);
   return accessRows.some((access) => {
     if (access.role === "area_admin") return matchesAccessWorkstream(access, workstream, "workstreams") && (intent !== "verify" || Boolean(access.data?.canVerify)) && (intent !== "update" || access.data?.canUpdateTasks !== false);
     if (access.role === "report_user") return intent !== "verify" && matchesAccessWorkstream(access, workstream, "workstreams") && access.data?.canViewTasks !== false && (intent !== "update" || access.data?.canUpdateTasks !== false);
-    if (access.role === "verifier") return matchesAccessWorkstream(access, workstream, "verificationWorkstreams", "workstreams") && (intent !== "verify" || access.data?.canVerify !== false);
+    if (access.role === "verifier") return intent !== "update" && matchesAccessWorkstream(access, workstream, "verificationWorkstreams", "workstreams") && access.data?.canVerify !== false;
     if (access.role === "viewer") return intent === "view" && matchesAccessWorkstream(access, workstream, "workstreams") && access.data?.canViewTasks !== false;
     return false;
   });
@@ -6572,9 +6587,22 @@ function canRejectVerificationForTask(state: EventPrepState, profile: Profile, t
 
 function matchingScopedProfileIds(state: EventPrepState, areaId: string, workstream: string, role: UserRole, intent: "view" | "verify" = "view") {
   return state.areaAccess
-    .filter((access) => access.areaId === areaId && access.role === role && matchesAccessWorkstream(access, workstream, intent === "verify" ? "verificationWorkstreams" : "workstreams", "workstreams"))
+    .filter((access) => (
+      access.areaId === areaId &&
+      access.role === role &&
+      matchesAccessWorkstream(access, workstream, intent === "verify" ? "verificationWorkstreams" : "workstreams", "workstreams") &&
+      accessRowAllowsIntent(access, intent)
+    ))
     .map((access) => access.profileId)
     .filter((profileId) => state.profiles.some((profile) => profile.id === profileId && profile.status === "active"));
+}
+
+function accessRowAllowsIntent(access: AreaAccess, intent: "view" | "verify" = "view") {
+  const scope = accessScopeForRole(access.role, access.data);
+  if (intent === "verify") return access.role === "verifier" && scope.canVerify !== false;
+  if (access.role === "report_user" || access.role === "viewer") return scope.canViewTasks !== false;
+  if (access.role === "area_admin") return scope.canViewTasks !== false;
+  return false;
 }
 
 function matchesAccessWorkstream(access: AreaAccess, workstream: string, primaryKey: "workstreams" | "verificationWorkstreams", fallbackKey?: "workstreams") {
@@ -6587,7 +6615,7 @@ function matchesAccessWorkstream(access: AreaAccess, workstream: string, primary
 }
 
 function normalizeScopeValue(value: string) {
-  return value.trim().toLowerCase();
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function scopedAreaAccessRow(profileId: string, areaId: string, role: UserRole): AreaAccess {

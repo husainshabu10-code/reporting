@@ -347,7 +347,7 @@ function scopedTaskIdsForProfile(state: EventPrepState, profile: Profile, intent
 
 function hasTaskScopeAccess(state: EventPrepState, profile: Profile, task: LiveTask, intent: "view" | "update" | "verify" = "view") {
   if (["super_admin", "admin"].includes(profile.role)) return true;
-  if (intent === "verify" && task.assignedVerifierIds.includes(profile.id)) return true;
+  if (intent !== "update" && task.assignedVerifierIds.includes(profile.id)) return true;
   if (intent !== "verify" && task.assignedProfileIds.includes(profile.id)) return true;
 
   const workstream = taskWorkstream(state, task);
@@ -355,7 +355,7 @@ function hasTaskScopeAccess(state: EventPrepState, profile: Profile, task: LiveT
     if (access.profileId !== profile.id || access.areaId !== task.areaId || access.role !== profile.role) return false;
     if (access.role === "area_admin") return matchesAccessWorkstream(access, workstream, "workstreams") && (intent !== "verify" || Boolean(access.data?.canVerify)) && (intent !== "update" || access.data?.canUpdateTasks !== false);
     if (access.role === "report_user") return intent !== "verify" && matchesAccessWorkstream(access, workstream, "workstreams") && access.data?.canViewTasks !== false && (intent !== "update" || access.data?.canUpdateTasks !== false);
-    if (access.role === "verifier") return matchesAccessWorkstream(access, workstream, "verificationWorkstreams", "workstreams") && (intent !== "verify" || access.data?.canVerify !== false);
+    if (access.role === "verifier") return intent !== "update" && matchesAccessWorkstream(access, workstream, "verificationWorkstreams", "workstreams") && access.data?.canVerify !== false;
     if (access.role === "viewer") return intent === "view" && matchesAccessWorkstream(access, workstream, "workstreams") && access.data?.canViewTasks !== false;
     return false;
   });
